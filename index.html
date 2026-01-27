@@ -1,0 +1,1837 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bunch Bets V6.0 Final - Nassau + Digits</title>
+<style>
+:root { --bg:#0b0e13; --card:#0f1420; --txt:#ecf0f6; --muted:#a3a9b6; --border:#1e2633; --acc:#3b82f6; --success:#16a34a; --danger:#dc2626; --warning:#d97706; color-scheme: light dark; }
+* { box-sizing:border-box; }
+body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; color:var(--txt); background:var(--bg); }
+header { background:var(--card); border-bottom:1px solid var(--border); padding:10px 12px; position:sticky; top:0; z-index:10; }
+h1 { font-size:18px; margin:0; }
+main { padding:12px; }
+.row { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-start; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:12px; }
+.btn { background:var(--card); border:1px solid var(--border); border-radius:999px; padding:8px 12px; cursor:pointer; color:var(--txt); transition:all 0.2s; }
+.btn:hover:not(:disabled) { transform:translateY(-1px); }
+.btn:disabled { opacity:0.5; cursor:not-allowed; }
+.btn.primary { background:var(--acc); color:#fff; border-color:var(--acc); }
+.btn.danger { background:var(--danger); color:#fff; border-color:var(--danger); }
+.btn.share { background:var(--success); color:#fff; font-weight:600; }
+.btn.small { padding:6px 10px; font-size:14px; }
+.pill { border:1px solid var(--border); padding:6px 10px; border-radius:999px; display:inline-block; background:rgba(255,255,255,0.02); }
+.grid { display:grid; gap:8px; }
+.grid-2 { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.grid-3 { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.muted { color:var(--muted); }
+.nowrap { white-space:nowrap; }
+input[type="text"], input[type="tel"], input[type="number"], select { border:1px solid var(--border); border-radius:10px; padding:10px 12px; width:100%; font-size:16px; min-height:44px; color:var(--txt); background:rgba(255,255,255,0.06); }
+input:focus, select:focus { outline:2px solid var(--acc); outline-offset:1px; }
+::placeholder { color:var(--muted); opacity:0.9; }
+table { border-collapse:collapse; width:100%; font-size:14px; }
+th, td { border:1px solid var(--border); padding:6px; text-align:center; vertical-align:middle; }
+th.sticky, td.sticky { position:sticky; left:0; background:var(--card); z-index:10; text-align:left; transform:translateZ(0); backface-visibility:hidden; }
+.tabs { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 10px; }
+.tabs .btn.active { background:var(--acc); color:#fff; border-color:var(--acc); }
+.scroll { overflow:auto; isolation:isolate; }
+.note { font-size:12px; color:var(--muted); }
+.error { position:fixed; bottom:8px; left:8px; right:8px; background:#fee2e2; color:#991b1b; border:1px solid #fecaca; border-radius:12px; padding:8px 12px; font-size:12px; display:none; z-index:9999; white-space:pre-wrap; }
+.success-toast { position:fixed; top:70px; right:8px; background:var(--success); color:#fff; border-radius:12px; padding:12px 16px; z-index:9999; animation:slideIn 0.3s; box-shadow:0 4px 12px rgba(0,0,0,0.3); }
+@keyframes slideIn { from { transform:translateX(400px); opacity:0; } to { transform:translateX(0); opacity:1; } }
+.theme-g1 .card { outline:1px solid rgba(22,163,74,.45); background:linear-gradient(0deg,rgba(22,163,74,.08),rgba(22,163,74,.08)) var(--card); }
+.theme-g2 .card { outline:1px solid rgba(220,38,38,.45); background:linear-gradient(0deg,rgba(220,38,38,.08),rgba(220,38,38,.08)) var(--card); }
+.theme-g3 .card { outline:1px solid rgba(217,119,6,.45); background:linear-gradient(0deg,rgba(217,119,6,.08),rgba(217,119,6,.08)) var(--card); }
+.theme-g4 .card { outline:1px solid rgba(99,102,241,.45); background:linear-gradient(0deg,rgba(99,102,241,.08),rgba(99,102,241,.08)) var(--card); }
+.theme-g5 .card { outline:1px solid rgba(20,184,166,.45); background:linear-gradient(0deg,rgba(20,184,166,.08),rgba(20,184,166,.08)) var(--card); }
+.theme-g6 .card { outline:1px solid rgba(219,39,119,.45); background:linear-gradient(0deg,rgba(219,39,119,.08),rgba(219,39,119,.08)) var(--card); }
+.cellWrap { position:relative; }
+.cellWrap input { width:54px; text-align:center; padding-right:14px; }
+.cellWrap .dots { position:absolute; right:2px; top:4px; display:flex; flex-direction:column; gap:2px; pointer-events:none; z-index:1; }
+.cellWrap .dot { width:6px; height:6px; border-radius:50%; }
+.cellWrap .dot.g1 { background-color:#16a34a; }
+.cellWrap .dot.g2 { background-color:#dc2626; }
+.cellWrap .dot.g3 { background-color:#d97706; }
+.cellWrap .dot.g4 { background-color:#6366f1; }
+.cellWrap .dot.g5 { background-color:#14b8a6; }
+.cellWrap .dot.g6 { background-color:#db2777; }
+.junkWrap { position:relative; display:inline-block; }
+.junkBox { width:48px; height:36px; text-align:center; font-size:20px; padding:6px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.22); position:relative; z-index:2; border-radius:6px; }
+.junkVal { position:absolute; top:8px; right:6px; font-size:12px; pointer-events:none; z-index:1; }
+.junkWrap .junkBox:not(:placeholder-shown) + .junkVal { display:none; }
+.junkWrap:focus-within .junkVal { display:none; }
+.game-options-row { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,0.8fr); gap:16px 20px; align-items:start; }
+@media (max-width: 360px) { .game-options-row { grid-template-columns:1fr; } }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#f6f7fb; --card:#fff; --txt:#111; --muted:#666; --border:#e5e7eb; --acc:#2563eb; }
+  .theme-g1 .card { outline:1px solid rgba(22,163,74,.35); background:linear-gradient(0deg,rgba(22,163,74,.10),rgba(22,163,74,.10)) var(--card); }
+  .theme-g2 .card { outline:1px solid rgba(220,38,38,.35); background:linear-gradient(0deg,rgba(220,38,38,.10),rgba(220,38,38,.10)) var(--card); }
+  .theme-g3 .card { outline:1px solid rgba(217,119,6,.35); background:linear-gradient(0deg,rgba(217,119,6,.10),rgba(217,119,6,.10)) var(--card); }
+  .theme-g4 .card { outline:1px solid rgba(99,102,241,.35); background:linear-gradient(0deg,rgba(99,102,241,.10),rgba(99,102,241,.10)) var(--card); }
+  .theme-g5 .card { outline:1px solid rgba(20,184,166,.35); background:linear-gradient(0deg,rgba(20,184,166,.10),rgba(20,184,166,.10)) var(--card); }
+  .theme-g6 .card { outline:1px solid rgba(219,39,119,.35); background:linear-gradient(0deg,rgba(219,39,119,.10),rgba(219,39,119,.10)) var(--card); }
+  input, .junkBox { background:#f3f4f6; border-color:#d1d5db; }
+  .press-row { background:rgba(0,0,0,0.02); }
+}
+.ios .junkWrap .junkBox { color:transparent; -webkit-text-fill-color:transparent; caret-color:var(--txt); z-index:1; }
+.ios .junkWrap .junkVal { position:absolute; inset:0; display:flex !important; align-items:center; justify-content:center; z-index:2; color:var(--txt); -webkit-text-fill-color:var(--txt); transform:translateZ(0); }
+select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
+.press-row { background:rgba(255,255,255,0.02); }
+.press-label { font-weight:600; font-size:12px; }
+.digits-display { font-size:20px; font-weight:700; font-family:monospace; color:var(--acc); }
+.points-positive { color:var(--success); font-weight:600; }
+.points-negative { color:var(--danger); font-weight:600; }
+</style>
+</head>
+<body>
+<header>
+  <div class="row" style="align-items:center; justify-content:space-between;">
+    <h1>Bunch Bets V6.0 Complete</h1>
+    <div class="row">
+      <button class="btn small" id="resetBtn">New Round</button>
+      <button class="btn small" id="clearBtn">Clear Scores</button>
+      <button class="btn small" id="factoryBtn">Factory Reset</button>
+    </div>
+  </div>
+</header>
+<main>
+  <div id="tabs"></div>
+  <div id="app"></div>
+</main>
+<div id="err" class="error"></div>
+
+<script>
+
+(function(){
+'use strict';
+
+// === CONSTANTS ===
+const STORAGE_KEY = 'nassauV28_complete';
+const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
+
+// === UTILITIES ===
+const Utils = {
+  fmt: n => isFinite(n) ? (n<0?'-':'') + '$' + Math.abs(n).toFixed(2) : '$0.00',
+  make18: fill => Array(HOLES).fill(fill),
+  uid: () => Math.random().toString(36).slice(2) + Date.now().toString(36),
+  sanitize: v => String(v).replace(/[^0-9]/g, ''),
+  sumRange(arr, start, end) {
+    let total = 0, has = false;
+    for (let i = start; i <= end && i < arr.length; i++) {
+      const v = arr[i];
+      if (v != null && isFinite(+v)) { total += +v; has = true; }
+    }
+    return has ? total : null;
+  },
+  clone: obj => JSON.parse(JSON.stringify(obj))
+};
+
+// === ERROR HANDLER ===
+const Err = {
+  box: document.getElementById('err'),
+  show(msg) {
+    console.error(msg);
+    this.box.textContent = msg;
+    this.box.style.display = 'block';
+    setTimeout(() => this.box.style.display = 'none', 5000);
+  },
+  toast(msg) {
+    const t = document.createElement('div');
+    t.className = 'success-toast';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 2000);
+  }
+};
+
+window.addEventListener('error', ev => Err.show(`Error: ${ev.message}`));
+
+// === STATE MANAGER ===
+const State = {
+  data: {
+    tab: 'setup',
+    players: [{id:'p1',name:'P1'},{id:'p2',name:'P2'},{id:'p3',name:'P3'},{id:'p4',name:'P4'},{id:'p5',name:'P5'}],
+    games: [],
+    course: {
+      name: 'El Macero',
+      hcp: [7,15,9,1,11,3,17,13,5,4,2,10,8,12,14,18,6,16],
+      par: [4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5]
+    },
+    settings: { thTop: 12, thMin: 5 },
+    debugStatus: false
+  },
+  presets: {
+    'El Macero': { hcp:[7,15,9,1,11,3,17,13,5,4,2,10,8,12,14,18,6,16], par:[4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5] },
+    'El Macero Temp': { hcp:[3,11,17,7,13,1,15,9,5,4,12,18,8,14,2,16,10,6], par:[4,5,3,4,5,4,3,4,4,4,5,3,4,5,4,3,4,4] }
+  },
+  locks: 0,
+  saveTimer: null,
+  renderTimer: null,
+
+  begin() { this.locks++; },
+  end() {
+    this.locks = Math.max(0, this.locks - 1);
+    if (!this.locks) {
+      this.scheduleSave();
+      this.scheduleRender();
+    }
+  },
+
+  scheduleSave() {
+    clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => {
+      try {
+        const saveData = {...this.data, presets: this.presets};
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
+      } catch(e) {
+        Err.show('Save failed: ' + e.message);
+      }
+    }, 200);
+  },
+
+  scheduleRender() {
+    if (this.locks > 0) return;
+    clearTimeout(this.renderTimer);
+    this.renderTimer = setTimeout(() => {
+      try { UI.render(); }
+      catch(e) { Err.show('Render failed: ' + e.message); }
+    }, 120);
+  },
+
+  load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      const obj = JSON.parse(raw);
+      if (obj.players && Array.isArray(obj.players)) this.data.players = obj.players;
+      if (obj.games && Array.isArray(obj.games)) this.data.games = obj.games.map(Game.sanitize);
+      if (obj.course) this.data.course = obj.course;
+      if (obj.presets) this.presets = obj.presets;
+      if (obj.settings) this.data.settings = obj.settings;
+      this.data.tab = obj.tab || 'setup';
+      this.data.debugStatus = !!obj.debugStatus;
+      return true;
+    } catch(e) {
+      Err.show('Load failed: ' + e.message);
+      return false;
+    }
+  }
+};
+
+// === GAME LOGIC ===
+const Game = {
+  create(clone = false) {
+    const g = {
+      id: Utils.uid(),
+      gameType: 'nassau',
+      teamA: ['p1','p2'],
+      teamB: ['p3','p4'],
+      teamSize: 2,
+      scoringMode: 'hi_low',
+      stakes: {front:2, back:4, overall:2},
+      autoPress: {front:true, back:true, overall:false},
+      junkValue: {front:1, back:2},
+      pointValue: {front:1, back:1},
+      presses: Utils.make18(''),
+      gross: {},
+      junkCounts: {},
+      strokesCount: {}
+    };
+    State.data.players.forEach(p => {
+      g.junkCounts[p.id] = Utils.make18(0);
+      g.strokesCount[p.id] = 0;
+      g.gross[p.id] = clone && State.data.games[0] ? [...State.data.games[0].gross[p.id]] : Utils.make18(null);
+    });
+    return g;
+  },
+
+  sanitize(g) {
+    if (!g) return this.create();
+    g.id = g.id || Utils.uid();
+    g.gameType = ['nassau','vegas'].includes(g.gameType) ? g.gameType : 'nassau';
+
+    const maxTeamSize = g.gameType === 'vegas' ? 2 : (g.teamSize || 2);
+    g.teamSize = [1,2].includes(g.teamSize) ? g.teamSize : 2;
+    g.scoringMode = ['hi_low','low_net'].includes(g.scoringMode) ? g.scoringMode : 'hi_low';
+    g.teamA = (g.teamA || []).slice(0, maxTeamSize);
+    g.teamB = (g.teamB || []).slice(0, maxTeamSize);
+    g.stakes = g.stakes || {front:2,back:4,overall:2};
+    ['front','back','overall'].forEach(k => g.stakes[k] = Math.max(0, parseInt(g.stakes[k])||0));
+    g.autoPress = g.autoPress || {front:true,back:true,overall:false};
+    g.junkValue = g.junkValue || {front:1,back:2};
+    ['front','back'].forEach(k => g.junkValue[k] = Math.max(0, parseInt(g.junkValue[k])||0));
+    g.pointValue = g.pointValue || {front:1,back:1};
+    ['front','back'].forEach(k => g.pointValue[k] = Math.max(0, parseFloat(g.pointValue[k])||1));
+
+    let pa = Array.isArray(g.presses) ? g.presses.slice(0,18) : Utils.make18('');
+    while (pa.length < 18) pa.push('');
+    g.presses = pa.map(v => ['','press','blind'].includes(v) ? v : '');
+
+    g.gross = g.gross || {};
+    g.junkCounts = g.junkCounts || {};
+    g.strokesCount = g.strokesCount || {};
+
+    State.data.players.forEach(p => {
+      let ga = Array.isArray(g.gross[p.id]) ? g.gross[p.id].slice(0,18) : Utils.make18(null);
+      while (ga.length < 18) ga.push(null);
+      ga = ga.map(v => {
+        if (v === '' || v == null) return null;
+        const n = parseInt(v);
+        return (n >= MIN_SCORE && n <= MAX_SCORE) ? n : null;
+      });
+      g.gross[p.id] = ga;
+
+      let ja = Array.isArray(g.junkCounts[p.id]) ? g.junkCounts[p.id].slice(0,18) : Utils.make18(0);
+      while (ja.length < 18) ja.push(0);
+      g.junkCounts[p.id] = ja.map(v => Math.max(0, parseInt(v)||0));
+
+      g.strokesCount[p.id] = Math.max(0, parseInt(g.strokesCount[p.id])||0);
+    });
+    return g;
+  },
+
+  strokes(g, pid, hole) {
+    const total = g.strokesCount[pid] || 0;
+    if (!total) return 0;
+    const base = Math.floor(total / 18);
+    const rem = total % 18;
+    const rank = State.data.course.hcp[hole] || 0;
+    return base + (rank > 0 && rank <= rem ? 1 : 0);
+  },
+
+  net(gross, strokes) {
+    return (gross != null && isFinite(gross)) ? gross - (strokes||0) : null;
+  },
+
+  holeDiff(g, hole) {
+    const A = g.teamA || [], B = g.teamB || [];
+    const bestNet = (team) => {
+      let best = Infinity, has = false;
+      team.forEach(pid => {
+        const gr = g.gross[pid] && g.gross[pid][hole];
+        const n = this.net(gr, this.strokes(g, pid, hole));
+        if (n != null) { best = Math.min(best, n); has = true; }
+      });
+      return has ? best : null;
+    };
+
+    if (g.scoringMode === 'low_net' || A.length < 2 || B.length < 2) {
+      const aL = bestNet(A), bL = bestNet(B);
+      if (aL == null || bL == null) return null;
+      return aL < bL ? 1 : (bL < aL ? -1 : 0);
+    }
+
+    const a0 = g.gross[A[0]] && g.gross[A[0]][hole];
+    const a1 = g.gross[A[1]] && g.gross[A[1]][hole];
+    const b0 = g.gross[B[0]] && g.gross[B[0]][hole];
+    const b1 = g.gross[B[1]] && g.gross[B[1]][hole];
+    if (a0 == null || a1 == null || b0 == null || b1 == null) return null;
+
+    const aN0 = this.net(a0, this.strokes(g,A[0],hole));
+    const aN1 = this.net(a1, this.strokes(g,A[1],hole));
+    const bN0 = this.net(b0, this.strokes(g,B[0],hole));
+    const bN1 = this.net(b1, this.strokes(g,B[1],hole));
+
+    const aLow = Math.min(aN0,aN1), bLow = Math.min(bN0,bN1);
+    const aHi = Math.max(aN0,aN1), bHi = Math.max(bN0,bN1);
+
+    let d = 0;
+    if (aLow < bLow) d++; else if (bLow < aLow) d--;
+    if (aHi < bHi) d++; else if (bHi < aHi) d--;
+    return d;
+  },
+
+  buildSegment(g, start, end, stake, autoPress) {
+    const diffs = [];
+    for (let i = 0; i < 18; i++) diffs.push(this.holeDiff(g, i));
+
+    const lines = [{start, end, stake, pressesTriggered:0}];
+
+    if (autoPress) {
+      for (let h = start; h <= end; h++) {
+        let pressed = false;
+        lines.forEach(line => {
+          if (line.start > h || h >= end) return;
+          let cum = 0, ok = true;
+          for (let i = line.start; i <= h; i++) {
+            if (diffs[i] == null) { ok = false; break; }
+            cum += diffs[i];
+          }
+          if (!ok) return;
+          const k = Math.floor(Math.abs(cum) / 2);
+          if (k > line.pressesTriggered && !pressed) {
+            const next = h + 1;
+            if (!lines.some(l => l.start === next)) {
+              lines.push({start:next, end, stake, pressedBy:cum<0?'A':'B', pressesTriggered:0});
+              pressed = true;
+            }
+            line.pressesTriggered = k;
+          }
+        });
+      }
+    }
+
+    const winners = [];
+    let payA = 0, teamPayA = 0;
+    const szA = (g.teamA||[]).length || 1;
+    const szB = (g.teamB||[]).length || 1;
+
+    lines.forEach(line => {
+      let cum = 0, hasAnyScore = false;
+      for (let i = line.start; i <= line.end; i++) {
+        if (diffs[i] != null) {
+          cum += diffs[i];
+          hasAnyScore = true;
+        }
+      }
+
+      if (!hasAnyScore) {
+        winners.push('—');
+        return;
+      }
+
+      // Show current standing even if incomplete
+      if (cum > 0) { winners.push(`A +${cum}`); payA += line.stake; teamPayA += line.stake * szB; }
+      else if (cum < 0) { winners.push(`B ${cum}`); payA -= line.stake; teamPayA -= line.stake * szA; }
+      else winners.push('E');
+    });
+
+    return {lines, winners, payA, teamPayA};
+  },
+
+  computeJunk(g) {
+    const sumTeam = (team, s, e) => {
+      let tot = 0;
+      team.forEach(pid => {
+        const arr = g.junkCounts[pid] || [];
+        for (let h = s; h <= e; h++) tot += (arr[h] || 0);
+      });
+      return tot;
+    };
+    const aF = sumTeam(g.teamA||[], 0, 8);
+    const aB = sumTeam(g.teamA||[], 9, 17);
+    const bF = sumTeam(g.teamB||[], 0, 8);
+    const bB = sumTeam(g.teamB||[], 9, 17);
+    const aVal = aF * (g.junkValue.front||0) + aB * (g.junkValue.back||0);
+    const bVal = bF * (g.junkValue.front||0) + bB * (g.junkValue.back||0);
+    return {aVal, bVal, netA: aVal - bVal};
+  },
+
+  computeResult(g) {
+    const front = this.buildSegment(g, 0, 8, g.stakes.front, g.autoPress.front);
+    const back = this.buildSegment(g, 9, 17, g.stakes.back, g.autoPress.back);
+    const overall = this.buildSegment(g, 0, 17, g.stakes.overall, g.autoPress.overall);
+    const junk = this.computeJunk(g);
+
+    const szA = (g.teamA||[]).length || 1;
+    const szB = (g.teamB||[]).length || 1;
+    let junkTeam = 0;
+    if (junk.netA > 0) junkTeam = junk.netA * szB;
+    else if (junk.netA < 0) junkTeam = junk.netA * szA;
+
+    const total = front.teamPayA + back.teamPayA + overall.teamPayA + junkTeam;
+
+    return {
+      segments: {front, back, overall},
+      junk,
+      teamTotals: {
+        front: front.teamPayA,
+        back: back.teamPayA,
+        overall: overall.teamPayA,
+        junk: junkTeam,
+        total
+      }
+    };
+  },
+
+  computeVegasHole(g, hole) {
+    const par = State.data.course.par[hole] || 4;
+
+    const getTeamScores = (team) => {
+      if (team.length < 2) return null;
+      const p1gross = g.gross[team[0]] && g.gross[team[0]][hole];
+      const p2gross = g.gross[team[1]] && g.gross[team[1]][hole];
+      if (p1gross == null || p2gross == null) return null;
+
+      const p1net = this.net(p1gross, this.strokes(g, team[0], hole));
+      const p2net = this.net(p2gross, this.strokes(g, team[1], hole));
+
+      return {
+        p1gross, p2gross, p1net, p2net,
+        scores: [p1net, p2net].sort((a,b) => a-b)
+      };
+    };
+
+    const teamA = getTeamScores(g.teamA || []);
+    const teamB = getTeamScores(g.teamB || []);
+
+    if (!teamA || !teamB) return null;
+
+    const opponentBirdie = (team) => team.p1gross < par || team.p2gross < par;
+    const teamBogey = (team) => team.p1net > par || team.p2net > par;
+
+    const aFlip = opponentBirdie(teamB) || teamBogey(teamA);
+    const bFlip = opponentBirdie(teamA) || teamBogey(teamB);
+
+    const formNumber = (data, flip) => {
+      const [low, high] = data.scores;
+      return flip ? (high * 10 + low) : (low * 10 + high);
+    };
+
+    const numA = formNumber(teamA, aFlip);
+    const numB = formNumber(teamB, bFlip);
+    const diff = Math.abs(numA - numB);
+
+    const basePoints = numA < numB ? diff : (numA > numB ? -diff : 0);
+
+    const press = g.presses[hole] || '';
+    let multiplier = 1;
+    if (press === 'press') multiplier = 2;
+    else if (press === 'blind') multiplier = 4;
+
+    return {
+      numA,
+      numB,
+      aFlip,
+      bFlip,
+      basePoints,
+      multiplier,
+      pointsToA: basePoints * multiplier
+    };
+  },
+
+  computeVegasResult(g) {
+    let frontPoints = 0, backPoints = 0;
+    const holeDetails = [];
+
+    for (let h = 0; h < 18; h++) {
+      const result = this.computeVegasHole(g, h);
+      holeDetails.push(result);
+
+      if (result) {
+        if (h <= 8) frontPoints += result.pointsToA;
+        else backPoints += result.pointsToA;
+      }
+    }
+
+    const frontValue = frontPoints * (g.pointValue.front || 0) * 2;
+    const backValue = backPoints * (g.pointValue.back || 0) * 2;
+
+    const junk = this.computeJunk(g);
+    const szA = (g.teamA||[]).length || 1;
+    const szB = (g.teamB||[]).length || 1;
+    let junkTeam = 0;
+    if (junk.netA > 0) junkTeam = junk.netA * szB;
+    else if (junk.netA < 0) junkTeam = junk.netA * szA;
+
+    return {
+      holeDetails,
+      frontPoints,
+      backPoints,
+      frontValue,
+      backValue,
+      junkValue: junkTeam,
+      totalValue: frontValue + backValue + junkTeam
+    };
+  },
+
+  getLastScored() {
+    const g = State.data.games[0];
+    if (!g || !g.gross) return -1;
+    let last = -1;
+    for (let h = 0; h < 18; h++) {
+      for (const p of State.data.players) {
+        const v = g.gross[p.id] && g.gross[p.id][h];
+        if (v != null && v !== '') { last = h; break; }
+      }
+    }
+    return last;
+  }
+};
+
+// === DOM HELPER ===
+const h = (tag, attrs = {}, children = []) => {
+  const el = document.createElement(tag);
+  Object.entries(attrs).forEach(([k,v]) => {
+    if (k === 'class') el.className = v;
+    else if (k === 'style') el.setAttribute('style', v);
+    else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v);
+    else if (k === 'value') el.value = v ?? '';
+    else if (k === 'checked') el.checked = !!v;
+    else if (k === 'disabled') el.disabled = !!v;
+    else if (k === 'selected') el.selected = !!v;
+    else el.setAttribute(k, v);
+  });
+  (Array.isArray(children) ? children : [children]).forEach(ch => {
+    if (ch == null) return;
+    el.appendChild(typeof ch === 'string' ? document.createTextNode(ch) : ch);
+  });
+  return el;
+};
+
+// === UI ===
+const UI = {
+  playerName(id) {
+    const p = State.data.players.find(x => x.id === id);
+    return p ? p.name : id;
+  },
+
+  gameLabel(g) {
+    const abbr = (pid, used) => {
+      const nm = this.playerName(pid);
+      if (/[0-9]/.test(nm)) {
+        const s = nm.toUpperCase();
+        if (!used[s]) { used[s] = true; return s; }
+      }
+      const base = nm.replace(/[^A-Za-z]/g, '').toUpperCase() || String(pid).toUpperCase();
+      for (let len = 1; len <= Math.min(3, base.length); len++) {
+        const c = base.slice(0, len);
+        if (!used[c]) { used[c] = true; return c; }
+      }
+      const stem = base.slice(0, 2) || base;
+      let n = 2;
+      while (used[stem + n]) n++;
+      used[stem + n] = true;
+      return stem + n;
+    };
+    const used = {};
+    const a1 = g.teamA && g.teamA[0] ? abbr(g.teamA[0], used) : '';
+    const a2 = g.teamA && g.teamA[1] ? abbr(g.teamA[1], used) : '';
+    const b1 = g.teamB && g.teamB[0] ? abbr(g.teamB[0], used) : '';
+    const b2 = g.teamB && g.teamB[1] ? abbr(g.teamB[1], used) : '';
+    const left = (a1 && a2) ? `${a1}/${a2}` : (a1 || a2 || 'Team A');
+    const right = (b1 && b2) ? `${b1}/${b2}` : (b1 || b2 || 'Team B');
+
+    if (g.gameType === 'vegas') {
+      return `Vegas: ${left} vs ${right}`;
+    } else {
+      const mode = g.scoringMode === 'low_net' ? 'Best Ball' : 'Hi/Low';
+      return `${mode}: ${left} vs ${right}`;
+    }
+  },
+
+  render() {
+    if (State.locks > 0) return;
+    this.renderTabs();
+    const root = document.getElementById('app');
+    root.innerHTML = '';
+    let view;
+    switch (State.data.tab) {
+      case 'setup': view = this.setup(); break;
+      case 'scores': view = this.scores(); break;
+      case 'junk': view = this.junk(); break;
+      case 'status': view = this.status(); break;
+      case 'game': view = this.game(); break;
+      case 'transactions': view = this.transactions(); break;
+      case 'highlights': view = this.highlights(); break;
+      case 'rules': view = this.rules(); break;
+      default: view = h('div', {class:'card'}, 'Unknown tab');
+    }
+    document.querySelector('header').style.display = State.data.tab === 'setup' ? '' : 'none';
+    root.appendChild(view);
+  },
+
+  renderTabs() {
+    const tabs = [
+      ['setup','SETUP'],['scores','SCORES'],['junk','JUNK'],
+      ['status','STATUS'],['game','GAME'],['transactions','PAYMENTS'],['highlights','HIGH'],['rules','RULES']
+    ];
+    const tabsEl = document.getElementById('tabs');
+    tabsEl.innerHTML = '';
+    tabs.forEach(([id, label]) => {
+      tabsEl.appendChild(h('button', {
+        class: `btn small ${State.data.tab === id ? 'active primary' : ''}`,
+        onclick: () => {
+          if (document.activeElement && document.activeElement.blur) {
+            try { document.activeElement.blur(); } catch(e) {}
+          }
+          State.data.tab = id;
+          State.scheduleRender();
+        }
+      }, label));
+    });
+  },
+
+  setup() {
+    // Players
+    const playerInputs = State.data.players.map(p =>
+      h('div', {style:'display:grid;grid-template-columns:64px 1fr;gap:8px;'}, [
+        h('span', {class:'muted',style:'text-align:right;'}, p.id),
+        h('input', {
+          type:'text', value:p.name,
+          onfocus:() => State.begin(),
+          oninput:(e) => p.name = e.target.value,
+          onblur:() => State.end()
+        })
+      ])
+    );
+
+    // Course
+    const presetSel = h('select', {
+      onchange:(e) => {
+        const pr = State.presets[e.target.value];
+        if (pr) {
+          State.data.course.hcp = [...pr.hcp];
+          State.data.course.par = [...pr.par];
+          State.data.course.name = e.target.value;
+          State.scheduleSave();
+          State.scheduleRender();
+        }
+      }
+    });
+    Object.keys(State.presets).forEach(nm => {
+      presetSel.appendChild(h('option', {value:nm, selected:nm===State.data.course.name}, nm));
+    });
+
+    const hcpHead = [h('th',{class:'sticky'},'HOLE')];
+    for (let i = 0; i < 18; i++) hcpHead.push(h('th',{},String(i+1)));
+    const parRow = [h('td',{class:'sticky'},'PAR')];
+    for (let i = 0; i < 18; i++) {
+      parRow.push(h('td',{},[
+        h('input',{
+          type:'tel',inputmode:'numeric',value:State.data.course.par[i]||4,
+          style:'width:56px;text-align:center;',
+          onfocus:()=>State.begin(),
+          oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},
+          onblur:(e)=>{
+            const v = Math.min(6, Math.max(3, parseInt(e.target.value)||4));
+            State.data.course.par[i] = v;
+            e.target.value = String(v);
+            State.end();
+          }
+        })
+      ]));
+    }
+    const hcpRow = [h('td',{class:'sticky'},'HCP')];
+    for (let i = 0; i < 18; i++) {
+      hcpRow.push(h('td',{},[
+        h('input',{
+          type:'tel',inputmode:'numeric',value:State.data.course.hcp[i],
+          style:'width:56px;text-align:center;',
+          onfocus:()=>State.begin(),
+          oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},
+          onblur:(e)=>{
+            const v = Math.min(18, Math.max(1, parseInt(e.target.value)||1));
+            State.data.course.hcp[i] = v;
+            e.target.value = String(v);
+            State.end();
+          }
+        })
+      ]));
+    }
+
+    const courseCard = h('div',{class:'card'},[
+      h('div',{class:'pill'},'Course Handicap'),
+      h('div',{style:'margin-top:8px;'},presetSel),
+      h('div',{class:'note',style:'margin-top:6px;'},`Loaded: ${State.data.course.name}`),
+      h('div',{class:'card scroll',style:'margin-top:8px;'},
+        h('table',{},[
+          h('thead',{},[h('tr',{},hcpHead)]),
+          h('tbody',{},[h('tr',{},parRow),h('tr',{},hcpRow)])
+        ])
+      ),
+      h('button',{class:'btn small',style:'margin-top:8px;',onclick:()=>{
+        const nm = prompt('Name this preset:');
+        if (!nm) return;
+        State.presets[nm] = {hcp:[...State.data.course.hcp], par:[...State.data.course.par]};
+        State.data.course.name = nm;
+        State.scheduleSave();
+        State.scheduleRender();
+        Err.toast('Preset saved');
+      }},'Save as New Preset')
+    ]);
+
+    // Games
+    const gamesHeader = h('div',{class:'row',style:'align-items:center;justify-content:space-between;'},[
+      h('div',{class:'pill'},'Games'),
+      h('button',{class:'btn small',onclick:()=>{
+        const ng = Game.create(true);
+        State.data.games.push(ng);
+        State.scheduleSave();
+        State.scheduleRender();
+      }},'Add Game')
+    ]);
+
+    const gameCards = State.data.games.map((g,idx) => {
+      const theme = `theme-g${(idx%6)+1}`;
+
+      const teamBtns = (key) => {
+        const team = key==='A'?g.teamA:g.teamB;
+        const btns = State.data.players.map(p => {
+          const on = team.indexOf(p.id)>=0;
+          const full = !on && team.length >= g.teamSize;
+          return h('button',{
+            class:`btn small ${on?'primary':''}`,
+            disabled:full,
+            onclick:()=>{
+              const i = team.indexOf(p.id);
+              if (i>=0) team.splice(i,1);
+              else if (team.length < g.teamSize) team.push(p.id);
+              State.scheduleSave();
+              State.scheduleRender();
+            }
+          },p.name);
+        });
+        return h('div',{class:'row'},btns);
+      };
+
+
+      const gameTypeSelector = () => h('div',{style:'margin:12px 0;'},[
+        h('div',{class:'muted'},'Game Type'),
+        h('div',{class:'row',style:'margin-top:6px;'},[
+          h('label',{class:'nowrap',style:'margin-right:12px;'},[
+            h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='nassau',
+              onchange:()=>{g.gameType='nassau';State.scheduleSave();State.scheduleRender();}}),
+            ' Nassau'
+          ]),
+          h('label',{class:'nowrap'},[
+            h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='vegas',
+              onchange:()=>{
+                g.gameType='vegas';
+                g.teamA=g.teamA.slice(0,2);
+                g.teamB=g.teamB.slice(0,2);
+                State.scheduleSave();
+                State.scheduleRender();
+              }}),
+            ' Vegas'
+          ])
+        ])
+      ]);
+
+      const strokesEditor = () => {
+        const teamRow = (lbl, ids) => {
+          const grid = h('div',{style:'display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));'});
+          ids.forEach(pid => {
+            grid.appendChild(h('div',{style:'display:flex;flex-direction:column;gap:6px;'},[
+              h('div',{class:'muted',style:'text-align:center;font-size:12px;'},this.playerName(pid)),
+              h('input',{
+                type:'tel',inputmode:'numeric',value:g.strokesCount[pid]||0,
+                style:'width:100%;text-align:center;padding:8px 10px;',
+                onfocus:()=>State.begin(),
+                oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},
+                onblur:(e)=>{
+                  g.strokesCount[pid]=parseInt(e.target.value)||0;
+                  e.target.value=String(g.strokesCount[pid]);
+                  State.end();
+                }
+              })
+            ]));
+          });
+          return h('div',{},[h('div',{class:'muted',style:'margin:6px 0 8px;'},lbl),grid]);
+        };
+        const body = [];
+        if (g.teamA.length) body.push(teamRow('Team A:',g.teamA));
+        if (g.teamB.length) body.push(teamRow('Team B:',g.teamB));
+        if (!g.teamA.length && !g.teamB.length) body.push(h('div',{class:'note'},'Pick players to edit strokes'));
+        else body.push(h('div',{class:'note'},'Strokes apply on HCP 1…n'));
+        return h('div',{class:'card'},[h('div',{class:'pill'},'Strokes'),h('div',{},body)]);
+      };
+
+      return h('div',{class:theme},[
+        h('div',{class:'card'},[
+          h('div',{class:'row',style:'align-items:center;justify-content:space-between;'},[
+            h('div',{class:'pill'},this.gameLabel(g)),
+            h('div',{},[
+              h('button',{class:'btn small',onclick:()=>{
+                State.data.tab='scores';
+                State.scheduleRender();
+              }},'Go to SCORES'),
+              h('button',{class:'btn small',style:'margin-left:6px;',onclick:()=>{
+                const i = State.data.games.indexOf(g);
+                if (i>=0) State.data.games.splice(i,1);
+                if (!State.data.games.length) State.data.games.push(Game.create());
+                State.scheduleSave();
+                State.scheduleRender();
+              }},'Delete')
+            ])
+          ]),
+
+          gameTypeSelector(),
+
+          g.gameType === 'nassau' ? h('div',{},[h('div',{class:'game-options-row',style:'margin:6px 0;'},[
+            h('div',{},[
+              h('div',{class:'muted nowrap'},'Nassau Scoring'),
+              h('label',{class:'nowrap',style:'display:block;margin-top:6px;'},[
+                h('input',{type:'radio',name:`mode_${g.id}`,checked:g.scoringMode==='hi_low',
+                  onchange:()=>{g.scoringMode='hi_low';State.scheduleSave();State.scheduleRender();}}),
+                ' Hi/Low'
+              ]),
+              h('label',{class:'nowrap',style:'display:block;margin-top:6px;'},[
+                h('input',{type:'radio',name:`mode_${g.id}`,checked:g.scoringMode==='low_net',
+                  onchange:()=>{g.scoringMode='low_net';State.scheduleSave();State.scheduleRender();}}),
+                ' Best Ball'
+              ])
+            ]),
+            h('div',{},[
+              h('div',{class:'muted nowrap'},'Team Size'),
+              h('label',{class:'nowrap',style:'display:block;margin-top:6px;'},[
+                h('input',{type:'radio',name:`ts_${g.id}`,checked:g.teamSize===2,
+                  onchange:()=>{g.teamSize=2;State.scheduleSave();State.scheduleRender();}}),
+                ' 2v2'
+              ]),
+              h('label',{class:'nowrap',style:'display:block;margin-top:6px;'},[
+                h('input',{type:'radio',name:`ts_${g.id}`,checked:g.teamSize===1,
+                  onchange:()=>{g.teamSize=1;g.teamA=g.teamA.slice(0,1);g.teamB=g.teamB.slice(0,1);State.scheduleSave();State.scheduleRender();}}),
+                ' 1v1'
+              ])
+            ])
+          ]),
+          g.scoringMode==='hi_low' && g.teamSize===1 ? h('div',{class:'note',style:'margin-top:4px;'},'Hi/Low needs 2v2. Using Best Ball until teams full.') : h('div',{}),
+          h('div',{class:'grid grid-2'},[
+            h('div',{},[h('div',{class:'muted'},`Team A (pick ${g.teamSize})`),teamBtns('A')]),
+            h('div',{},[h('div',{class:'muted'},`Team B (pick ${g.teamSize})`),teamBtns('B')])
+          ]),
+          h('div',{class:'grid grid-3'},[
+            h('div',{},[h('div',{class:'muted'},'Front $'),h('input',{type:'tel',inputmode:'numeric',value:g.stakes.front,onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.stakes.front=parseInt(e.target.value)||0;e.target.value=String(g.stakes.front);State.end();}})]),
+            h('div',{},[h('div',{class:'muted'},'Back $'),h('input',{type:'tel',inputmode:'numeric',value:g.stakes.back,onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.stakes.back=parseInt(e.target.value)||0;e.target.value=String(g.stakes.back);State.end();}})]),
+            h('div',{},[h('div',{class:'muted'},'Overall $'),h('input',{type:'tel',inputmode:'numeric',value:g.stakes.overall,onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.stakes.overall=parseInt(e.target.value)||0;e.target.value=String(g.stakes.overall);State.end();}})]),
+          ]),
+          h('div',{class:'grid grid-3'},[
+            h('label',{},[h('input',{type:'checkbox',checked:g.autoPress.front,onclick:(e)=>{g.autoPress.front=e.target.checked;State.scheduleSave();State.scheduleRender();}}),' Auto-Press 2DN']),
+            h('label',{},[h('input',{type:'checkbox',checked:g.autoPress.back,onclick:(e)=>{g.autoPress.back=e.target.checked;State.scheduleSave();State.scheduleRender();}}),' Auto-Press 2DN']),
+            h('label',{},[h('input',{type:'checkbox',checked:g.autoPress.overall,onclick:(e)=>{g.autoPress.overall=e.target.checked;State.scheduleSave();State.scheduleRender();}}),' Auto-Press 2DN'])
+          ]),
+          h('div',{class:'row',style:'align-items:center;gap:12px;margin:8px 0;'},[
+            h('div',{class:'pill'},'Junk $/point'),
+            h('div',{},[h('div',{class:'muted'},'Front'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.front,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.front=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.front);State.end();}})]),
+            h('div',{},[h('div',{class:'muted'},'Back'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.back,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.back=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.back);State.end();}})]),
+          ]),
+]) : h('div',{}),
+
+          g.gameType === 'vegas' ? h('div',{},[
+            h('div',{class:'grid grid-2'},[
+              h('div',{},[h('div',{class:'muted'},'Team A (pick 2)'),teamBtns('A')]),
+              h('div',{},[h('div',{class:'muted'},'Team B (pick 2)'),teamBtns('B')])
+            ]),
+            h('div',{class:'grid grid-2',style:'margin-top:12px;'},[
+              h('div',{},[h('div',{class:'muted'},'Front $/pt'),h('input',{type:'number',step:'0.25',value:g.pointValue.front,onfocus:()=>State.begin(),onblur:(e)=>{g.pointValue.front=parseFloat(e.target.value)||1;State.end();}})]),
+              h('div',{},[h('div',{class:'muted'},'Back $/pt'),h('input',{type:'number',step:'0.25',value:g.pointValue.back,onfocus:()=>State.begin(),onblur:(e)=>{g.pointValue.back=parseFloat(e.target.value)||1;State.end();}})]),
+            ]),
+            h('div',{class:'row',style:'align-items:center;gap:12px;margin:8px 0;'},[
+              h('div',{class:'pill'},'Junk $/point'),
+              h('div',{},[h('div',{class:'muted'},'Front'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.front,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.front=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.front);State.end();}})]),
+              h('div',{},[h('div',{class:'muted'},'Back'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.back,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.back=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.back);State.end();}})]),
+            ]),
+            h('div',{class:'note',style:'margin-top:8px;'},'Flip if: opponent gross birdie OR your team net bogey+')
+          ]) : h('div',{}),
+
+          strokesEditor(),
+          h('div',{class:'note'},'Scores tab shows GROSS. Net is auto from strokes + course HCP.')
+        ])
+      ]);
+    });
+
+    return h('div',{},[
+      h('div',{class:'card'},[h('div',{class:'pill'},'Players'),h('div',{},playerInputs)]),
+      courseCard,
+      h('div',{},[gamesHeader,...gameCards])
+    ]);
+  },
+
+  scores() {
+    const g = State.data.games[0];
+    if (!g) return h('div',{class:'card'},'No game. Add one in Setup.');
+
+    const last = Game.getLastScored();
+    const updateSums = (pid) => {
+      const arr = g.gross[pid];
+      const f = Utils.sumRange(arr,0,8);
+      const b = Utils.sumRange(arr,9,17);
+      const t = (f==null && b==null)?null:((f||0)+(b||0));
+      const fEl = document.getElementById(`sumF_${pid}`);
+      const bEl = document.getElementById(`sumB_${pid}`);
+      const tEl = document.getElementById(`sumT_${pid}`);
+      if (fEl) fEl.textContent = f==null?'':String(f);
+      if (bEl) bEl.textContent = b==null?'':String(b);
+      if (tEl) tEl.textContent = t==null?'':String(t);
+    };
+
+    const createDots = (pid, hole) => {
+      const dots = [];
+      for (let gi = 0; gi < Math.min(6, State.data.games.length); gi++) {
+        const gm = State.data.games[gi];
+        const inA = (gm.teamA||[]).indexOf(pid)>=0;
+        const inB = (gm.teamB||[]).indexOf(pid)>=0;
+        if (!inA && !inB) continue;
+        const s = Game.strokes(gm, pid, hole);
+        if (s > 0) dots.push(h('span',{class:`dot g${gi+1}`}));
+      }
+      return dots.length ? h('span',{class:'dots'},dots) : null;
+    };
+
+    const head = [h('th',{class:'sticky'},'Hole')];
+    for (let i = 0; i < 18; i++) head.push(h('th',{id:`col_h_${i}`},String(i+1)));
+    head.push(h('th',{},'F'),h('th',{},'B'),h('th',{},'TOT'));
+
+    const parRow = [h('th',{class:'sticky'},'Par')];
+    for (let i = 0; i < 18; i++) parRow.push(h('th',{},String(State.data.course.par[i]||'')));
+    parRow.push(h('th',{}),h('th',{}),h('th',{}));
+
+    const rows = State.data.players.map((p, ri) => {
+      const cells = [h('td',{class:'sticky'},p.name)];
+      for (let hole = 0; hole < 18; hole++) {
+        const tabIdx = (hole * State.data.players.length) + ri + 1;
+        cells.push(h('td',{},[
+          h('div',{class:'cellWrap'},[
+            h('input',{
+              type:'tel',inputmode:'numeric',tabindex:tabIdx,
+              value:g.gross[p.id][hole]==null?'':String(g.gross[p.id][hole]),
+              style:'width:54px;text-align:center;',
+              placeholder:'-',
+              onfocus:()=>State.begin(),
+              oninput:(e)=>{
+                e.target.value = Utils.sanitize(e.target.value);
+                const v = e.target.value===''?null:parseInt(e.target.value);
+                State.data.games.forEach(gm => gm.gross[p.id][hole] = v);
+              },
+              onkeydown:(e)=>{
+                if (e.key==='Enter') {
+                  e.preventDefault();
+                  let next = tabIdx + 1;
+                  const maxCol = (hole+1)*State.data.players.length;
+                  if (next > maxCol) {
+                    if (hole+1 < 18) next = (hole+1)*State.data.players.length - (State.data.players.length-1);
+                    else next = tabIdx;
+                  }
+                  const nextEl = document.querySelector(`input[tabindex="${next}"]`);
+                  if (nextEl) nextEl.focus();
+                }
+              },
+              onblur:(e)=>{
+                const v = e.target.value===''?null:parseInt(e.target.value);
+                if (v!==null && (v<MIN_SCORE || v>MAX_SCORE)) {
+                  Err.show(`Invalid score ${v}. Use ${MIN_SCORE}-${MAX_SCORE}`);
+                  e.target.value = '';
+                  State.data.games.forEach(gm => gm.gross[p.id][hole] = null);
+                } else {
+                  State.data.games.forEach(gm => gm.gross[p.id][hole] = v);
+                  e.target.value = v==null?'':String(v);
+                }
+                updateSums(p.id);
+                State.end();
+              }
+            }),
+            createDots(p.id, hole) || ''
+          ])
+        ]));
+      }
+      const arr = g.gross[p.id];
+      const f = Utils.sumRange(arr,0,8);
+      const b = Utils.sumRange(arr,9,17);
+      const t = (f==null && b==null)?null:((f||0)+(b||0));
+      cells.push(
+        h('td',{id:`sumF_${p.id}`},f==null?'':String(f)),
+        h('td',{id:`sumB_${p.id}`},b==null?'':String(b)),
+        h('td',{id:`sumT_${p.id}`},t==null?'':String(t))
+      );
+      return h('tr',{},cells);
+    });
+
+
+    const tbl = h('table',{},[
+      h('thead',{},[h('tr',{},head),h('tr',{},parRow)]),
+      h('tbody',{},[...rows,...(State.data.games.filter(g => g.gameType === 'vegas').map((game,gi) => {
+        const actualIdx = State.data.games.indexOf(game);
+        const cells = [h('td',{class:'sticky press-label'},UI.gameLabel(game))];
+        for (let hole = 0; hole < 18; hole++) {
+          const currentPress = game.presses[hole] || '';
+          const sel = h('select',{
+            class:'press-select',
+            onchange:(e)=>{
+              game.presses[hole] = e.target.value;
+              State.scheduleSave();
+              State.scheduleRender();
+            }
+          },[
+            h('option',{value:'',selected:currentPress===''},'—'),
+            h('option',{value:'press',selected:currentPress==='press'},'P'),
+            h('option',{value:'blind',selected:currentPress==='blind'},'B')
+          ]);
+          cells.push(h('td',{},[sel]));
+        }
+        cells.push(h('td',{colspan:'3'}));
+        return h('tr',{class:'press-row'},cells);
+      }))])
+    ]);
+
+    const scroller = h('div',{class:'card scroll',id:'scoresScroll'},tbl);
+
+    setTimeout(()=>{
+      try {
+        if (last>=0) {
+          const col = document.getElementById(`col_h_${last}`);
+          const sc = document.getElementById('scoresScroll');
+          if (col && sc) {
+            const tgt = Math.max(0, col.offsetLeft - sc.clientWidth*0.2);
+            sc.scrollLeft = tgt;
+          }
+        }
+      } catch(e) {}
+    },0);
+
+    // Calculate current standings for indicator
+    let statusMsg = '';
+    let statusClass = '';
+
+    if (g.gameType === 'vegas') {
+      const result = Game.computeVegasResult(g);
+      const total = result.totalValue;
+      const perPerson = total / 2;
+      const teamANames = (g.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
+      const teamBNames = (g.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
+
+      if (total > 0) {
+        statusMsg = `${teamANames} leading by ${Utils.fmt(total)} (${Utils.fmt(perPerson)}/player)`;
+        statusClass = 'points-positive';
+      } else if (total < 0) {
+        statusMsg = `${teamBNames} leading by ${Utils.fmt(Math.abs(total))} (${Utils.fmt(Math.abs(perPerson))}/player)`;
+        statusClass = 'points-negative';
+      } else {
+        statusMsg = 'Match is tied';
+        statusClass = '';
+      }
+    } else {
+      const result = Game.computeResult(g);
+      const total = result.teamTotals.total;
+      const teamSize = (g.teamA||[]).length || 1;
+      const perPerson = total / teamSize;
+      const teamANames = (g.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
+      const teamBNames = (g.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
+
+      if (total > 0) {
+        statusMsg = `${teamANames} leading by ${Utils.fmt(total)} (${Utils.fmt(perPerson)}/player)`;
+        statusClass = 'points-positive';
+      } else if (total < 0) {
+        statusMsg = `${teamBNames} leading by ${Utils.fmt(Math.abs(total))} (${Utils.fmt(Math.abs(perPerson))}/player)`;
+        statusClass = 'points-negative';
+      } else {
+        statusMsg = 'Match is tied';
+        statusClass = '';
+      }
+    }
+
+    return h('div',{},[
+      h('div',{class:'row',style:'align-items:center;justify-content:space-between;margin-bottom:12px;'},[
+        h('div',{class:'pill'},'Entering GROSS for all players'),
+        statusMsg ? h('div',{class:statusClass,style:'font-weight:600;font-size:16px;'},statusMsg) : null
+      ]),
+      h('div',{class:'note',style:'margin-bottom:8px;'},'Press rows show below for Vegas games (Press=2x, Blind=4x)'),
+      scroller
+    ]);
+  },
+
+  junk() {
+    const last = Game.getLastScored();
+    const blocks = State.data.games.map((g, gi) => {
+      const pids = [...(g.teamA||[]),...(g.teamB||[])];
+      const theme = `theme-g${(gi%6)+1}`;
+      const baseTab = gi * 10000;
+
+      const createInput = (pid, hole, ri) => {
+        if (!g.junkCounts[pid]) g.junkCounts[pid] = Utils.make18(0);
+        let cur = g.junkCounts[pid][hole];
+        if (!Number.isFinite(cur)) { cur = 0; g.junkCounts[pid][hole] = 0; }
+        const disp = cur===0?'':String(cur);
+        const badge = h('span',{class:'junkVal'},disp);
+        const tabIdx = baseTab + (hole * pids.length) + ri + 1;
+        const inp = h('input',{
+          class:'junkBox',type:'text',inputmode:'numeric',autocomplete:'off',placeholder:'-',tabindex:tabIdx,value:disp,
+          oninput:(e)=>{
+            const dig = Utils.sanitize(e.target.value);
+            if (dig !== e.target.value) e.target.value = dig;
+            const v = dig===''?0:parseInt(dig);
+            g.junkCounts[pid][hole] = v;
+            badge.textContent = v===0?'':String(v);
+            try { localStorage.setItem(STORAGE_KEY, JSON.stringify({...State.data, presets:State.presets})); } catch(e) {}
+          },
+          onkeydown:(e)=>{
+            if (e.key==='Enter') {
+              e.preventDefault();
+              let next = tabIdx + 1;
+              const colEnd = baseTab + ((hole+1)*pids.length);
+              if (next > colEnd) next = baseTab + ((hole+1)*pids.length - (pids.length-1));
+              const nextEl = document.querySelector(`input[tabindex="${next}"]`);
+              if (nextEl) nextEl.focus();
+            }
+          },
+          onblur:(e)=>{
+            const dig = Utils.sanitize(e.target.value);
+            const v = dig===''?0:parseInt(dig);
+            g.junkCounts[pid][hole] = v;
+            e.target.value = v===0?'':String(v);
+            badge.textContent = v===0?'':String(v);
+            State.scheduleSave();
+          }
+        });
+        return h('div',{class:'junkWrap'},[inp, badge]);
+      };
+
+      const head = [h('th',{class:'sticky'},'Hole')];
+      for (let i = 0; i < 18; i++) head.push(h('th',{id:`junk_col_${gi}_${i}`},String(i+1)));
+
+      const rows = pids.map((pid,ri) => {
+        const cells = [h('td',{class:'sticky'},UI.playerName(pid))];
+        for (let hole = 0; hole < 18; hole++) {
+          cells.push(h('td',{},[createInput(pid, hole, ri)]));
+        }
+        return h('tr',{},cells);
+      });
+
+      const tbl = h('table',{},[
+        h('thead',{},[h('tr',{},head)]),
+        h('tbody',{},rows)
+      ]);
+
+      const scroller = h('div',{class:'card scroll',id:`junkScroll_${gi}`},tbl);
+
+      if (last >= 0) {
+        setTimeout(()=>{
+          try {
+            const col = document.getElementById(`junk_col_${gi}_${last}`);
+            const sc = document.getElementById(`junkScroll_${gi}`);
+            if (col && sc) {
+              const tgt = Math.max(0, col.offsetLeft - sc.clientWidth*0.2);
+              sc.scrollLeft = tgt;
+            }
+          } catch(e) {}
+        },0);
+      }
+
+      return h('div',{class:theme},scroller);
+    });
+
+    return h('div',{},[
+      h('div',{class:'note',style:'margin-bottom:8px;'},'Sweeps (+3) Sweeps/Quads (+6) on last Par 3'),
+      ...blocks
+    ]);
+  },
+
+  status() {
+    const dbg = h('div',{class:'row',style:'align-items:center;justify-content:space-between;'},[
+      h('label',{},[
+        h('input',{type:'checkbox',checked:State.data.debugStatus,
+          onclick:(e)=>{State.data.debugStatus=e.target.checked;State.scheduleSave();State.scheduleRender();}}),
+        ' Show debug details'
+      ])
+    ]);
+
+    const blocks = State.data.games.map((g,idx) => {
+      const theme = `theme-g${(idx%6)+1}`;
+
+      if (g.gameType === 'vegas') {
+        const result = Game.computeVegasResult(g);
+        const teamANames = (g.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
+        const teamBNames = (g.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
+
+        return h('div',{class:theme},[
+          h('div',{class:'card'},[
+            h('div',{class:'pill'},UI.gameLabel(g)),
+            h('div',{class:'note',style:'margin-top:6px;'},`A: ${teamANames}  |  B: ${teamBNames}`),
+            h('div',{style:'margin-top:12px;'},[
+              h('div',{class:'muted'},'Front: ' + (result.frontPoints>0?'+':'') + result.frontPoints + ' pts = ' + Utils.fmt(result.frontValue)),
+              h('div',{class:'muted',style:'margin-top:4px;'},'Back: ' + (result.backPoints>0?'+':'') + result.backPoints + ' pts = ' + Utils.fmt(result.backValue)),
+              h('div',{class:'muted',style:'margin-top:4px;'},'Junk: ' + Utils.fmt(result.junkValue)),
+              h('div',{style:'margin-top:8px;font-weight:700;'},'Total: ' + Utils.fmt(result.totalValue))
+            ])
+          ])
+        ]);
+      }
+
+      const renderSeg = (lbl, start, end, autoKey) => {
+        const stake = g.stakes[autoKey] || 0;
+        const seg = Game.buildSegment(g, start, end, stake, g.autoPress[autoKey]);
+        const diffs = [];
+        for (let i = 0; i < 18; i++) diffs.push(Game.holeDiff(g, i));
+        const calcCum = (line) => {
+          let cum = 0, hasAny = false;
+          for (let h = line.start; h <= line.end; h++) {
+            if (diffs[h] != null) {
+              cum += diffs[h];
+              hasAny = true;
+            }
+          }
+          return hasAny ? cum : null;
+        };
+        const bets = seg.lines.map(line => {
+          const c = calcCum(line);
+          if (c===null) return '—';
+          if (c>0) return `+${c}`;
+          if (c<0) return String(c);
+          return 'E';
+        });
+        const hasAny = bets.some(t => t !== '—');
+        const betsTxt = hasAny ? bets.join(' / ') : '—';
+
+        const sumJunk = (team) => {
+          let tot = 0;
+          team.forEach(pid => {
+            const arr = g.junkCounts[pid] || [];
+            for (let h = start; h <= end && h < 18; h++) tot += (arr[h]||0);
+          });
+          return tot;
+        };
+        const aJ = sumJunk(g.teamA||[]);
+        const bJ = sumJunk(g.teamB||[]);
+
+        return h('div',{class:'card'},[
+          h('div',{class:'row',style:'align-items:center;justify-content:space-between;'},[
+            h('div',{class:'muted'},lbl),
+            h('div',{class:'pill'},[
+              h('div',{},`Bets: ${betsTxt}`),
+              h('div',{},`Junk: A=${aJ} B=${bJ}`)
+            ])
+          ])
+        ]);
+      };
+
+      const aN = (g.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
+      const bN = (g.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
+
+      return h('div',{class:theme},[
+        h('div',{class:'card'},[
+          h('div',{class:'row',style:'align-items:center;justify-content:space-between;'},[
+            h('div',{class:'pill'},this.gameLabel(g)),
+            h('div',{class:'note'},'Positive = Team A')
+          ]),
+          h('div',{class:'note'},`A: ${aN||'—'}  |  B: ${bN||'—'}`),
+          renderSeg('Front (1–9)',0,8,'front'),
+          renderSeg('Back (10–18)',9,17,'back'),
+          renderSeg('Overall (1–18)',0,17,'overall')
+        ])
+      ]);
+    });
+
+    return h('div',{},[dbg,...blocks]);
+  },
+
+  game() {
+    const blocks = State.data.games.map((g,idx) => {
+      const theme = `theme-g${(idx%6)+1}`;
+
+      if (g.gameType === 'vegas') {
+        const result = Game.computeVegasResult(g);
+        const teamANames = (g.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
+        const teamBNames = (g.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
+
+        return h('div',{class:theme},[
+          h('div',{class:'card'},[
+            h('div',{class:'pill'},UI.gameLabel(g)),
+            h('div',{class:'note',style:'margin-top:6px;'},`Team A: ${teamANames}  |  Team B: ${teamBNames}`),
+            h('div',{style:'margin-top:12px;'},[
+              h('div',{class:'grid grid-2'},[
+                h('div',{class:'card'},[
+                  h('div',{class:'muted'},'Front'),
+                  h('div',{},`${result.frontPoints>0?'+':''}${result.frontPoints} pts`),
+                  h('div',{style:'font-weight:600;'},Utils.fmt(result.frontValue))
+                ]),
+                h('div',{class:'card'},[
+                  h('div',{class:'muted'},'Back'),
+                  h('div',{},`${result.backPoints>0?'+':''}${result.backPoints} pts`),
+                  h('div',{style:'font-weight:600;'},Utils.fmt(result.backValue))
+                ])
+              ]),
+              h('div',{class:'card',style:'margin-top:12px;'},[
+                h('div',{class:'row',style:'justify-content:space-between;'},[
+                  h('div',{class:'muted'},'Junk:'),
+                  h('div',{style:'font-weight:600;'},Utils.fmt(result.junkValue))
+                ])
+              ]),
+              h('div',{class:'card',style:'margin-top:12px;background:linear-gradient(135deg,rgba(59,130,246,0.1),rgba(22,163,74,0.1));'},[
+                h('div',{class:'row',style:'justify-content:space-between;align-items:center;'},[
+                  h('div',{},[
+                    h('div',{class:'muted'},'TOTAL TO TEAM A'),
+                    h('div',{class:'muted',style:'font-size:11px;margin-top:2px;'},Utils.fmt(result.totalValue/2)+' per player')
+                  ]),
+                  h('div',{style:'font-size:24px;font-weight:700;',class:result.totalValue>0?'points-positive':'points-negative'},
+                    Utils.fmt(result.totalValue))
+                ])
+              ])
+            ])
+          ])
+        ]);
+      }
+
+      let res;
+      try {
+        res = Game.computeResult(g);
+      } catch(e) {
+        console.error('computeResult failed:', e);
+        return h('div',{class:theme},[h('div',{class:'card'},[h('div',{},'Error calculating Nassau result: ' + e.message)])]);
+      }
+
+      const fmtTP = (tot, sz) => {
+        const s = Math.max(1, sz||1);
+        return `${Utils.fmt(tot)} / ${Utils.fmt(tot/s)}`;
+      };
+
+      const renderSeg = (lbl, segRes) => {
+        const pills = segRes.lines.map((line, li) => {
+          const typ = line.pressedBy ? 'Press' : 'Main';
+          const holes = `${line.start+1}–${line.end+1}`;
+          const win = segRes.winners[li];
+          return h('div',{class:'pill'},`${typ} • ${holes} • ${win}`);
+        });
+        const teamTot = segRes.teamPayA;
+        return h('div',{class:'card'},[
+          h('div',{class:'row',style:'align-items:center;justify-content:space-between;'},[
+            h('div',{},lbl),
+            h('div',{class:'muted'},`Net to Team A (Team/Player): ${fmtTP(teamTot,(g.teamA||[]).length)}`)
+          ]),
+          h('div',{class:'row'},pills)
+        ]);
+      };
+
+      const aN = (g.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
+      const bN = (g.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
+
+      return h('div',{class:theme},[
+        h('div',{class:'card'},[
+          h('div',{class:'row',style:'align-items:center;justify-content:space-between;'},[
+            h('div',{class:'pill'},this.gameLabel(g)),
+            h('div',{class:'note'},'Positive = Team A')
+          ]),
+          h('div',{class:'note'},`A: ${aN||'—'}  |  B: ${bN||'—'}`),
+          renderSeg('Front (1–9)',res.segments.front),
+          renderSeg('Back (10–18)',res.segments.back),
+          renderSeg('Overall (1–18)',res.segments.overall),
+          h('div',{class:'card'},[h('div',{class:'pill'},`Junk to Team A (Team/Player): ${fmtTP(res.teamTotals.junk,(g.teamA||[]).length)}`)]),
+          h('div',{class:'card',style:'background:linear-gradient(135deg,rgba(59,130,246,0.05),rgba(22,163,74,0.05));'},[
+            h('div',{class:'row',style:'justify-content:space-between;align-items:center;'},[
+              h('div',{},[
+                h('div',{style:'font-weight:600;'},'GAME TOTAL TO TEAM A'),
+                h('div',{class:'muted',style:'font-size:12px;margin-top:2px;'},Utils.fmt(res.teamTotals.total/((g.teamA||[]).length||1))+' per player')
+              ]),
+              h('div',{style:'font-size:20px;font-weight:700;',class:res.teamTotals.total>0?'points-positive':'points-negative'},
+                Utils.fmt(res.teamTotals.total))
+            ])
+          ])
+        ])
+      ]);
+    });
+
+    return h('div',{},blocks);
+  },
+
+  transactions() {
+    const shareBtn = h('div',{style:'margin-bottom:12px;'},[
+      h('button',{class:'btn small share',onclick:()=>this.share()},'Share Results')
+    ]);
+
+    const net = {};
+    State.data.players.forEach(p => net[p.id] = 0);
+
+    const perGameRows = State.data.games.map(g => {
+      let tot;
+      if (g.gameType === 'vegas') {
+        const res = Game.computeVegasResult(g);
+        tot = res.totalValue;
+      } else {
+        const res = Game.computeResult(g);
+        tot = res.teamTotals.total;
+      }
+      const szA = (g.teamA||[]).length || 1;
+      const szB = (g.teamB||[]).length || 1;
+      const aShare = szA ? tot/szA : 0;
+      const bShare = szB ? -tot/szB : 0;
+      (g.teamA||[]).forEach(id => net[id] += aShare);
+      (g.teamB||[]).forEach(id => net[id] += bShare);
+      return h('li',{},`${this.gameLabel(g)}: ${Utils.fmt(tot)} to Team A`);
+    });
+
+    const perPlayerRows = State.data.players.map(p =>
+      h('li',{},`${p.name}: ${Utils.fmt(net[p.id])}`)
+    );
+
+    const xfers = this.calcTransfers(net);
+    const xferRows = xfers.map(x =>
+      h('li',{},`${UI.playerName(x.from)} → ${UI.playerName(x.to)}: ${Utils.fmt(x.amount)}`)
+    );
+
+    const themed = State.data.games.map((g,idx) => {
+      const theme = `theme-g${(idx%6)+1}`;
+      return h('div',{class:theme},[h('div',{class:'card'},[h('div',{class:'pill'},this.gameLabel(g))])]);
+    });
+
+    return h('div',{},[
+      shareBtn,
+      h('div',{class:'card'},[
+        h('div',{class:'pill'},'Per-Game Totals (to Team A)'),
+        perGameRows.length ? h('ul',{},perGameRows) : h('div',{class:'muted'},'No games yet.')
+      ]),
+      h('div',{class:'card'},[
+        h('div',{class:'pill'},'Per-Player Net (All Games + Junk)'),
+        h('ul',{},perPlayerRows)
+      ]),
+      h('div',{class:'card'},[
+        h('div',{class:'pill'},'Least-Cash Transfers'),
+        xfers.length ? h('ul',{},xferRows) : h('div',{class:'muted'},'All square.')
+      ]),
+      h('div',{},themed)
+    ]);
+  },
+
+  rules() {
+    return h('div',{style:'max-width:800px;margin:0 auto;'},[
+      h('div',{class:'card',style:'margin-bottom:16px;'},[
+        h('h2',{style:'margin:0 0 12px 0;'},'Nassau'),
+        h('p',{},'Traditional Nassau is three separate bets: Front 9, Back 9, and Overall 18.'),
+        h('h3',{style:'margin:16px 0 8px 0;'},'Scoring'),
+        h('ul',{style:'margin:8px 0;padding-left:20px;'},[
+          h('li',{},'Hi/Low: Each team\'s best and worst net scores combine'),
+          h('li',{},'Best Ball: Each team\'s best net score counts')
+        ]),
+        h('h3',{style:'margin:16px 0 8px 0;'},'Auto-Press'),
+        h('p',{},'When a team falls 2-down in a bet, a new "press" bet automatically starts for the remaining holes at the same stake.'),
+        h('h3',{style:'margin:16px 0 8px 0;'},'Junk'),
+        h('p',{},'Optional side bets for: Birdies, Sandies (sand save par+), Greenies (closest on par 3), etc. Each junk point has a $ value.')
+      ]),
+
+      h('div',{class:'card',style:'margin-bottom:16px;'},[
+        h('h2',{style:'margin:0 0 12px 0;'},'Vegas'),
+        h('p',{},'Two-digit scoring game where each team forms a number from their two net scores.'),
+        h('h3',{style:'margin:16px 0 8px 0;'},'How Numbers Form'),
+        h('ul',{style:'margin:8px 0;padding-left:20px;'},[
+          h('li',{},'Normal: Low score = tens digit, High score = ones digit'),
+          h('li',{},'Example: Team scores 4 and 5 → Number is 45')
+        ]),
+        h('h3',{style:'margin:16px 0 8px 0;'},'Reversal (The Flip)'),
+        h('p',{},'Numbers reverse (high becomes tens digit) when:'),
+        h('ul',{style:'margin:8px 0;padding-left:20px;'},[
+          h('li',{},'Any opponent makes gross birdie, OR'),
+          h('li',{},'Any teammate makes net bogey or worse')
+        ]),
+        h('p',{},'Example: Team scores 4 and 5, but flips → Number is 54'),
+        h('h3',{style:'margin:16px 0 8px 0;'},'Scoring'),
+        h('ul',{style:'margin:8px 0;padding-left:20px;'},[
+          h('li',{},'Lower number wins the difference in points'),
+          h('li',{},'Example: 45 vs 56 → Lower team wins 11 points'),
+          h('li',{},'Points convert to dollars using $/point values for Front and Back 9')
+        ]),
+        h('h3',{style:'margin:16px 0 8px 0;'},'Presses'),
+        h('p',{},'Set per hole to multiply points:'),
+        h('ul',{style:'margin:8px 0;padding-left:20px;'},[
+          h('li',{},'Blank (—): 1x multiplier'),
+          h('li',{},'Press (P): 2x multiplier'),
+          h('li',{},'Blind (B): 4x multiplier')
+        ]),
+        h('h3',{style:'margin:16px 0 8px 0;'},'Junk'),
+        h('p',{},'Same as Nassau - optional side bets with $ values.')
+      ]),
+
+      h('div',{class:'card'},[
+        h('h2',{style:'margin:0 0 12px 0;'},'App Tips'),
+        h('ul',{style:'margin:8px 0;padding-left:20px;'},[
+          h('li',{},'Use SETUP to configure games and player handicaps'),
+          h('li',{},'Enter gross scores in SCORES tab'),
+          h('li',{},'Track junk in JUNK tab'),
+          h('li',{},'STATUS shows live standings as you play'),
+          h('li',{},'GAME shows final breakdown when complete'),
+          h('li',{},'PAYMENTS calculates who owes what')
+        ])
+      ])
+    ]);
+  },
+
+  calcTransfers(net) {
+    const debt = [], cred = [];
+    Object.entries(net).forEach(([id, amt]) => {
+      if (Math.abs(amt) < 0.005) return;
+      if (amt < 0) debt.push({id, amount:-amt});
+      else cred.push({id, amount:amt});
+    });
+    debt.sort((a,b) => b.amount - a.amount);
+    cred.sort((a,b) => b.amount - a.amount);
+
+    const xfers = [];
+    let i = 0, j = 0;
+    while (i < debt.length && j < cred.length) {
+      const d = debt[i], c = cred[j];
+      const pay = Math.min(d.amount, c.amount);
+      xfers.push({from:d.id, to:c.id, amount:pay});
+      d.amount -= pay;
+      c.amount -= pay;
+      if (d.amount <= 0.005) i++;
+      if (c.amount <= 0.005) j++;
+    }
+    return xfers;
+  },
+
+  share() {
+    try {
+      const lines = ['Round Summary from Bunch Bets:',''];
+      lines.push('Player Scores:');
+      State.data.players.forEach(p => {
+        const g = State.data.games[0];
+        const arr = g.gross[p.id] || [];
+        const f = Utils.sumRange(arr,0,8);
+        const b = Utils.sumRange(arr,9,17);
+        const t = (f==null && b==null)?null:((f||0)+(b||0));
+        lines.push(`  ${p.name}: ${f??'-'} / ${b??'-'} / ${t??'-'}`);
+      });
+      lines.push('');
+
+      State.data.games.forEach(g => {
+        if (g.gameType === 'vegas') {
+          const res = Game.computeVegasResult(g);
+          lines.push(this.gameLabel(g));
+          lines.push(`  Front:   ${Utils.fmt(res.frontValue)}`);
+          lines.push(`  Back:    ${Utils.fmt(res.backValue)}`);
+          lines.push(`  Junk:    ${Utils.fmt(res.junkValue)}`);
+          lines.push(`  Total:   ${Utils.fmt(res.totalValue)}`);
+          lines.push('');
+        } else {
+          const res = Game.computeResult(g);
+          lines.push(this.gameLabel(g));
+          lines.push(`  Front:   ${Utils.fmt(res.teamTotals.front)}`);
+          lines.push(`  Back:    ${Utils.fmt(res.teamTotals.back)}`);
+          lines.push(`  Overall: ${Utils.fmt(res.teamTotals.overall)}`);
+          lines.push(`  Junk:    ${Utils.fmt(res.teamTotals.junk)}`);
+          lines.push(`  Total:   ${Utils.fmt(res.teamTotals.total)}`);
+          lines.push('');
+        }
+      });
+
+      const net = {};
+      State.data.players.forEach(p => net[p.id] = 0);
+      State.data.games.forEach(g => {
+        let tot;
+        if (g.gameType === 'vegas') {
+          const res = Game.computeVegasResult(g);
+          tot = res.totalValue;
+        } else {
+          const res = Game.computeResult(g);
+          tot = res.teamTotals.total;
+        }
+        const szA = (g.teamA||[]).length || 1;
+        const szB = (g.teamB||[]).length || 1;
+        const aShare = szA ? tot/szA : 0;
+        const bShare = szB ? -tot/szB : 0;
+        (g.teamA||[]).forEach(id => net[id] += aShare);
+        (g.teamB||[]).forEach(id => net[id] += bShare);
+      });
+
+      lines.push('Per-Player Net:');
+      State.data.players.forEach(p => lines.push(`  ${p.name}: ${Utils.fmt(net[p.id])}`));
+
+      const xfers = this.calcTransfers(net);
+      if (xfers.length) {
+        lines.push('');
+        lines.push('Transfers:');
+        xfers.forEach(x => lines.push(`  ${UI.playerName(x.from)} → ${UI.playerName(x.to)} : ${Utils.fmt(x.amount)}`));
+      }
+
+      const txt = lines.join('\n');
+
+      if (navigator.share) {
+        navigator.share({text:txt}).catch(() => alert(txt));
+      } else if (/Mobi|Android/i.test(navigator.userAgent)) {
+        window.location.href = `sms:?&body=${encodeURIComponent(txt)}`;
+      } else {
+        alert(txt);
+      }
+    } catch(e) {
+      Err.show('Share failed: ' + e.message);
+    }
+  },
+
+  highlights() {
+    const minInp = h('input',{
+      type:'number',value:State.data.settings.thMin,style:'width:80px;padding:4px 6px;',
+      oninput:(e)=>{State.data.settings.thMin=parseFloat(e.target.value)||0;State.scheduleRender();}
+    });
+    const topInp = h('input',{
+      type:'number',value:State.data.settings.thTop,style:'width:64px;padding:4px 6px;',
+      oninput:(e)=>{State.data.settings.thTop=Math.max(1,parseInt(e.target.value)||1);State.scheduleRender();}
+    });
+
+    const toolbar = h('div',{class:'row',style:'justify-content:space-between;align-items:center;'},[
+      h('div',{class:'pill'},'Highlights (hole vs zero)'),
+      h('div',{},[
+        h('label',{},['Min $ ',minInp]),
+        h('label',{style:'margin-left:8px;'},['Top ',topInp])
+      ])
+    ]);
+
+    const all = this.buildHighlights()
+      .filter(x => x.value >= State.data.settings.thMin)
+      .slice(0, State.data.settings.thTop);
+
+    const content = all.length
+      ? h('ul',{}, all.map(x => h('li',{}, x.text)))
+      : h('div',{class:'muted',style:'padding:8px 0;'},'No highlights yet.');
+
+    return h('div',{},[h('div',{class:'card'},[toolbar, content])]);
+  },
+
+  buildHighlights() {
+    const equalizeHole = (g, hole) => {
+      const g2 = Utils.clone(g);
+      const ids = [...(g2.teamA||[]),...(g2.teamB||[])];
+      ids.forEach(pid => {
+        const s = Game.strokes(g2, pid, hole) || 0;
+        if (!g2.gross[pid]) g2.gross[pid] = Utils.make18(null);
+        g2.gross[pid][hole] = s + 100;
+        if (!g2.junkCounts[pid]) g2.junkCounts[pid] = Utils.make18(0);
+        g2.junkCounts[pid][hole] = 0;
+      });
+      return g2;
+    };
+
+    const aggTotal = (games) => {
+      let tot = 0;
+      games.forEach(g => tot += Game.computeResult(g).teamTotals.total);
+      return tot;
+    };
+
+    const actual = aggTotal(State.data.games);
+    const lines = [];
+
+    for (let hole = 0; hole < 18; hole++) {
+      const hasAny = State.data.games.some(g => {
+        const ids = [...(g.teamA||[]),...(g.teamB||[])];
+        return ids.some(pid => {
+          const v = g.gross[pid] && g.gross[pid][hole];
+          return v != null;
+        });
+      });
+      if (!hasAny) continue;
+
+      const neutral = State.data.games.map(g => equalizeHole(g, hole));
+      const cf = aggTotal(neutral);
+      const swing = actual - cf;
+      if (swing === 0) continue;
+
+      const contrib = State.data.games.map((g, idx) => {
+        const a = Game.computeResult(g).teamTotals.total;
+        const c = Game.computeResult(neutral[idx]).teamTotals.total;
+        return {gi:idx, delta:a-c, game:g};
+      });
+      contrib.sort((a,b) => Math.abs(b.delta) - Math.abs(a.delta));
+      const top = contrib[0];
+
+      const perPlayer = [...(top.game.teamA||[]),...(top.game.teamB||[])].map(pid => {
+        const g2 = Utils.clone(top.game);
+        const s = Game.strokes(g2, pid, hole) || 0;
+        g2.gross[pid][hole] = s + 100;
+        g2.junkCounts[pid][hole] = 0;
+        const cfRes = Game.computeResult(g2).teamTotals.total;
+        const actRes = Game.computeResult(top.game).teamTotals.total;
+        return {pid, delta:actRes - cfRes};
+      }).filter(pc => Math.abs(pc.delta) > 0.001);
+
+      perPlayer.sort((a,b) => Math.abs(b.delta) - Math.abs(a.delta));
+
+      const swingSign = swing > 0 ? 1 : -1;
+      const sameDir = perPlayer.filter(pc => Math.sign(pc.delta) === swingSign);
+      const rel = sameDir.length ? sameDir : perPlayer;
+      if (!rel.length) continue;
+
+      const maxD = Math.max(...rel.map(pc => Math.abs(pc.delta)));
+      const tied = rel.filter(pc => Math.abs(Math.abs(pc.delta) - maxD) < 0.001);
+
+      const labelFor = (pid) => {
+        const parVal = State.data.course.par[hole];
+        const gross = top.game.gross[pid] && top.game.gross[pid][hole];
+        if (parVal == null || gross == null) return '';
+        const d = gross - parVal;
+        if (d <= -3) return 'albatross';
+        if (d === -2) return 'eagle';
+        if (d === -1) return 'birdie';
+        if (d === 1) return 'bogey';
+        if (d >= 2) return 'double bogey';
+        return gross === parVal ? 'par' : '';
+      };
+
+      const pluralize = (s) => {
+        if (s === 'par') return 'pars';
+        if (s === 'birdie') return 'birdies';
+        if (s === 'eagle') return 'eagles';
+        if (s === 'bogey') return 'bogeys';
+        if (s === 'double bogey') return 'double bogeys';
+        if (s === 'albatross') return 'albatrosses';
+        return s ? (s + 's') : s;
+      };
+
+      const names = tied.map(t => UI.playerName(t.pid));
+      const labels = tied.map(t => labelFor(t.pid));
+
+      let whoText;
+      const allSame = labels.length && labels.every(l => l && l === labels[0]);
+      if (labels.length === 1) {
+        whoText = names[0] + (labels[0] ? (' ' + labels[0]) : '');
+      } else if (allSame) {
+        whoText = names.join(' & ') + (labels[0] ? ("'s " + pluralize(labels[0])) : '');
+      } else {
+        const parts = names.map((nm, i) => nm + (labels[i] ? (' ' + labels[i]) : ''));
+        whoText = parts.join(' & ');
+      }
+
+      const toward = swing > 0 ? 'Team A' : 'Team B';
+      lines.push({
+        hole,
+        value:Math.abs(swing),
+        swing,
+        text:`Hole ${hole+1}: ${whoText} swung ${Utils.fmt(Math.abs(swing))} toward ${toward}`
+      });
+    }
+
+    lines.sort((a,b) => (b.value - a.value) || (b.hole - a.hole));
+    return lines;
+  }
+};
+
+// === INIT ===
+if (!State.load() || !State.data.games.length) {
+  State.data.games = [Game.create()];
+  State.scheduleSave();
+}
+
+State.data.games = State.data.games.map(Game.sanitize);
+
+document.getElementById('resetBtn').onclick = () => {
+  if (!confirm('Start a new round? Scores & junk cleared, teams/stakes reset. Custom courses kept.')) return;
+  const keepCourse = Utils.clone(State.data.course);
+  const keepPresets = Utils.clone(State.presets);
+  State.data.games = [Game.create()];
+  State.data.course = keepCourse;
+  State.presets = keepPresets;
+  State.scheduleSave();
+  State.scheduleRender();
+  Err.toast('Round reset');
+};
+
+document.getElementById('clearBtn').onclick = () => {
+  if (!confirm('Clear all scores & junk? Teams/stakes/course stay the same.')) return;
+  State.data.games.forEach(g => {
+    State.data.players.forEach(p => {
+      g.gross[p.id] = Utils.make18(null);
+      g.junkCounts[p.id] = Utils.make18(0);
+    });
+  });
+  State.scheduleSave();
+  State.scheduleRender();
+  Err.toast('Scores cleared');
+};
+
+document.getElementById('factoryBtn').onclick = () => {
+  if (!confirm('Factory reset? EVERYTHING erased: scores, teams, strokes, players, ALL presets!')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  location.reload();
+};
+
+// iOS detection
+(function() {
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (ua.includes('Mac') && 'ontouchend' in document);
+  if (isIOS) document.documentElement.classList.add('ios');
+})();
+
+UI.render();
+Err.toast('App loaded');
+
+})();
+</script>
+
+</body>
+</html>
