@@ -406,6 +406,13 @@ const Game = {
     return {lines, winners, payA, teamPayA};
   },
 
+  hasAnyScores(g) {
+    return State.data.players.some(p => {
+      const arr = g.gross[p.id] || [];
+      return arr.some(score => score != null);
+    });
+  },
+
   computeJunk(g) {
     const sumTeam = (team, s, e) => {
       let tot = 0;
@@ -1039,7 +1046,8 @@ const UI = {
       h('thead',{},[h('tr',{},head),h('tr',{},parRow)]),
       h('tbody',{},[...rows,...(State.data.games.filter(g => g.gameType === 'vegas').map((game,gi) => {
         const actualIdx = State.data.games.indexOf(game);
-        const cells = [h('td',{class:'sticky press-label'},UI.gameLabel(game))];
+        const theme = `theme-g${(actualIdx%6)+1}`;
+        const cells = [h('td',{class:'sticky press-label',style:'font-weight:600;'},UI.gameLabel(game))];
         for (let hole = 0; hole < 18; hole++) {
           const currentPress = game.presses[hole] || '';
           const sel = h('select',{
@@ -1057,7 +1065,7 @@ const UI = {
           cells.push(h('td',{},[sel]));
         }
         cells.push(h('td',{colspan:'3'}));
-        return h('tr',{class:'press-row'},cells);
+        return h('tr',{class:`press-row ${theme}`},cells);
       }))])
     ]);
 
@@ -1082,7 +1090,16 @@ const UI = {
       let statusMsg = '';
       let statusClass = '';
       
-      if (game.gameType === 'vegas') {
+      // Check if ANY scores have been entered
+      const hasAnyScore = State.data.players.some(p => {
+        const arr = game.gross[p.id] || [];
+        return arr.some(score => score != null);
+      });
+      
+      if (!hasAnyScore) {
+        statusMsg = 'No scores yet';
+        statusClass = 'muted';
+      } else if (game.gameType === 'vegas') {
         const result = Game.computeVegasResult(game);
         const total = result.totalValue;
         const perPerson = total / 2;
@@ -1123,17 +1140,19 @@ const UI = {
         h('div',{class:'card',style:'padding:8px 12px;'},[
           h('div',{class:'row',style:'align-items:center;justify-content:space-between;gap:12px;'},[
             h('div',{class:'pill',style:'font-size:12px;'},UI.gameLabel(game)),
-            statusMsg ? h('div',{class:statusClass,style:'font-weight:600;font-size:14px;'},statusMsg) : h('div',{class:'muted',style:'font-size:14px;'},'No scores yet')
+            h('div',{class:statusClass || 'muted',style:`font-weight:${statusClass?'600':'400'};font-size:14px;`},statusMsg || 'No scores yet')
           ])
         ])
       ]);
     });
 
     return h('div',{},[
-      h('div',{class:'pill',style:'margin-bottom:8px;'},'Entering GROSS for all players'),
-      h('div',{},gameStatusRows),
-      h('div',{class:'note',style:'margin:8px 0;'},'Press rows show below for Vegas games (Press=2x, Blind=4x)'),
-      scroller
+      h('div',{class:'row',style:'align-items:center;justify-content:space-between;margin-bottom:8px;'},[
+        h('div',{class:'pill'},'Entering GROSS for all players'),
+        h('div',{class:'note'},'Press rows show below for Vegas games (Press=2x, Blind=4x)')
+      ]),
+      scroller,
+      h('div',{style:'margin-top:12px;'},gameStatusRows)
     ]);
   },
 
@@ -1224,14 +1243,6 @@ const UI = {
   },
 
   status() {
-    const dbg = h('div',{class:'row',style:'align-items:center;justify-content:space-between;'},[
-      h('label',{},[
-        h('input',{type:'checkbox',checked:State.data.debugStatus,
-          onclick:(e)=>{State.data.debugStatus=e.target.checked;State.scheduleSave();State.scheduleRender();}}),
-        ' Show debug details'
-      ])
-    ]);
-
     const blocks = State.data.games.map((g,idx) => {
       const theme = `theme-g${(idx%6)+1}`;
       
@@ -1318,12 +1329,25 @@ const UI = {
       ]);
     });
 
-    return h('div',{},[dbg,...blocks]);
+    return h('div',{},[
+      h('div',{class:'note',style:'margin-bottom:8px;'},'Current match standings'),
+      ...blocks
+    ]);
   },
 
   game() {
     const blocks = State.data.games.map((g,idx) => {
       const theme = `theme-g${(idx%6)+1}`;
+      
+      // Check if any scores entered
+      if (!Game.hasAnyScores(g)) {
+        return h('div',{class:theme},[
+          h('div',{class:'card'},[
+            h('div',{class:'pill'},UI.gameLabel(g)),
+            h('div',{class:'muted',style:'margin-top:12px;text-align:center;padding:20px;'},'No scores entered yet. Go to SCORES tab to enter scores.')
+          ])
+        ]);
+      }
       
       if (g.gameType === 'vegas') {
         const result = Game.computeVegasResult(g);
@@ -1438,6 +1462,11 @@ const UI = {
     State.data.players.forEach(p => net[p.id] = 0);
 
     const perGameRows = State.data.games.map(g => {
+      // Skip if no scores
+      if (!Game.hasAnyScores(g)) {
+        return h('li',{class:'muted'},`${this.gameLabel(g)}: No scores yet`);
+      }
+      
       let tot;
       if (g.gameType === 'vegas') {
         const res = Game.computeVegasResult(g);
@@ -1850,3 +1879,4 @@ Err.toast('App loaded');
 </script>
 </body>
 </html>
+
