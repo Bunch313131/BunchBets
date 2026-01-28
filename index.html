@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/BunchBets180.png">
 <link rel="mask-icon" href="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/safari-pinned-tab.svg" color="#2563eb">
 <link rel="manifest" href="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/manifest.webmanifest" crossorigin="anonymous">
-<title>Bunch Bets V6.0 Final - Nassau + Vegas</title>
+<title>Bunch Bets V6.0 Final - Nassau + Digits</title>
 <style>
 :root { --bg:#0b0e13; --card:#0f1420; --txt:#ecf0f6; --muted:#a3a9b6; --border:#1e2633; --acc:#3b82f6; --success:#16a34a; --danger:#dc2626; --warning:#d97706; color-scheme: light dark; }
 * { box-sizing:border-box; }
@@ -136,18 +136,18 @@ const Utils = {
 // === ERROR HANDLER ===
 const Err = {
   box: document.getElementById('err'),
-  show(msg) {
+  show(msg) { 
     console.error(msg);
-    this.box.textContent = msg;
-    this.box.style.display = 'block';
-    setTimeout(() => this.box.style.display = 'none', 5000);
+    this.box.textContent = msg; 
+    this.box.style.display = 'block'; 
+    setTimeout(() => this.box.style.display = 'none', 5000); 
   },
-  toast(msg) {
-    const t = document.createElement('div');
-    t.className = 'success-toast';
-    t.textContent = msg;
-    document.body.appendChild(t);
-    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 2000);
+  toast(msg) { 
+    const t = document.createElement('div'); 
+    t.className = 'success-toast'; 
+    t.textContent = msg; 
+    document.body.appendChild(t); 
+    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 2000); 
   }
 };
 
@@ -159,10 +159,10 @@ const State = {
     tab: 'setup',
     players: [{id:'p1',name:'P1'},{id:'p2',name:'P2'},{id:'p3',name:'P3'},{id:'p4',name:'P4'},{id:'p5',name:'P5'}],
     games: [],
-    course: {
-      name: 'El Macero',
-      hcp: [7,15,9,1,11,3,17,13,5,4,2,10,8,12,14,18,6,16],
-      par: [4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5]
+    course: { 
+      name: 'El Macero', 
+      hcp: [7,15,9,1,11,3,17,13,5,4,2,10,8,12,14,18,6,16], 
+      par: [4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5] 
     },
     settings: { thTop: 12, thMin: 5 },
     debugStatus: false
@@ -176,22 +176,22 @@ const State = {
   renderTimer: null,
 
   begin() { this.locks++; },
-  end() {
-    this.locks = Math.max(0, this.locks - 1);
-    if (!this.locks) {
-      this.scheduleSave();
-      this.scheduleRender();
-    }
+  end() { 
+    this.locks = Math.max(0, this.locks - 1); 
+    if (!this.locks) { 
+      this.scheduleSave(); 
+      this.scheduleRender(); 
+    } 
   },
-
+  
   scheduleSave() {
     clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(() => {
-      try {
+      try { 
         const saveData = {...this.data, presets: this.presets};
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
-      } catch(e) {
-        Err.show('Save failed: ' + e.message);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData)); 
+      } catch(e) { 
+        Err.show('Save failed: ' + e.message); 
       }
     }, 200);
   },
@@ -218,9 +218,9 @@ const State = {
       this.data.tab = obj.tab || 'setup';
       this.data.debugStatus = !!obj.debugStatus;
       return true;
-    } catch(e) {
+    } catch(e) { 
       Err.show('Load failed: ' + e.message);
-      return false;
+      return false; 
     }
   }
 };
@@ -231,17 +231,17 @@ const Game = {
     const g = {
       id: Utils.uid(),
       gameType: 'nassau',
-      teamA: ['p1','p2'],
+      teamA: ['p1','p2'], 
       teamB: ['p3','p4'],
-      teamSize: 2,
+      teamSize: 2, 
       scoringMode: 'hi_low',
       stakes: {front:2, back:4, overall:2},
       autoPress: {front:true, back:true, overall:false},
       junkValue: {front:1, back:2},
       pointValue: {front:1, back:1},
       presses: Utils.make18(''),
-      gross: {},
-      junkCounts: {},
+      gross: {}, 
+      junkCounts: {}, 
       strokesCount: {}
     };
     State.data.players.forEach(p => {
@@ -256,7 +256,7 @@ const Game = {
     if (!g) return this.create();
     g.id = g.id || Utils.uid();
     g.gameType = ['nassau','vegas'].includes(g.gameType) ? g.gameType : 'nassau';
-
+    
     const maxTeamSize = g.gameType === 'vegas' ? 2 : (g.teamSize || 2);
     g.teamSize = [1,2].includes(g.teamSize) ? g.teamSize : 2;
     g.scoringMode = ['hi_low','low_net'].includes(g.scoringMode) ? g.scoringMode : 'hi_low';
@@ -269,15 +269,15 @@ const Game = {
     ['front','back'].forEach(k => g.junkValue[k] = Math.max(0, parseInt(g.junkValue[k])||0));
     g.pointValue = g.pointValue || {front:1,back:1};
     ['front','back'].forEach(k => g.pointValue[k] = Math.max(0, parseFloat(g.pointValue[k])||1));
-
+    
     let pa = Array.isArray(g.presses) ? g.presses.slice(0,18) : Utils.make18('');
     while (pa.length < 18) pa.push('');
     g.presses = pa.map(v => ['','press','blind'].includes(v) ? v : '');
-
+    
     g.gross = g.gross || {};
     g.junkCounts = g.junkCounts || {};
     g.strokesCount = g.strokesCount || {};
-
+    
     State.data.players.forEach(p => {
       let ga = Array.isArray(g.gross[p.id]) ? g.gross[p.id].slice(0,18) : Utils.make18(null);
       while (ga.length < 18) ga.push(null);
@@ -287,11 +287,11 @@ const Game = {
         return (n >= MIN_SCORE && n <= MAX_SCORE) ? n : null;
       });
       g.gross[p.id] = ga;
-
+      
       let ja = Array.isArray(g.junkCounts[p.id]) ? g.junkCounts[p.id].slice(0,18) : Utils.make18(0);
       while (ja.length < 18) ja.push(0);
       g.junkCounts[p.id] = ja.map(v => Math.max(0, parseInt(v)||0));
-
+      
       g.strokesCount[p.id] = Math.max(0, parseInt(g.strokesCount[p.id])||0);
     });
     return g;
@@ -341,7 +341,7 @@ const Game = {
 
     const aLow = Math.min(aN0,aN1), bLow = Math.min(bN0,bN1);
     const aHi = Math.max(aN0,aN1), bHi = Math.max(bN0,bN1);
-
+    
     let d = 0;
     if (aLow < bLow) d++; else if (bLow < aLow) d--;
     if (aHi < bHi) d++; else if (bHi < aHi) d--;
@@ -351,9 +351,9 @@ const Game = {
   buildSegment(g, start, end, stake, autoPress) {
     const diffs = [];
     for (let i = 0; i < 18; i++) diffs.push(this.holeDiff(g, i));
-
+    
     const lines = [{start, end, stake, pressesTriggered:0}];
-
+    
     if (autoPress) {
       for (let h = start; h <= end; h++) {
         let pressed = false;
@@ -391,12 +391,12 @@ const Game = {
           hasAnyScore = true;
         }
       }
-
+      
       if (!hasAnyScore) {
         winners.push('—');
         return;
       }
-
+      
       // Show current standing even if incomplete
       if (cum > 0) { winners.push(`A +${cum}`); payA += line.stake; teamPayA += line.stake * szB; }
       else if (cum < 0) { winners.push(`B ${cum}`); payA -= line.stake; teamPayA -= line.stake * szA; }
@@ -429,15 +429,15 @@ const Game = {
     const back = this.buildSegment(g, 9, 17, g.stakes.back, g.autoPress.back);
     const overall = this.buildSegment(g, 0, 17, g.stakes.overall, g.autoPress.overall);
     const junk = this.computeJunk(g);
-
+    
     const szA = (g.teamA||[]).length || 1;
     const szB = (g.teamB||[]).length || 1;
     let junkTeam = 0;
     if (junk.netA > 0) junkTeam = junk.netA * szB;
     else if (junk.netA < 0) junkTeam = junk.netA * szA;
-
+    
     const total = front.teamPayA + back.teamPayA + overall.teamPayA + junkTeam;
-
+    
     return {
       segments: {front, back, overall},
       junk,
@@ -453,49 +453,49 @@ const Game = {
 
   computeVegasHole(g, hole) {
     const par = State.data.course.par[hole] || 4;
-
+    
     const getTeamScores = (team) => {
       if (team.length < 2) return null;
       const p1gross = g.gross[team[0]] && g.gross[team[0]][hole];
       const p2gross = g.gross[team[1]] && g.gross[team[1]][hole];
       if (p1gross == null || p2gross == null) return null;
-
+      
       const p1net = this.net(p1gross, this.strokes(g, team[0], hole));
       const p2net = this.net(p2gross, this.strokes(g, team[1], hole));
-
+      
       return {
         p1gross, p2gross, p1net, p2net,
         scores: [p1net, p2net].sort((a,b) => a-b)
       };
     };
-
+    
     const teamA = getTeamScores(g.teamA || []);
     const teamB = getTeamScores(g.teamB || []);
-
+    
     if (!teamA || !teamB) return null;
-
+    
     const opponentBirdie = (team) => team.p1gross < par || team.p2gross < par;
     const teamBogey = (team) => team.p1net > par || team.p2net > par;
-
+    
     const aFlip = opponentBirdie(teamB) || teamBogey(teamA);
     const bFlip = opponentBirdie(teamA) || teamBogey(teamB);
-
+    
     const formNumber = (data, flip) => {
       const [low, high] = data.scores;
       return flip ? (high * 10 + low) : (low * 10 + high);
     };
-
+    
     const numA = formNumber(teamA, aFlip);
     const numB = formNumber(teamB, bFlip);
     const diff = Math.abs(numA - numB);
-
+    
     const basePoints = numA < numB ? diff : (numA > numB ? -diff : 0);
-
+    
     const press = g.presses[hole] || '';
     let multiplier = 1;
     if (press === 'press') multiplier = 2;
     else if (press === 'blind') multiplier = 4;
-
+    
     return {
       numA,
       numB,
@@ -510,27 +510,27 @@ const Game = {
   computeVegasResult(g) {
     let frontPoints = 0, backPoints = 0;
     const holeDetails = [];
-
+    
     for (let h = 0; h < 18; h++) {
       const result = this.computeVegasHole(g, h);
       holeDetails.push(result);
-
+      
       if (result) {
         if (h <= 8) frontPoints += result.pointsToA;
         else backPoints += result.pointsToA;
       }
     }
-
+    
     const frontValue = frontPoints * (g.pointValue.front || 0) * 2;
     const backValue = backPoints * (g.pointValue.back || 0) * 2;
-
+    
     const junk = this.computeJunk(g);
     const szA = (g.teamA||[]).length || 1;
     const szB = (g.teamB||[]).length || 1;
     let junkTeam = 0;
     if (junk.netA > 0) junkTeam = junk.netA * szB;
     else if (junk.netA < 0) junkTeam = junk.netA * szA;
-
+    
     return {
       holeDetails,
       frontPoints,
@@ -608,7 +608,7 @@ const UI = {
     const b2 = g.teamB && g.teamB[1] ? abbr(g.teamB[1], used) : '';
     const left = (a1 && a2) ? `${a1}/${a2}` : (a1 || a2 || 'Team A');
     const right = (b1 && b2) ? `${b1}/${b2}` : (b1 || b2 || 'Team B');
-
+    
     if (g.gameType === 'vegas') {
       return `Vegas: ${left} vs ${right}`;
     } else {
@@ -648,12 +648,12 @@ const UI = {
     tabs.forEach(([id, label]) => {
       tabsEl.appendChild(h('button', {
         class: `btn small ${State.data.tab === id ? 'active primary' : ''}`,
-        onclick: () => {
+        onclick: () => { 
           if (document.activeElement && document.activeElement.blur) {
             try { document.activeElement.blur(); } catch(e) {}
           }
-          State.data.tab = id;
-          State.scheduleRender();
+          State.data.tab = id; 
+          State.scheduleRender(); 
         }
       }, label));
     });
@@ -661,7 +661,7 @@ const UI = {
 
   setup() {
     // Players
-    const playerInputs = State.data.players.map(p =>
+    const playerInputs = State.data.players.map(p => 
       h('div', {style:'display:grid;grid-template-columns:64px 1fr;gap:8px;'}, [
         h('span', {class:'muted',style:'text-align:right;'}, p.id),
         h('input', {
@@ -761,7 +761,7 @@ const UI = {
 
     const gameCards = State.data.games.map((g,idx) => {
       const theme = `theme-g${(idx%6)+1}`;
-
+      
       const teamBtns = (key) => {
         const team = key==='A'?g.teamA:g.teamB;
         const btns = State.data.players.map(p => {
@@ -852,9 +852,9 @@ const UI = {
               }},'Delete')
             ])
           ]),
-
+          
           gameTypeSelector(),
-
+          
           g.gameType === 'nassau' ? h('div',{},[h('div',{class:'game-options-row',style:'margin:6px 0;'},[
             h('div',{},[
               h('div',{class:'muted nowrap'},'Nassau Scoring'),
@@ -1076,53 +1076,63 @@ const UI = {
       } catch(e) {}
     },0);
 
-    // Calculate current standings for indicator
-    let statusMsg = '';
-    let statusClass = '';
-
-    if (g.gameType === 'vegas') {
-      const result = Game.computeVegasResult(g);
-      const total = result.totalValue;
-      const perPerson = total / 2;
-      const teamANames = (g.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
-      const teamBNames = (g.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
-
-      if (total > 0) {
-        statusMsg = `${teamANames} leading by ${Utils.fmt(total)} (${Utils.fmt(perPerson)}/player)`;
-        statusClass = 'points-positive';
-      } else if (total < 0) {
-        statusMsg = `${teamBNames} leading by ${Utils.fmt(Math.abs(total))} (${Utils.fmt(Math.abs(perPerson))}/player)`;
-        statusClass = 'points-negative';
+    // Calculate current standings for ALL games
+    const gameStatusRows = State.data.games.map((game, idx) => {
+      const theme = `theme-g${(idx%6)+1}`;
+      let statusMsg = '';
+      let statusClass = '';
+      
+      if (game.gameType === 'vegas') {
+        const result = Game.computeVegasResult(game);
+        const total = result.totalValue;
+        const perPerson = total / 2;
+        const teamANames = (game.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
+        const teamBNames = (game.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
+        
+        if (total > 0) {
+          statusMsg = `${teamANames} +${Utils.fmt(total)} (${Utils.fmt(perPerson)}/player)`;
+          statusClass = 'points-positive';
+        } else if (total < 0) {
+          statusMsg = `${teamBNames} +${Utils.fmt(Math.abs(total))} (${Utils.fmt(Math.abs(perPerson))}/player)`;
+          statusClass = 'points-negative';
+        } else {
+          statusMsg = 'Tied';
+          statusClass = '';
+        }
       } else {
-        statusMsg = 'Match is tied';
-        statusClass = '';
+        const result = Game.computeResult(game);
+        const total = result.teamTotals.total;
+        const teamSize = (game.teamA||[]).length || 1;
+        const perPerson = total / teamSize;
+        const teamANames = (game.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
+        const teamBNames = (game.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
+        
+        if (total > 0) {
+          statusMsg = `${teamANames} +${Utils.fmt(total)} (${Utils.fmt(perPerson)}/player)`;
+          statusClass = 'points-positive';
+        } else if (total < 0) {
+          statusMsg = `${teamBNames} +${Utils.fmt(Math.abs(total))} (${Utils.fmt(Math.abs(perPerson))}/player)`;
+          statusClass = 'points-negative';
+        } else {
+          statusMsg = 'Tied';
+          statusClass = '';
+        }
       }
-    } else {
-      const result = Game.computeResult(g);
-      const total = result.teamTotals.total;
-      const teamSize = (g.teamA||[]).length || 1;
-      const perPerson = total / teamSize;
-      const teamANames = (g.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
-      const teamBNames = (g.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
-
-      if (total > 0) {
-        statusMsg = `${teamANames} leading by ${Utils.fmt(total)} (${Utils.fmt(perPerson)}/player)`;
-        statusClass = 'points-positive';
-      } else if (total < 0) {
-        statusMsg = `${teamBNames} leading by ${Utils.fmt(Math.abs(total))} (${Utils.fmt(Math.abs(perPerson))}/player)`;
-        statusClass = 'points-negative';
-      } else {
-        statusMsg = 'Match is tied';
-        statusClass = '';
-      }
-    }
+      
+      return h('div',{class:theme,style:'margin-bottom:6px;'},[
+        h('div',{class:'card',style:'padding:8px 12px;'},[
+          h('div',{class:'row',style:'align-items:center;justify-content:space-between;gap:12px;'},[
+            h('div',{class:'pill',style:'font-size:12px;'},UI.gameLabel(game)),
+            statusMsg ? h('div',{class:statusClass,style:'font-weight:600;font-size:14px;'},statusMsg) : h('div',{class:'muted',style:'font-size:14px;'},'No scores yet')
+          ])
+        ])
+      ]);
+    });
 
     return h('div',{},[
-      h('div',{class:'row',style:'align-items:center;justify-content:space-between;margin-bottom:12px;'},[
-        h('div',{class:'pill'},'Entering GROSS for all players'),
-        statusMsg ? h('div',{class:statusClass,style:'font-weight:600;font-size:16px;'},statusMsg) : null
-      ]),
-      h('div',{class:'note',style:'margin-bottom:8px;'},'Press rows show below for Vegas games (Press=2x, Blind=4x)'),
+      h('div',{class:'pill',style:'margin-bottom:8px;'},'Entering GROSS for all players'),
+      h('div',{},gameStatusRows),
+      h('div',{class:'note',style:'margin:8px 0;'},'Press rows show below for Vegas games (Press=2x, Blind=4x)'),
       scroller
     ]);
   },
@@ -1224,12 +1234,12 @@ const UI = {
 
     const blocks = State.data.games.map((g,idx) => {
       const theme = `theme-g${(idx%6)+1}`;
-
+      
       if (g.gameType === 'vegas') {
         const result = Game.computeVegasResult(g);
         const teamANames = (g.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
         const teamBNames = (g.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
-
+        
         return h('div',{class:theme},[
           h('div',{class:'card'},[
             h('div',{class:'pill'},UI.gameLabel(g)),
@@ -1243,7 +1253,7 @@ const UI = {
           ])
         ]);
       }
-
+      
       const renderSeg = (lbl, start, end, autoKey) => {
         const stake = g.stakes[autoKey] || 0;
         const seg = Game.buildSegment(g, start, end, stake, g.autoPress[autoKey]);
@@ -1314,7 +1324,7 @@ const UI = {
   game() {
     const blocks = State.data.games.map((g,idx) => {
       const theme = `theme-g${(idx%6)+1}`;
-
+      
       if (g.gameType === 'vegas') {
         const result = Game.computeVegasResult(g);
         const teamANames = (g.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
@@ -1357,7 +1367,7 @@ const UI = {
           ])
         ]);
       }
-
+      
       let res;
       try {
         res = Game.computeResult(g);
@@ -1445,12 +1455,12 @@ const UI = {
       return h('li',{},`${this.gameLabel(g)}: ${Utils.fmt(tot)} to Team A`);
     });
 
-    const perPlayerRows = State.data.players.map(p =>
+    const perPlayerRows = State.data.players.map(p => 
       h('li',{},`${p.name}: ${Utils.fmt(net[p.id])}`)
     );
 
     const xfers = this.calcTransfers(net);
-    const xferRows = xfers.map(x =>
+    const xferRows = xfers.map(x => 
       h('li',{},`${UI.playerName(x.from)} → ${UI.playerName(x.to)}: ${Utils.fmt(x.amount)}`)
     );
 
@@ -1492,7 +1502,7 @@ const UI = {
         h('h3',{style:'margin:16px 0 8px 0;'},'Junk'),
         h('p',{},'Optional side bets for: Birdies, Sandies (sand save par+), Greenies (closest on par 3), etc. Each junk point has a $ value.')
       ]),
-
+      
       h('div',{class:'card',style:'margin-bottom:16px;'},[
         h('h2',{style:'margin:0 0 12px 0;'},'Vegas'),
         h('p',{},'Two-digit scoring game where each team forms a number from their two net scores.'),
@@ -1524,7 +1534,7 @@ const UI = {
         h('h3',{style:'margin:16px 0 8px 0;'},'Junk'),
         h('p',{},'Same as Nassau - optional side bets with $ values.')
       ]),
-
+      
       h('div',{class:'card'},[
         h('h2',{style:'margin:0 0 12px 0;'},'App Tips'),
         h('ul',{style:'margin:8px 0;padding-left:20px;'},[
@@ -1663,7 +1673,7 @@ const UI = {
       .filter(x => x.value >= State.data.settings.thMin)
       .slice(0, State.data.settings.thTop);
 
-    const content = all.length
+    const content = all.length 
       ? h('ul',{}, all.map(x => h('li',{}, x.text)))
       : h('div',{class:'muted',style:'padding:8px 0;'},'No highlights yet.');
 
@@ -1838,6 +1848,5 @@ Err.toast('App loaded');
 
 })();
 </script>
-
 </body>
 </html>
