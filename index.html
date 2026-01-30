@@ -152,7 +152,7 @@ const FIREBASE_CONFIG = {
 };
 
 // === LIVE SYNC MODULE ===
-const LiveSync = {
+window.LiveSync = {
   db: null,
   gameRef: null,
   shareCode: null,
@@ -413,7 +413,7 @@ const Utils = {
 };
 
 // === ERROR HANDLER ===
-const Err = {
+window.Err = {
   box: document.getElementById('err'),
   show(msg) { 
     console.error(msg);
