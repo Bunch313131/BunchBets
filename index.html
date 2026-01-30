@@ -1725,7 +1725,13 @@ const UI = {
 
     const aggTotal = (games) => {
       let tot = 0;
-      games.forEach(g => tot += Game.computeResult(g).teamTotals.total);
+      games.forEach(g => {
+        if (g.gameType === 'vegas') {
+          tot += Game.computeVegasResult(g).totalValue;
+        } else {
+          tot += Game.computeResult(g).teamTotals.total;
+        }
+      });
       return tot;
     };
 
@@ -1755,13 +1761,21 @@ const UI = {
       contrib.sort((a,b) => Math.abs(b.delta) - Math.abs(a.delta));
       const top = contrib[0];
 
+      const getGameTotal = (game) => {
+        if (game.gameType === 'vegas') {
+          return Game.computeVegasResult(game).totalValue;
+        } else {
+          return Game.computeResult(game).teamTotals.total;
+        }
+      };
+
       const perPlayer = [...(top.game.teamA||[]),...(top.game.teamB||[])].map(pid => {
         const g2 = Utils.clone(top.game);
         const s = Game.strokes(g2, pid, hole) || 0;
         g2.gross[pid][hole] = s + 100;
         g2.junkCounts[pid][hole] = 0;
-        const cfRes = Game.computeResult(g2).teamTotals.total;
-        const actRes = Game.computeResult(top.game).teamTotals.total;
+        const cfRes = getGameTotal(g2);
+        const actRes = getGameTotal(top.game);
         return {pid, delta:actRes - cfRes};
       }).filter(pc => Math.abs(pc.delta) > 0.001);
 
