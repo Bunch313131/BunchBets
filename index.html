@@ -11,6 +11,9 @@
 <link rel="mask-icon" href="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/safari-pinned-tab.svg" color="#2563eb">
 <link rel="manifest" href="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/manifest.webmanifest" crossorigin="anonymous">
 <title>Bunch Bets V6.0 Final - Nassau + Vegas</title>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 <style>
 :root { --bg:#0b0e13; --card:#0f1420; --txt:#ecf0f6; --muted:#a3a9b6; --border:#1e2633; --acc:#3b82f6; --success:#16a34a; --danger:#dc2626; --warning:#d97706; color-scheme: light dark; }
 * { box-sizing:border-box; }
@@ -88,6 +91,23 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .digits-display { font-size:20px; font-weight:700; font-family:monospace; color:var(--acc); }
 .points-positive { color:var(--success); font-weight:600; }
 .points-negative { color:var(--danger); font-weight:600; }
+/* Live Sharing Styles */
+.live-banner { background:linear-gradient(135deg,var(--acc),#6366f1); color:#fff; padding:8px 12px; text-align:center; font-weight:600; font-size:14px; }
+.live-banner.viewer { background:linear-gradient(135deg,#d97706,#dc2626); }
+.share-code { font-family:monospace; font-size:24px; font-weight:700; letter-spacing:2px; background:rgba(255,255,255,0.1); padding:8px 16px; border-radius:8px; display:inline-block; }
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:1000; display:flex; align-items:center; justify-content:center; padding:16px; }
+.modal { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:20px; max-width:400px; width:100%; max-height:90vh; overflow-y:auto; }
+.modal h2 { margin:0 0 16px 0; font-size:18px; }
+.modal-actions { display:flex; gap:8px; margin-top:16px; justify-content:flex-end; }
+.copy-btn { background:var(--acc); color:#fff; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-weight:600; }
+.copy-btn:hover { opacity:0.9; }
+.join-input { font-family:monospace; font-size:20px; letter-spacing:2px; text-transform:uppercase; text-align:center; }
+.sync-indicator { display:inline-block; width:8px; height:8px; border-radius:50%; background:#16a34a; margin-right:6px; animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+/* Viewer mode - disable all inputs */
+.viewer-mode input, .viewer-mode select, .viewer-mode button:not(.btn) { pointer-events:none; opacity:0.7; }
+.viewer-mode .tabs .btn { pointer-events:auto; opacity:1; }
+.viewer-mode #joinBtn { display:none; }
 </style>
 </head>
 <body>
@@ -95,12 +115,15 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
   <div class="row" style="align-items:center; justify-content:space-between;">
     <h1>Bunch Bets V6.0 Complete</h1>
     <div class="row">
+      <button class="btn small primary" id="hostBtn">Host Live</button>
+      <button class="btn small" id="joinBtn">Join Game</button>
       <button class="btn small" id="resetBtn">New Round</button>
       <button class="btn small" id="clearBtn">Clear Scores</button>
       <button class="btn small" id="factoryBtn">Factory Reset</button>
     </div>
   </div>
 </header>
+<div id="liveBanner" class="live-banner" style="display:none;"></div>
 <main>
   <div id="tabs"></div>
   <div id="app"></div>
@@ -115,6 +138,262 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
+
+// === FIREBASE CONFIG ===
+// Live sharing enabled! Project: bunchbets.firebaseapp.com
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDZlbkZMkfmFk1CS1i51JQ1NuknlNae0zo",
+  authDomain: "bunchbets.firebaseapp.com",
+  databaseURL: "https://bunchbets-default-rtdb.firebaseio.com",
+  projectId: "bunchbets",
+  storageBucket: "bunchbets.firebasestorage.app",
+  messagingSenderId: "267555779116",
+  appId: "1:267555779116:web:af1e05bacb82f0d4fe5789"
+};
+
+// === LIVE SYNC MODULE ===
+const LiveSync = {
+  db: null,
+  gameRef: null,
+  shareCode: null,
+  isHost: false,
+  isViewer: false,
+  unsubscribe: null,
+
+  init() {
+    if (FIREBASE_CONFIG.apiKey === "YOUR_API_KEY") {
+      console.log('Firebase not configured - live sharing disabled');
+      return false;
+    }
+    try {
+      firebase.initializeApp(FIREBASE_CONFIG);
+      this.db = firebase.database();
+      return true;
+    } catch (e) {
+      console.error('Firebase init failed:', e);
+      return false;
+    }
+  },
+
+  generateCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    return code;
+  },
+
+  async hostGame() {
+    if (!this.init()) {
+      Err.show('Firebase not configured. See instructions in index.html to enable live sharing.');
+      return null;
+    }
+
+    this.shareCode = this.generateCode();
+    this.isHost = true;
+    this.isViewer = false;
+    this.gameRef = this.db.ref('games/' + this.shareCode);
+
+    try {
+      await this.gameRef.set({
+        data: State.data,
+        presets: State.presets,
+        updatedAt: firebase.database.ServerValue.TIMESTAMP
+      });
+
+      this.showBanner(`Hosting: ${this.shareCode}`, false);
+      Err.toast('Game hosted! Share code: ' + this.shareCode);
+      return this.shareCode;
+    } catch (e) {
+      Err.show('Failed to host game: ' + e.message);
+      this.isHost = false;
+      return null;
+    }
+  },
+
+  async joinGame(code) {
+    if (!this.init()) {
+      Err.show('Firebase not configured. See instructions in index.html to enable live sharing.');
+      return false;
+    }
+
+    code = code.toUpperCase().trim();
+    if (!/^[A-Z0-9]{6}$/.test(code)) {
+      Err.show('Invalid code. Should be 6 characters.');
+      return false;
+    }
+
+    this.gameRef = this.db.ref('games/' + code);
+
+    try {
+      const snapshot = await this.gameRef.once('value');
+      if (!snapshot.exists()) {
+        Err.show('Game not found. Check the code and try again.');
+        return false;
+      }
+
+      this.shareCode = code;
+      this.isViewer = true;
+      this.isHost = false;
+
+      // Subscribe to updates
+      this.unsubscribe = this.gameRef.on('value', (snap) => {
+        const val = snap.val();
+        if (val && val.data) {
+          State.data = val.data;
+          State.presets = val.presets || [];
+          State.scheduleRender();
+        }
+      });
+
+      this.showBanner(`Viewing: ${code} (read-only)`, true);
+      this.disableEditing();
+      Err.toast('Connected to game ' + code);
+      return true;
+    } catch (e) {
+      Err.show('Failed to join game: ' + e.message);
+      return false;
+    }
+  },
+
+  syncToFirebase() {
+    if (!this.isHost || !this.gameRef) return;
+
+    this.gameRef.update({
+      data: State.data,
+      presets: State.presets,
+      updatedAt: firebase.database.ServerValue.TIMESTAMP
+    }).catch(e => console.error('Sync failed:', e));
+  },
+
+  stopSharing() {
+    if (this.unsubscribe && this.gameRef) {
+      this.gameRef.off('value', this.unsubscribe);
+    }
+    this.shareCode = null;
+    this.isHost = false;
+    this.isViewer = false;
+    this.gameRef = null;
+    this.hideBanner();
+    this.enableEditing();
+    Err.toast('Disconnected from live game');
+  },
+
+  showBanner(text, isViewer) {
+    const banner = document.getElementById('liveBanner');
+    banner.innerHTML = `<span class="sync-indicator"></span>${text} <button class="btn small" style="margin-left:12px;padding:4px 8px;" onclick="LiveSync.stopSharing()">Disconnect</button>`;
+    banner.className = 'live-banner' + (isViewer ? ' viewer' : '');
+    banner.style.display = 'block';
+  },
+
+  hideBanner() {
+    document.getElementById('liveBanner').style.display = 'none';
+  },
+
+  disableEditing() {
+    document.body.classList.add('viewer-mode');
+    // Hide edit buttons
+    ['resetBtn', 'clearBtn', 'factoryBtn', 'hostBtn'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+  },
+
+  enableEditing() {
+    document.body.classList.remove('viewer-mode');
+    ['resetBtn', 'clearBtn', 'factoryBtn', 'hostBtn'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = '';
+    });
+  },
+
+  showHostModal() {
+    if (this.isHost) {
+      // Already hosting - show current code
+      this.showShareModal(this.shareCode);
+      return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal">
+        <h2>Host Live Game</h2>
+        <p class="muted">Share your game in real-time. Others can view scores as you enter them.</p>
+        <div class="modal-actions">
+          <button class="btn" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+          <button class="btn primary" id="startHostBtn">Start Hosting</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    document.getElementById('startHostBtn').onclick = async () => {
+      const code = await this.hostGame();
+      overlay.remove();
+      if (code) this.showShareModal(code);
+    };
+
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  },
+
+  showShareModal(code) {
+    const url = window.location.origin + window.location.pathname + '?join=' + code;
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal">
+        <h2>Share This Code</h2>
+        <p class="muted" style="margin-bottom:16px;">Others can join with this code to view live scores:</p>
+        <div style="text-align:center;margin:20px 0;">
+          <div class="share-code">${code}</div>
+        </div>
+        <p class="muted" style="font-size:12px;">Or share this link:</p>
+        <input type="text" value="${url}" readonly style="font-size:12px;margin-bottom:8px;" onclick="this.select()">
+        <div class="modal-actions">
+          <button class="btn" onclick="this.closest('.modal-overlay').remove()">Close</button>
+          <button class="copy-btn" onclick="navigator.clipboard.writeText('${code}');Err.toast('Code copied!');">Copy Code</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  },
+
+  showJoinModal() {
+    if (this.isViewer) {
+      Err.toast('Already viewing a game. Disconnect first.');
+      return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal">
+        <h2>Join Live Game</h2>
+        <p class="muted">Enter the 6-character code to view a live game:</p>
+        <input type="text" id="joinCodeInput" class="join-input" maxlength="6" placeholder="ABC123" style="margin:16px 0;">
+        <div class="modal-actions">
+          <button class="btn" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+          <button class="btn primary" id="joinGameBtn">Join</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const input = document.getElementById('joinCodeInput');
+    input.focus();
+    input.oninput = () => { input.value = input.value.toUpperCase(); };
+    input.onkeydown = (e) => { if (e.key === 'Enter') document.getElementById('joinGameBtn').click(); };
+
+    document.getElementById('joinGameBtn').onclick = async () => {
+      const code = input.value;
+      const success = await this.joinGame(code);
+      if (success) overlay.remove();
+    };
+
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  }
+};
 
 // === UTILITIES ===
 const Utils = {
@@ -187,11 +466,13 @@ const State = {
   scheduleSave() {
     clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(() => {
-      try { 
+      try {
         const saveData = {...this.data, presets: this.presets};
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData)); 
-      } catch(e) { 
-        Err.show('Save failed: ' + e.message); 
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
+        // Sync to Firebase if hosting
+        if (LiveSync.isHost) LiveSync.syncToFirebase();
+      } catch(e) {
+        Err.show('Save failed: ' + e.message);
       }
     }, 200);
   },
@@ -1725,7 +2006,13 @@ const UI = {
 
     const aggTotal = (games) => {
       let tot = 0;
-      games.forEach(g => tot += Game.computeResult(g).teamTotals.total);
+      games.forEach(g => {
+        if (g.gameType === 'vegas') {
+          tot += Game.computeVegasResult(g).totalValue;
+        } else {
+          tot += Game.computeResult(g).teamTotals.total;
+        }
+      });
       return tot;
     };
 
@@ -1755,13 +2042,21 @@ const UI = {
       contrib.sort((a,b) => Math.abs(b.delta) - Math.abs(a.delta));
       const top = contrib[0];
 
+      const getGameTotal = (game) => {
+        if (game.gameType === 'vegas') {
+          return Game.computeVegasResult(game).totalValue;
+        } else {
+          return Game.computeResult(game).teamTotals.total;
+        }
+      };
+
       const perPlayer = [...(top.game.teamA||[]),...(top.game.teamB||[])].map(pid => {
         const g2 = Utils.clone(top.game);
         const s = Game.strokes(g2, pid, hole) || 0;
         g2.gross[pid][hole] = s + 100;
         g2.junkCounts[pid][hole] = 0;
-        const cfRes = Game.computeResult(g2).teamTotals.total;
-        const actRes = Game.computeResult(top.game).teamTotals.total;
+        const cfRes = getGameTotal(g2);
+        const actRes = getGameTotal(top.game);
         return {pid, delta:actRes - cfRes};
       }).filter(pc => Math.abs(pc.delta) > 0.001);
 
@@ -1864,6 +2159,22 @@ document.getElementById('factoryBtn').onclick = () => {
   localStorage.removeItem(STORAGE_KEY);
   location.reload();
 };
+
+// Live sharing buttons
+document.getElementById('hostBtn').onclick = () => LiveSync.showHostModal();
+document.getElementById('joinBtn').onclick = () => LiveSync.showJoinModal();
+
+// Check URL for join code on load
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const joinCode = params.get('join');
+  if (joinCode) {
+    // Remove code from URL to prevent re-joining on refresh
+    window.history.replaceState({}, '', window.location.pathname);
+    // Delay join to allow app to initialize
+    setTimeout(() => LiveSync.joinGame(joinCode), 500);
+  }
+})();
 
 // iOS detection
 (function() {
