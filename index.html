@@ -108,21 +108,65 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .viewer-mode input, .viewer-mode select, .viewer-mode button:not(.btn) { pointer-events:none; opacity:0.7; }
 .viewer-mode .tabs .btn { pointer-events:auto; opacity:1; }
 .viewer-mode #joinBtn { display:none; }
+
+/* Hamburger Menu Styles */
+.header-brand { display:flex; align-items:center; gap:10px; }
+.header-brand img { width:36px; height:36px; border-radius:8px; }
+.header-brand h1 { font-size:18px; margin:0; }
+.hamburger { background:none; border:none; color:var(--txt); font-size:28px; cursor:pointer; padding:4px 8px; line-height:1; }
+.hamburger:hover { color:var(--acc); }
+.menu-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100; opacity:0; visibility:hidden; transition:opacity 0.3s, visibility 0.3s; }
+.menu-overlay.open { opacity:1; visibility:visible; }
+.slide-menu { position:fixed; top:0; right:-280px; width:280px; height:100%; background:var(--card); border-left:1px solid var(--border); z-index:101; transition:right 0.3s ease; overflow-y:auto; display:flex; flex-direction:column; }
+.slide-menu.open { right:0; }
+.menu-header { padding:16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.menu-header h2 { margin:0; font-size:16px; }
+.menu-close { background:none; border:none; color:var(--txt); font-size:24px; cursor:pointer; padding:4px; line-height:1; }
+.menu-close:hover { color:var(--danger); }
+.menu-section { padding:12px 0; border-bottom:1px solid var(--border); }
+.menu-section:last-child { border-bottom:none; }
+.menu-section-title { padding:8px 16px; font-size:11px; text-transform:uppercase; color:var(--muted); letter-spacing:0.5px; }
+.menu-item { display:block; width:100%; padding:12px 16px; background:none; border:none; color:var(--txt); font-size:15px; text-align:left; cursor:pointer; transition:background 0.2s; }
+.menu-item:hover { background:rgba(255,255,255,0.05); }
+.menu-item.active { color:var(--acc); background:rgba(59,130,246,0.1); }
+.menu-item.danger { color:var(--danger); }
+.menu-item.primary { color:var(--acc); font-weight:600; }
 </style>
 </head>
 <body>
 <header>
   <div class="row" style="align-items:center; justify-content:space-between;">
-    <h1>Bunch Bets V6.0 Complete</h1>
-    <div class="row">
-      <button class="btn small primary" id="hostBtn">Host Live</button>
-      <button class="btn small" id="joinBtn">Join Game</button>
-      <button class="btn small" id="resetBtn">New Round</button>
-      <button class="btn small" id="clearBtn">Clear Scores</button>
-      <button class="btn small" id="factoryBtn">Factory Reset</button>
+    <div class="header-brand">
+      <img src="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/BunchBets180.png" alt="Bunch Bets">
+      <h1>Bunch Bets</h1>
     </div>
+    <button class="hamburger" id="menuToggle" aria-label="Menu">&#9776;</button>
   </div>
 </header>
+
+<!-- Slide-out Menu -->
+<div class="menu-overlay" id="menuOverlay"></div>
+<div class="slide-menu" id="slideMenu">
+  <div class="menu-header">
+    <h2>Menu</h2>
+    <button class="menu-close" id="menuClose">&times;</button>
+  </div>
+  <div class="menu-section">
+    <div class="menu-section-title">Navigate</div>
+    <div id="menuNav"></div>
+  </div>
+  <div class="menu-section">
+    <div class="menu-section-title">Live Sharing</div>
+    <button class="menu-item primary" id="hostBtn">Host Live Game</button>
+    <button class="menu-item" id="joinBtn">Join Game</button>
+  </div>
+  <div class="menu-section">
+    <div class="menu-section-title">Actions</div>
+    <button class="menu-item" id="resetBtn">New Round</button>
+    <button class="menu-item" id="clearBtn">Clear Scores</button>
+    <button class="menu-item danger" id="factoryBtn">Factory Reset</button>
+  </div>
+</div>
 <div id="liveBanner" class="live-banner" style="display:none;"></div>
 <main>
   <div id="tabs"></div>
@@ -926,29 +970,55 @@ const UI = {
       case 'rules': view = this.rules(); break;
       default: view = h('div', {class:'card'}, 'Unknown tab');
     }
-    document.querySelector('header').style.display = State.data.tab === 'setup' ? '' : 'none';
+    // Header always visible now (contains hamburger menu)
     root.appendChild(view);
   },
 
   renderTabs() {
     const tabs = [
-      ['setup','SETUP'],['scores','SCORES'],['junk','JUNK'],
-      ['status','STATUS'],['game','GAME'],['transactions','PAYMENTS'],['highlights','HIGH'],['rules','RULES']
+      ['scores','Scores'],['junk','Junk'],
+      ['status','Status'],['game','Game Details'],['transactions','Payments'],['highlights','Highlights'],['rules','Rules'],
+      ['setup','Setup (Advanced)']
     ];
+
+    // Populate menu navigation
+    const menuNav = document.getElementById('menuNav');
+    if (menuNav) {
+      menuNav.innerHTML = '';
+      tabs.forEach(([id, label]) => {
+        const btn = document.createElement('button');
+        btn.className = `menu-item ${State.data.tab === id ? 'active' : ''}`;
+        btn.textContent = label;
+        btn.onclick = () => {
+          State.data.tab = id;
+          this.closeMenu();
+          State.scheduleRender();
+        };
+        menuNav.appendChild(btn);
+      });
+    }
+
+    // Hide old tabs bar (keeping element for compatibility)
     const tabsEl = document.getElementById('tabs');
-    tabsEl.innerHTML = '';
-    tabs.forEach(([id, label]) => {
-      tabsEl.appendChild(h('button', {
-        class: `btn small ${State.data.tab === id ? 'active primary' : ''}`,
-        onclick: () => { 
-          if (document.activeElement && document.activeElement.blur) {
-            try { document.activeElement.blur(); } catch(e) {}
-          }
-          State.data.tab = id; 
-          State.scheduleRender(); 
-        }
-      }, label));
-    });
+    if (tabsEl) tabsEl.style.display = 'none';
+  },
+
+  openMenu() {
+    document.getElementById('menuOverlay').classList.add('open');
+    document.getElementById('slideMenu').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  },
+
+  closeMenu() {
+    document.getElementById('menuOverlay').classList.remove('open');
+    document.getElementById('slideMenu').classList.remove('open');
+    document.body.style.overflow = '';
+  },
+
+  initMenu() {
+    document.getElementById('menuToggle').onclick = () => this.openMenu();
+    document.getElementById('menuClose').onclick = () => this.closeMenu();
+    document.getElementById('menuOverlay').onclick = () => this.closeMenu();
   },
 
   setup() {
@@ -2134,6 +2204,7 @@ if (!State.load() || !State.data.games.length) {
 State.data.games = State.data.games.map(Game.sanitize);
 
 document.getElementById('resetBtn').onclick = () => {
+  UI.closeMenu();
   if (!confirm('Start a new round? Scores & junk cleared, teams/stakes reset. Custom courses kept.')) return;
   const keepCourse = Utils.clone(State.data.course);
   const keepPresets = Utils.clone(State.presets);
@@ -2146,6 +2217,7 @@ document.getElementById('resetBtn').onclick = () => {
 };
 
 document.getElementById('clearBtn').onclick = () => {
+  UI.closeMenu();
   if (!confirm('Clear all scores & junk? Teams/stakes/course stay the same.')) return;
   State.data.games.forEach(g => {
     State.data.players.forEach(p => {
@@ -2159,14 +2231,15 @@ document.getElementById('clearBtn').onclick = () => {
 };
 
 document.getElementById('factoryBtn').onclick = () => {
+  UI.closeMenu();
   if (!confirm('Factory reset? EVERYTHING erased: scores, teams, strokes, players, ALL presets!')) return;
   localStorage.removeItem(STORAGE_KEY);
   location.reload();
 };
 
 // Live sharing buttons
-document.getElementById('hostBtn').onclick = () => LiveSync.showHostModal();
-document.getElementById('joinBtn').onclick = () => LiveSync.showJoinModal();
+document.getElementById('hostBtn').onclick = () => { UI.closeMenu(); LiveSync.showHostModal(); };
+document.getElementById('joinBtn').onclick = () => { UI.closeMenu(); LiveSync.showJoinModal(); };
 
 // Check URL for join code on load
 (function() {
@@ -2188,6 +2261,7 @@ document.getElementById('joinBtn').onclick = () => LiveSync.showJoinModal();
 })();
 
 UI.render();
+UI.initMenu();
 Err.toast('App loaded');
 
 })();
