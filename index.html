@@ -2430,7 +2430,13 @@ const UI = {
       return h('div',{class:theme},scroller);
     });
 
+    const toggleBar = h('div',{class:'scoring-toggle'},[
+      h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.tab='scores';State.scheduleRender();}},'Scores'),
+      h('button',{class:'scoring-toggle-btn active',onclick:()=>{}},'Junk')
+    ]);
+
     return h('div',{},[
+      toggleBar,
       h('div',{class:'note',style:'margin-bottom:8px;'},'Sweeps (+3) Sweeps/Quads (+6) on last Par 3'),
       ...blocks
     ]);
@@ -2644,12 +2650,7 @@ const UI = {
       ]);
     });
 
-    const toggleBar = h('div',{class:'scoring-toggle'},[
-      h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.tab='scores';State.scheduleRender();}},'Scores'),
-      h('button',{class:'scoring-toggle-btn active',onclick:()=>{}},'Junk')
-    ]);
-
-    return h('div',{},[toggleBar, ...blocks]);
+    return h('div',{},blocks);
   },
 
   transactions() {
