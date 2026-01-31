@@ -962,6 +962,8 @@ const Game = {
       numB,
       aFlip,
       bFlip,
+      aHasBirdie: hasBirdie(teamA),
+      bHasBirdie: hasBirdie(teamB),
       basePoints,
       multiplier,
       pointsToA: basePoints * multiplier
@@ -2605,7 +2607,7 @@ const UI = {
   game() {
     const blocks = State.data.games.map((g,idx) => {
       const theme = `theme-g${(idx%6)+1}`;
-      
+
       // Check if any scores entered
       if (!Game.hasAnyScores(g)) {
         return h('div',{class:theme},[
@@ -2615,50 +2617,119 @@ const UI = {
           ])
         ]);
       }
-      
+
+      const teamANames = (g.teamA||[]).map(pid => UI.playerName(pid));
+      const teamBNames = (g.teamB||[]).map(pid => UI.playerName(pid));
+      const fmtPts = (p) => p > 0 ? `+${p}` : p === 0 ? 'E' : String(p);
+
       if (g.gameType === 'vegas') {
         const result = Game.computeVegasResult(g);
-        const teamANames = (g.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
-        const teamBNames = (g.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
+        const par = State.data.course.par;
+
+        // Build hole-by-hole rows for Vegas
+        const buildVegasHoleRows = (startHole, endHole) => {
+          let runningTotal = 0;
+          const rows = [];
+
+          for (let hole = startHole; hole <= endHole; hole++) {
+            const detail = result.holeDetails[hole];
+            if (!detail) {
+              rows.push(h('div',{style:'padding:6px 0;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;'},
+                `Hole ${hole+1}: No scores`));
+              continue;
+            }
+
+            runningTotal += detail.pointsToA;
+
+            // Build flip reason text
+            let flipReasonA = '', flipReasonB = '';
+            if (detail.aFlip) {
+              if (detail.bHasBirdie) flipReasonA = '(B birdie)';
+              else flipReasonA = '(no net par)';
+            }
+            if (detail.bFlip) {
+              if (detail.aHasBirdie) flipReasonB = '(A birdie)';
+              else flipReasonB = '(no net par)';
+            }
+
+            const aFlipTxt = detail.aFlip ? ' FLIP' + flipReasonA : '';
+            const bFlipTxt = detail.bFlip ? ' FLIP' + flipReasonB : '';
+
+            const diffAbs = Math.abs(detail.numA - detail.numB);
+            const winner = detail.numA < detail.numB ? 'A' : detail.numA > detail.numB ? 'B' : 'TIE';
+            const mathTxt = winner === 'TIE' ? `${detail.numA} vs ${detail.numB} = Push`
+              : `${Math.min(detail.numA,detail.numB)} vs ${Math.max(detail.numA,detail.numB)} = ${winner} +${diffAbs}`;
+
+            const ptClass = detail.pointsToA > 0 ? 'points-positive' : detail.pointsToA < 0 ? 'points-negative' : '';
+
+            rows.push(h('div',{style:'padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;'},[
+              h('div',{style:'display:flex;justify-content:space-between;align-items:center;'},[
+                h('span',{style:'font-weight:600;'},`#${hole+1}`),
+                h('span',{class:ptClass,style:'font-weight:600;'},`Run: ${fmtPts(runningTotal)}`)
+              ]),
+              h('div',{style:'margin-top:4px;color:var(--muted);'},[
+                h('div',{},`A: ${detail.numA}${aFlipTxt}  |  B: ${detail.numB}${bFlipTxt}`),
+                h('div',{style:'margin-top:2px;'},mathTxt + (detail.multiplier > 1 ? ` ×${detail.multiplier}` : ''))
+              ])
+            ]));
+          }
+          return rows;
+        };
+
+        const frontRows = buildVegasHoleRows(0, 8);
+        const backRows = buildVegasHoleRows(9, 17);
+        const frontPts = result.frontPoints;
+        const backPts = result.backPoints;
+        const frontVal = frontPts * (g.pointValue.front || 0);
+        const backVal = backPts * (g.pointValue.back || 0);
 
         return h('div',{class:theme},[
           h('div',{class:'card'},[
             h('div',{class:'pill'},UI.gameLabel(g)),
-            h('div',{class:'note',style:'margin-top:6px;'},`Team A: ${teamANames}  |  Team B: ${teamBNames}`),
+            h('div',{class:'note',style:'margin-top:6px;'},`Team A: ${teamANames.join(' & ')}  |  Team B: ${teamBNames.join(' & ')}`),
+
+            // Front 9
             h('div',{style:'margin-top:12px;'},[
-              h('div',{class:'grid grid-2'},[
-                h('div',{class:'card'},[
-                  h('div',{class:'muted'},'Front'),
-                  h('div',{},`${result.frontPoints>0?'+':''}${result.frontPoints} pts`),
-                  h('div',{style:'font-weight:600;'},Utils.fmt(result.frontValue))
+              h('div',{style:'font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between;'},[
+                h('span',{},'Front 9'),
+                h('span',{class:frontPts>0?'points-positive':frontPts<0?'points-negative':''},
+                  `${fmtPts(frontPts)} pts = ${Utils.fmt(frontVal)}/ea`)
+              ]),
+              ...frontRows
+            ]),
+
+            // Back 9
+            h('div',{style:'margin-top:16px;'},[
+              h('div',{style:'font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between;'},[
+                h('span',{},'Back 9'),
+                h('span',{class:backPts>0?'points-positive':backPts<0?'points-negative':''},
+                  `${fmtPts(backPts)} pts = ${Utils.fmt(backVal)}/ea`)
+              ]),
+              ...backRows
+            ]),
+
+            // Junk & Total
+            h('div',{class:'card',style:'margin-top:12px;'},[
+              h('div',{class:'row',style:'justify-content:space-between;'},[
+                h('div',{class:'muted'},'Junk:'),
+                h('div',{style:'font-weight:600;'},Utils.fmt(result.junkValue))
+              ])
+            ]),
+            h('div',{class:'card',style:'margin-top:12px;background:linear-gradient(135deg,rgba(59,130,246,0.1),rgba(22,163,74,0.1));'},[
+              h('div',{class:'row',style:'justify-content:space-between;align-items:center;'},[
+                h('div',{},[
+                  h('div',{class:'muted'},'TOTAL TO TEAM A'),
+                  h('div',{class:'muted',style:'font-size:11px;margin-top:2px;'},Utils.fmt((frontVal+backVal)/1)+' per player')
                 ]),
-                h('div',{class:'card'},[
-                  h('div',{class:'muted'},'Back'),
-                  h('div',{},`${result.backPoints>0?'+':''}${result.backPoints} pts`),
-                  h('div',{style:'font-weight:600;'},Utils.fmt(result.backValue))
-                ])
-              ]),
-              h('div',{class:'card',style:'margin-top:12px;'},[
-                h('div',{class:'row',style:'justify-content:space-between;'},[
-                  h('div',{class:'muted'},'Junk:'),
-                  h('div',{style:'font-weight:600;'},Utils.fmt(result.junkValue))
-                ])
-              ]),
-              h('div',{class:'card',style:'margin-top:12px;background:linear-gradient(135deg,rgba(59,130,246,0.1),rgba(22,163,74,0.1));'},[
-                h('div',{class:'row',style:'justify-content:space-between;align-items:center;'},[
-                  h('div',{},[
-                    h('div',{class:'muted'},'TOTAL TO TEAM A'),
-                    h('div',{class:'muted',style:'font-size:11px;margin-top:2px;'},Utils.fmt(result.totalValue/2)+' per player')
-                  ]),
-                  h('div',{style:'font-size:24px;font-weight:700;',class:result.totalValue>0?'points-positive':'points-negative'},
-                    Utils.fmt(result.totalValue))
-                ])
+                h('div',{style:'font-size:24px;font-weight:700;',class:result.totalValue>0?'points-positive':'points-negative'},
+                  Utils.fmt(result.totalValue))
               ])
             ])
           ])
         ]);
       }
-      
+
+      // Nassau - detailed hole-by-hole view
       let res;
       try {
         res = Game.computeResult(g);
@@ -2667,30 +2738,77 @@ const UI = {
         return h('div',{class:theme},[h('div',{class:'card'},[h('div',{},'Error calculating Nassau result: ' + e.message)])]);
       }
 
+      const buildNassauHoleRows = (startHole, endHole) => {
+        let cumulative = 0;
+        const rows = [];
+        const A = g.teamA || [];
+        const B = g.teamB || [];
+
+        for (let hole = startHole; hole <= endHole; hole++) {
+          // Get net scores for each player
+          const getNetScore = (pid) => {
+            const gr = g.gross[pid] && g.gross[pid][hole];
+            if (gr == null) return null;
+            return Game.net(gr, Game.strokes(g, pid, hole));
+          };
+
+          const aNets = A.map(pid => ({ name: UI.playerName(pid), net: getNetScore(pid) }));
+          const bNets = B.map(pid => ({ name: UI.playerName(pid), net: getNetScore(pid) }));
+
+          // Check if all scores are in
+          const allScored = aNets.every(p => p.net !== null) && bNets.every(p => p.net !== null);
+          if (!allScored) {
+            rows.push(h('div',{style:'padding:6px 0;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;'},
+              `Hole ${hole+1}: Incomplete`));
+            continue;
+          }
+
+          // Calculate high/low results
+          const aLow = Math.min(...aNets.map(p => p.net));
+          const aHi = Math.max(...aNets.map(p => p.net));
+          const bLow = Math.min(...bNets.map(p => p.net));
+          const bHi = Math.max(...bNets.map(p => p.net));
+
+          const lowWinner = aLow < bLow ? 'A' : bLow < aLow ? 'B' : 'T';
+          const hiWinner = aHi < bHi ? 'A' : bHi < aHi ? 'B' : 'T';
+
+          let holeDiff = 0;
+          if (aLow < bLow) holeDiff++; else if (bLow < aLow) holeDiff--;
+          if (aHi < bHi) holeDiff++; else if (bHi < aHi) holeDiff--;
+
+          cumulative += holeDiff;
+
+          const aNetsTxt = aNets.map(p => `${p.name.split(' ')[0]}: ${p.net}`).join(' / ');
+          const bNetsTxt = bNets.map(p => `${p.name.split(' ')[0]}: ${p.net}`).join(' / ');
+
+          const resultTxt = `Low: ${lowWinner} | Hi: ${hiWinner}`;
+          const cumClass = cumulative > 0 ? 'points-positive' : cumulative < 0 ? 'points-negative' : '';
+
+          rows.push(h('div',{style:'padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;'},[
+            h('div',{style:'display:flex;justify-content:space-between;align-items:center;'},[
+              h('span',{style:'font-weight:600;'},`#${hole+1}`),
+              h('span',{class:cumClass,style:'font-weight:600;'},`Cum: ${fmtPts(cumulative)}`)
+            ]),
+            h('div',{style:'margin-top:4px;color:var(--muted);'},[
+              h('div',{},`A Net: ${aNetsTxt}`),
+              h('div',{},`B Net: ${bNetsTxt}`),
+              h('div',{style:'margin-top:2px;'},resultTxt + ` | Hole: ${fmtPts(holeDiff)}`)
+            ])
+          ]));
+        }
+        return { rows, cumulative };
+      };
+
+      const front = buildNassauHoleRows(0, 8);
+      const back = buildNassauHoleRows(9, 17);
+
       const fmtTP = (tot, sz) => {
         const s = Math.max(1, sz||1);
         return `${Utils.fmt(tot)} / ${Utils.fmt(tot/s)}`;
       };
 
-      const renderSeg = (lbl, segRes) => {
-        const pills = segRes.lines.map((line, li) => {
-          const typ = line.pressedBy ? 'Press' : 'Main';
-          const holes = `${line.start+1}–${line.end+1}`;
-          const win = segRes.winners[li];
-          return h('div',{class:'pill'},`${typ} • ${holes} • ${win}`);
-        });
-        const teamTot = segRes.teamPayA;
-        return h('div',{class:'card'},[
-          h('div',{class:'row',style:'align-items:center;justify-content:space-between;'},[
-            h('div',{},lbl),
-            h('div',{class:'muted'},`Net to Team A (Team/Player): ${fmtTP(teamTot,(g.teamA||[]).length)}`)
-          ]),
-          h('div',{class:'row'},pills)
-        ]);
-      };
-
-      const aN = (g.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
-      const bN = (g.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
+      const aN = teamANames.join(' & ');
+      const bN = teamBNames.join(' & ');
 
       return h('div',{class:theme},[
         h('div',{class:'card'},[
@@ -2699,11 +2817,38 @@ const UI = {
             h('div',{class:'note'},'Positive = Team A')
           ]),
           h('div',{class:'note'},`A: ${aN||'—'}  |  B: ${bN||'—'}`),
-          renderSeg('Front (1–9)',res.segments.front),
-          renderSeg('Back (10–18)',res.segments.back),
-          renderSeg('Overall (1–18)',res.segments.overall),
-          h('div',{class:'card'},[h('div',{class:'pill'},`Junk to Team A (Team/Player): ${fmtTP(res.teamTotals.junk,(g.teamA||[]).length)}`)]),
-          h('div',{class:'card',style:'background:linear-gradient(135deg,rgba(59,130,246,0.05),rgba(22,163,74,0.05));'},[
+
+          // Front 9 details
+          h('div',{style:'margin-top:12px;'},[
+            h('div',{style:'font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between;'},[
+              h('span',{},'Front 9'),
+              h('span',{class:front.cumulative>0?'points-positive':front.cumulative<0?'points-negative':''},
+                `${fmtPts(front.cumulative)} (${Utils.fmt(res.segments.front.payA)})`)
+            ]),
+            ...front.rows
+          ]),
+
+          // Back 9 details
+          h('div',{style:'margin-top:16px;'},[
+            h('div',{style:'font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between;'},[
+              h('span',{},'Back 9'),
+              h('span',{class:back.cumulative>0?'points-positive':back.cumulative<0?'points-negative':''},
+                `${fmtPts(back.cumulative)} (${Utils.fmt(res.segments.back.payA)})`)
+            ]),
+            ...back.rows
+          ]),
+
+          // Overall summary
+          h('div',{class:'card',style:'margin-top:12px;'},[
+            h('div',{style:'font-weight:600;margin-bottom:4px;'},'Overall (1-18)'),
+            h('div',{class:'muted'},`Result: ${res.segments.overall.winners.join(' / ')} = ${Utils.fmt(res.segments.overall.payA)}`)
+          ]),
+
+          // Junk
+          h('div',{class:'card',style:'margin-top:8px;'},[h('div',{class:'pill'},`Junk to Team A: ${fmtTP(res.teamTotals.junk,(g.teamA||[]).length)}`)]),
+
+          // Total
+          h('div',{class:'card',style:'margin-top:8px;background:linear-gradient(135deg,rgba(59,130,246,0.05),rgba(22,163,74,0.05));'},[
             h('div',{class:'row',style:'justify-content:space-between;align-items:center;'},[
               h('div',{},[
                 h('div',{style:'font-weight:600;'},'GAME TOTAL TO TEAM A'),
