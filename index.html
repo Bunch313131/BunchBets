@@ -2174,6 +2174,11 @@ const UI = {
                 e.target.value = Utils.sanitize(e.target.value);
                 const v = e.target.value===''?null:parseInt(e.target.value);
                 State.data.games.forEach(gm => { if (gm.gross[p.id]) gm.gross[p.id][hole] = v; });
+                // Update score indicator immediately
+                const wrap = e.target.closest('.cellWrap');
+                wrap.classList.remove('eagle','birdie','bogey','double-bogey');
+                const cls = getScoreClass(v, par);
+                if (cls) wrap.classList.add(cls);
               },
               onkeydown:(e)=>{
                 if (e.key==='Enter') {
