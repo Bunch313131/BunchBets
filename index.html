@@ -193,8 +193,8 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .wizard-option:hover { border-color:var(--acc); }
 .wizard-option.selected { border-color:var(--acc); background:rgba(59,130,246,0.1); }
 .wizard-option input[type="radio"] { width:18px; height:18px; }
-.wizard-team-zone { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; min-height:100px; }
-.wizard-team-zone h4 { margin:0 0 8px 0; font-size:13px; color:var(--muted); }
+.wizard-team-zone { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; min-height:100px; text-align:center; }
+.wizard-team-zone h4 { margin:0 0 8px 0; font-size:13px; color:var(--muted); text-align:center; }
 .wizard-player-chip { display:inline-block; background:rgba(59,130,246,0.2); border:1px solid var(--acc); border-radius:20px; padding:6px 12px; margin:4px; font-size:13px; cursor:pointer; }
 .wizard-player-chip:hover { background:rgba(59,130,246,0.3); }
 .wizard-player-chip.team-a { background:rgba(22,163,74,0.2); border-color:#16a34a; }
@@ -210,6 +210,10 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .wizard-hole-num { font-size:11px; font-weight:600; color:var(--muted); }
 .wizard-hole-input { width:100%; min-width:0; padding:6px 2px; text-align:center; font-size:13px; border:1px solid var(--border); border-radius:6px; background:var(--card); }
 .wizard-hole-input:focus { border-color:var(--acc); outline:none; }
+/* Currency input styling for stakes/points */
+.currency-input-wrap { position:relative; display:flex; align-items:center; }
+.currency-input-wrap::before { content:'$'; position:absolute; left:10px; color:var(--muted); font-size:14px; pointer-events:none; z-index:1; }
+.currency-input { width:80px; padding:8px 8px 8px 22px; font-size:14px; min-height:40px; text-align:right; }
 </style>
 </head>
 <body>
@@ -1545,7 +1549,7 @@ const Wizard = {
               ${teamBHtml || '<span class="muted">Tap players below</span>'}
             </div>
           </div>
-          ${unassignedHtml ? `<div style="margin-top:12px;text-align:center;">${unassignedHtml}</div>` : ''}
+          ${unassignedHtml ? `<div style="margin-top:12px;text-align:center;"><div class="muted" style="font-size:12px;margin-bottom:6px;">Not in game:</div>${unassignedHtml}</div>` : ''}
         </div>
 
         <div class="wizard-section">
@@ -1572,20 +1576,26 @@ const Wizard = {
         </div>
 
         <div class="wizard-section">
-          <div class="wizard-section-title">${g.gameType==='vegas'?'Points':'Stakes'}</div>
+          <div class="wizard-section-title">${g.gameType==='vegas'?'$/Point':'Stakes'}</div>
           <div class="grid grid-3" style="gap:8px;">
             <div>
               <div class="muted" style="font-size:12px;margin-bottom:4px;">Front</div>
-              <input type="number" id="wizardStakesFront" value="${g.gameType==='vegas'?g.pointValue.front:g.stakes.front}" min="0" step="0.5">
+              <div class="currency-input-wrap">
+                <input type="number" class="currency-input" id="wizardStakesFront" value="${(g.gameType==='vegas'?g.pointValue.front:g.stakes.front).toFixed(2)}" min="0" step="0.01">
+              </div>
             </div>
             <div>
               <div class="muted" style="font-size:12px;margin-bottom:4px;">Back</div>
-              <input type="number" id="wizardStakesBack" value="${g.gameType==='vegas'?g.pointValue.back:g.stakes.back}" min="0" step="0.5">
+              <div class="currency-input-wrap">
+                <input type="number" class="currency-input" id="wizardStakesBack" value="${(g.gameType==='vegas'?g.pointValue.back:g.stakes.back).toFixed(2)}" min="0" step="0.01">
+              </div>
             </div>
             ${g.gameType==='nassau'?`
             <div>
               <div class="muted" style="font-size:12px;margin-bottom:4px;">Overall</div>
-              <input type="number" id="wizardStakesOverall" value="${g.stakes.overall}" min="0" step="0.5">
+              <div class="currency-input-wrap">
+                <input type="number" class="currency-input" id="wizardStakesOverall" value="${g.stakes.overall.toFixed(2)}" min="0" step="0.01">
+              </div>
             </div>
             `:'<div></div>'}
           </div>
@@ -1596,11 +1606,15 @@ const Wizard = {
           <div class="grid grid-2" style="gap:8px;">
             <div>
               <div class="muted" style="font-size:12px;margin-bottom:4px;">Front</div>
-              <input type="number" id="wizardJunkFront" value="${g.junkValue.front}" min="0" step="0.5">
+              <div class="currency-input-wrap">
+                <input type="number" class="currency-input" id="wizardJunkFront" value="${g.junkValue.front.toFixed(2)}" min="0" step="0.01">
+              </div>
             </div>
             <div>
               <div class="muted" style="font-size:12px;margin-bottom:4px;">Back</div>
-              <input type="number" id="wizardJunkBack" value="${g.junkValue.back}" min="0" step="0.5">
+              <div class="currency-input-wrap">
+                <input type="number" class="currency-input" id="wizardJunkBack" value="${g.junkValue.back.toFixed(2)}" min="0" step="0.01">
+              </div>
             </div>
           </div>
         </div>
@@ -1650,18 +1664,20 @@ const Wizard = {
         };
       });
 
-      // Team assignment
+      // Team assignment (max 2 per team)
       div.querySelectorAll('.wizard-player-chip').forEach(chip => {
         chip.onclick = () => {
           const pid = chip.dataset.pid;
-          // Cycle: unassigned -> A -> B -> unassigned
+          // Cycle: unassigned -> A -> B -> unassigned (max 2 per team)
           if (g.teamA.includes(pid)) {
             g.teamA = g.teamA.filter(x => x !== pid);
-            g.teamB.push(pid);
+            if (g.teamB.length < 2) g.teamB.push(pid);
           } else if (g.teamB.includes(pid)) {
             g.teamB = g.teamB.filter(x => x !== pid);
           } else {
-            g.teamA.push(pid);
+            // Unassigned - try to add to Team A first, then B
+            if (g.teamA.length < 2) g.teamA.push(pid);
+            else if (g.teamB.length < 2) g.teamB.push(pid);
           }
           this.render();
         };
