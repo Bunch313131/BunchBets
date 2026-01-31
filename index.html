@@ -65,6 +65,16 @@ th.sticky, td.sticky { position:sticky; left:0; background:var(--card); z-index:
 .cellWrap .dot.g4 { background-color:#6366f1; }
 .cellWrap .dot.g5 { background-color:#14b8a6; }
 .cellWrap .dot.g6 { background-color:#db2777; }
+/* Score indicators - circles for under par, squares for over par */
+.cellWrap .score-indicator { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
+.cellWrap .score-indicator::before { content:''; position:absolute; width:28px; height:28px; border:2px solid transparent; }
+.cellWrap .score-indicator::after { content:''; position:absolute; width:36px; height:36px; border:2px solid transparent; }
+.cellWrap.birdie .score-indicator::before { border-color:#16a34a; border-radius:50%; }
+.cellWrap.eagle .score-indicator::before { border-color:#16a34a; border-radius:50%; }
+.cellWrap.eagle .score-indicator::after { border-color:#16a34a; border-radius:50%; }
+.cellWrap.bogey .score-indicator::before { border-color:#dc2626; border-radius:4px; }
+.cellWrap.double-bogey .score-indicator::before { border-color:#dc2626; border-radius:4px; }
+.cellWrap.double-bogey .score-indicator::after { border-color:#dc2626; border-radius:4px; }
 .junkWrap { position:relative; display:inline-block; }
 .junkBox { width:48px; height:36px; text-align:center; font-size:20px; padding:6px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.22); position:relative; z-index:2; border-radius:6px; }
 .junkVal { position:absolute; top:8px; right:6px; font-size:12px; pointer-events:none; z-index:1; }
@@ -140,10 +150,8 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
   display:flex;
   align-items:center;
   justify-content:center;
-  opacity:0;
-  animation: wizardFadeIn 1.5s ease-out forwards;
 }
-.wizard-splash img { width:45%; max-width:280px; height:auto; border-radius:24px; box-shadow:0 8px 32px rgba(0,0,0,0.3); }
+.wizard-splash img { width:45%; max-width:280px; height:auto; border-radius:24px; box-shadow:0 8px 32px rgba(0,0,0,0.3); opacity:0; animation: wizardFadeIn 1.5s ease-out forwards; }
 @keyframes wizardFadeIn { from { opacity:0; } to { opacity:1; } }
 .wizard-screen { background:var(--bg); flex:1; display:flex; flex-direction:column; overflow:hidden; }
 .wizard-header { padding:20px 16px 12px; text-align:center; }
@@ -186,6 +194,11 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .wizard-game-tab.active { background:var(--acc); color:#fff; border-color:var(--acc); }
 .wizard-game-tab .delete-game { margin-left:6px; opacity:0.7; }
 .wizard-game-tab .delete-game:hover { opacity:1; }
+.wizard-holes-grid { display:grid; grid-template-columns:repeat(9, 1fr); gap:4px; margin-bottom:12px; }
+.wizard-hole-col { display:flex; flex-direction:column; align-items:center; gap:2px; }
+.wizard-hole-num { font-size:11px; font-weight:600; color:var(--muted); }
+.wizard-hole-input { width:100%; min-width:0; padding:6px 2px; text-align:center; font-size:13px; border:1px solid var(--border); border-radius:6px; background:var(--card); }
+.wizard-hole-input:focus { border-color:var(--acc); outline:none; }
 </style>
 </head>
 <body>
@@ -552,7 +565,8 @@ const State = {
     },
     settings: { thTop: 12, thMin: 5 },
     debugStatus: false,
-    lastActiveDate: null
+    lastActiveDate: null,
+    roundCompleteShown: false
   },
   presets: {
     'El Macero': { hcp:[7,15,9,1,11,3,17,13,5,4,2,10,8,12,14,18,6,16], par:[4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5] },
@@ -563,12 +577,32 @@ const State = {
   renderTimer: null,
 
   begin() { this.locks++; },
-  end() { 
-    this.locks = Math.max(0, this.locks - 1); 
-    if (!this.locks) { 
-      this.scheduleSave(); 
-      this.scheduleRender(); 
-    } 
+  end() {
+    this.locks = Math.max(0, this.locks - 1);
+    if (!this.locks) {
+      this.scheduleSave();
+      this.scheduleRender();
+      // Check if round just completed
+      if (!this.data.roundCompleteShown && this.isRoundComplete()) {
+        this.data.roundCompleteShown = true;
+        this.scheduleSave();
+        setTimeout(() => UI.showRoundCompleteModal(), 300);
+      }
+    }
+  },
+
+  isRoundComplete() {
+    // Check if all players have scores for all 18 holes
+    const g = this.data.games[0];
+    if (!g) return false;
+    for (const p of this.data.players) {
+      const scores = g.gross[p.id];
+      if (!scores) return false;
+      for (let i = 0; i < 18; i++) {
+        if (scores[i] === null || scores[i] === undefined) return false;
+      }
+    }
+    return true;
   },
   
   scheduleSave() {
@@ -607,6 +641,7 @@ const State = {
       if (obj.presets) this.presets = obj.presets;
       if (obj.settings) this.data.settings = obj.settings;
       if (obj.lastActiveDate) this.data.lastActiveDate = obj.lastActiveDate;
+      this.data.roundCompleteShown = !!obj.roundCompleteShown;
       this.data.tab = obj.tab || 'setup';
       this.data.debugStatus = !!obj.debugStatus;
       return true;
@@ -852,16 +887,18 @@ const Game = {
 
   computeVegasHole(g, hole) {
     const par = State.data.course.par[hole] || 4;
-    
+    const maxNet = par + 3; // Triple bogey max for Vegas
+
     const getTeamScores = (team) => {
       if (team.length < 2) return null;
       const p1gross = g.gross[team[0]] && g.gross[team[0]][hole];
       const p2gross = g.gross[team[1]] && g.gross[team[1]][hole];
       if (p1gross == null || p2gross == null) return null;
-      
-      const p1net = this.net(p1gross, this.strokes(g, team[0], hole));
-      const p2net = this.net(p2gross, this.strokes(g, team[1], hole));
-      
+
+      // Calculate net scores, capped at triple bogey
+      const p1net = Math.min(this.net(p1gross, this.strokes(g, team[0], hole)), maxNet);
+      const p2net = Math.min(this.net(p2gross, this.strokes(g, team[1], hole)), maxNet);
+
       return {
         p1gross, p2gross, p1net, p2net,
         scores: [p1net, p2net].sort((a,b) => a-b)
@@ -1127,6 +1164,7 @@ const Wizard = {
     this.active = false;
     this.removeOverlay();
     State.data.tab = 'scores';
+    State.data.roundCompleteShown = false;
     State.scheduleSave();
     State.scheduleRender();
     Err.toast('Game ready! Enter scores.');
@@ -1149,6 +1187,7 @@ const Wizard = {
     switch(this.step) {
       case 'splash': content = this.renderSplash(); break;
       case 'course': content = this.renderCourse(); break;
+      case 'courseSetup': content = this.renderCourseSetup(); break;
       case 'players': content = this.renderPlayers(); break;
       case 'game': content = this.renderGame(); break;
       default: content = document.createElement('div');
@@ -1213,8 +1252,9 @@ const Wizard = {
 
       document.getElementById('wizardCourseNext').onclick = () => {
         if (this.data.selectedCourse === '__new__') {
-          // For now, just proceed - they can set up course in advanced setup
-          this.skip();
+          // Go to course setup screen
+          this.step = 'courseSetup';
+          this.render();
           return;
         }
         if (this.data.selectedCourse && this.data.selectedCourse !== '__current__') {
@@ -1230,6 +1270,112 @@ const Wizard = {
       };
 
       document.getElementById('wizardSkip').onclick = () => this.skip();
+    }, 0);
+
+    return div;
+  },
+
+  renderCourseSetup() {
+    const div = document.createElement('div');
+    div.className = 'wizard-screen';
+
+    // Initialize temp course data if not set
+    if (!this.data.newCourse) {
+      this.data.newCourse = {
+        name: '',
+        par: [...State.data.course.par],
+        hcp: [...State.data.course.hcp]
+      };
+    }
+
+    const frontHoles = [];
+    const backHoles = [];
+    for (let i = 0; i < 9; i++) {
+      frontHoles.push(`
+        <div class="wizard-hole-col">
+          <div class="wizard-hole-num">${i+1}</div>
+          <input type="number" class="wizard-hole-input" data-hole="${i}" data-field="par" value="${this.data.newCourse.par[i] || ''}" min="3" max="6" placeholder="P">
+          <input type="number" class="wizard-hole-input" data-hole="${i}" data-field="hcp" value="${this.data.newCourse.hcp[i] || ''}" min="1" max="18" placeholder="H">
+        </div>
+      `);
+      backHoles.push(`
+        <div class="wizard-hole-col">
+          <div class="wizard-hole-num">${i+10}</div>
+          <input type="number" class="wizard-hole-input" data-hole="${i+9}" data-field="par" value="${this.data.newCourse.par[i+9] || ''}" min="3" max="6" placeholder="P">
+          <input type="number" class="wizard-hole-input" data-hole="${i+9}" data-field="hcp" value="${this.data.newCourse.hcp[i+9] || ''}" min="1" max="18" placeholder="H">
+        </div>
+      `);
+    }
+
+    div.innerHTML = `
+      <div class="wizard-header">
+        <h2>Course Setup</h2>
+        <p>Enter course details</p>
+      </div>
+      <div class="wizard-content">
+        <div class="wizard-section">
+          <div class="wizard-section-title">Course Name</div>
+          <input type="text" id="wizardCourseName" placeholder="Course name" value="${this.data.newCourse.name}" style="width:100%;margin-bottom:16px;">
+        </div>
+        <div class="wizard-section">
+          <div class="wizard-section-title">Front 9 (Par / Handicap)</div>
+          <div class="wizard-holes-grid">${frontHoles.join('')}</div>
+        </div>
+        <div class="wizard-section">
+          <div class="wizard-section-title">Back 9 (Par / Handicap)</div>
+          <div class="wizard-holes-grid">${backHoles.join('')}</div>
+        </div>
+        <div class="wizard-section">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="wizardSavePreset" checked>
+            <span>Save as course preset</span>
+          </label>
+        </div>
+      </div>
+      <div class="wizard-footer">
+        <button class="btn secondary" id="wizardCourseSetupBack">Back</button>
+        <button class="btn primary" id="wizardCourseSetupNext">Next</button>
+      </div>
+    `;
+
+    setTimeout(() => {
+      // Course name input
+      document.getElementById('wizardCourseName').oninput = (e) => {
+        this.data.newCourse.name = e.target.value;
+      };
+
+      // Par and handicap inputs
+      div.querySelectorAll('.wizard-hole-input').forEach(input => {
+        input.oninput = (e) => {
+          const hole = parseInt(e.target.dataset.hole);
+          const field = e.target.dataset.field;
+          const val = parseInt(e.target.value) || 0;
+          this.data.newCourse[field][hole] = val;
+        };
+      });
+
+      document.getElementById('wizardCourseSetupBack').onclick = () => {
+        this.step = 'course';
+        this.render();
+      };
+
+      document.getElementById('wizardCourseSetupNext').onclick = () => {
+        // Apply course to state
+        State.data.course.name = this.data.newCourse.name || 'New Course';
+        State.data.course.par = [...this.data.newCourse.par];
+        State.data.course.hcp = [...this.data.newCourse.hcp];
+
+        // Save as preset if checked
+        if (document.getElementById('wizardSavePreset').checked && this.data.newCourse.name.trim()) {
+          State.presets[this.data.newCourse.name.trim()] = {
+            par: [...this.data.newCourse.par],
+            hcp: [...this.data.newCourse.hcp]
+          };
+        }
+
+        this.step = 'players';
+        this.render();
+      };
     }, 0);
 
     return div;
@@ -1996,17 +2142,31 @@ const UI = {
     for (let i = 0; i < 18; i++) parRow.push(h('th',{},String(State.data.course.par[i]||'')));
     parRow.push(h('th',{}),h('th',{}),h('th',{}));
 
+    // Get score indicator class based on gross score vs par
+    const getScoreClass = (score, par) => {
+      if (score == null) return '';
+      const diff = score - par;
+      if (diff <= -2) return 'eagle';
+      if (diff === -1) return 'birdie';
+      if (diff === 0) return '';
+      if (diff === 1) return 'bogey';
+      return 'double-bogey';
+    };
+
     const rows = State.data.players.map((p, ri) => {
       // Ensure gross array exists for this player
       if (!g.gross[p.id]) g.gross[p.id] = Utils.make18(null);
       const cells = [h('td',{class:'sticky'},p.name)];
       for (let hole = 0; hole < 18; hole++) {
         const tabIdx = (hole * State.data.players.length) + ri + 1;
+        const score = g.gross[p.id][hole];
+        const par = State.data.course.par[hole] || 4;
+        const scoreClass = getScoreClass(score, par);
         cells.push(h('td',{},[
-          h('div',{class:'cellWrap'},[
+          h('div',{class:'cellWrap' + (scoreClass ? ' ' + scoreClass : '')},[
             h('input',{
               type:'tel',inputmode:'numeric',tabindex:tabIdx,
-              value:g.gross[p.id][hole]==null?'':String(g.gross[p.id][hole]),
+              value:score==null?'':String(score),
               style:'width:54px;text-align:center;',
               placeholder:'-',
               onfocus:()=>State.begin(),
@@ -2014,6 +2174,11 @@ const UI = {
                 e.target.value = Utils.sanitize(e.target.value);
                 const v = e.target.value===''?null:parseInt(e.target.value);
                 State.data.games.forEach(gm => { if (gm.gross[p.id]) gm.gross[p.id][hole] = v; });
+                // Update score indicator immediately
+                const wrap = e.target.closest('.cellWrap');
+                wrap.classList.remove('eagle','birdie','bogey','double-bogey');
+                const cls = getScoreClass(v, par);
+                if (cls) wrap.classList.add(cls);
               },
               onkeydown:(e)=>{
                 if (e.key==='Enter') {
@@ -2042,6 +2207,7 @@ const UI = {
                 State.end();
               }
             }),
+            h('div',{class:'score-indicator'}),
             createDots(p.id, hole) || ''
           ])
         ]));
@@ -2619,6 +2785,67 @@ const UI = {
     return xfers;
   },
 
+  showRoundCompleteModal() {
+    // Build quick summary
+    const net = {};
+    State.data.players.forEach(p => net[p.id] = 0);
+    State.data.games.forEach(g => {
+      let tot;
+      if (g.gameType === 'vegas') {
+        const res = Game.computeVegasResult(g);
+        tot = res.totalValue;
+      } else {
+        const res = Game.computeResult(g);
+        tot = res.teamTotals.total;
+      }
+      const szA = (g.teamA||[]).length || 1;
+      const szB = (g.teamB||[]).length || 1;
+      const aShare = szA ? tot/szA : 0;
+      const bShare = szB ? -tot/szB : 0;
+      (g.teamA||[]).forEach(id => net[id] += aShare);
+      (g.teamB||[]).forEach(id => net[id] += bShare);
+    });
+
+    const xfers = this.calcTransfers(net);
+    let transfersHtml = '<p class="muted">All square!</p>';
+    if (xfers.length) {
+      transfersHtml = '<ul style="margin:0;padding-left:20px;">' +
+        xfers.map(x => `<li>${this.playerName(x.from)} → ${this.playerName(x.to)}: ${Utils.fmt(x.amount)}</li>`).join('') +
+        '</ul>';
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:340px;">
+        <h2 style="text-align:center;margin-bottom:8px;">Round Complete!</h2>
+        <p class="muted" style="text-align:center;margin-bottom:16px;">Great round! Here's the settlement:</p>
+        <div style="background:var(--card);border-radius:8px;padding:12px;margin-bottom:16px;">
+          <div style="font-weight:600;margin-bottom:8px;">Payments:</div>
+          ${transfersHtml}
+        </div>
+        <div class="modal-actions" style="flex-direction:column;gap:8px;">
+          <button class="btn primary" id="shareResultsBtn" style="width:100%;">Share Results</button>
+          <button class="btn" id="viewPaymentsBtn" style="width:100%;">View Full Details</button>
+          <button class="btn secondary" id="dismissCompleteBtn" style="width:100%;">Dismiss</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    document.getElementById('shareResultsBtn').onclick = () => {
+      overlay.remove();
+      this.share();
+    };
+    document.getElementById('viewPaymentsBtn').onclick = () => {
+      overlay.remove();
+      State.data.tab = 'transactions';
+      State.scheduleRender();
+    };
+    document.getElementById('dismissCompleteBtn').onclick = () => overlay.remove();
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  },
+
   share() {
     try {
       const lines = ['Round Summary from Bunch Bets:',''];
@@ -2873,6 +3100,7 @@ document.getElementById('resetBtn').onclick = () => {
   State.data.games = [Game.create()];
   State.data.course = keepCourse;
   State.presets = keepPresets;
+  State.data.roundCompleteShown = false;
   State.scheduleSave();
   State.scheduleRender();
   Err.toast('Round reset');
