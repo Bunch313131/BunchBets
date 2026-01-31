@@ -992,13 +992,13 @@ const Wizard = {
     this.currentGameIndex = 0;
     this.data.games.push(this.createGameData());
     this.render();
-    // Auto-advance from splash after 2 seconds
+    // Auto-advance from splash after 4 seconds
     setTimeout(() => {
       if (this.step === 'splash') {
         this.step = 'course';
         this.render();
       }
-    }, 2000);
+    }, 4000);
   },
 
   getCurrentGame() {
