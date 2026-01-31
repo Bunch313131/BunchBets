@@ -762,11 +762,15 @@ const Game = {
     
     if (!teamA || !teamB) return null;
     
-    const opponentBirdie = (team) => team.p1gross < par || team.p2gross < par;
-    const teamBogey = (team) => team.p1net > par || team.p2net > par;
-    
-    const aFlip = opponentBirdie(teamB) || teamBogey(teamA);
-    const bFlip = opponentBirdie(teamA) || teamBogey(teamB);
+    const hasBirdie = (team) => team.p1gross < par || team.p2gross < par;
+    const hasNetParOrBetter = (team) => team.p1net <= par || team.p2net <= par;
+
+    // Flip conditions:
+    // - Opponent birdie (gross) always flips your number
+    // - Your own bogey flips your number, BUT only if no one on your team has net par or better
+    //   (net par or better "protects" your team from self-inflicted flip)
+    const aFlip = hasBirdie(teamB) || !hasNetParOrBetter(teamA);
+    const bFlip = hasBirdie(teamA) || !hasNetParOrBetter(teamB);
     
     const formNumber = (data, flip) => {
       const [low, high] = data.scores;
@@ -1207,7 +1211,7 @@ const UI = {
               h('div',{},[h('div',{class:'muted'},'Front'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.front,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.front=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.front);State.end();}})]),
               h('div',{},[h('div',{class:'muted'},'Back'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.back,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.back=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.back);State.end();}})]),
             ]),
-            h('div',{class:'note',style:'margin-top:8px;'},'Flip if: opponent gross birdie OR your team net bogey+')
+            h('div',{class:'note',style:'margin-top:8px;'},'Flip if: opponent birdie, OR no one on your team has net par or better')
           ]) : h('div',{}),
 
           strokesEditor(),
