@@ -550,7 +550,8 @@ const State = {
     },
     settings: { thTop: 12, thMin: 5 },
     debugStatus: false,
-    lastActiveDate: null
+    lastActiveDate: null,
+    roundCompleteShown: false
   },
   presets: {
     'El Macero': { hcp:[7,15,9,1,11,3,17,13,5,4,2,10,8,12,14,18,6,16], par:[4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5] },
@@ -561,12 +562,32 @@ const State = {
   renderTimer: null,
 
   begin() { this.locks++; },
-  end() { 
-    this.locks = Math.max(0, this.locks - 1); 
-    if (!this.locks) { 
-      this.scheduleSave(); 
-      this.scheduleRender(); 
-    } 
+  end() {
+    this.locks = Math.max(0, this.locks - 1);
+    if (!this.locks) {
+      this.scheduleSave();
+      this.scheduleRender();
+      // Check if round just completed
+      if (!this.data.roundCompleteShown && this.isRoundComplete()) {
+        this.data.roundCompleteShown = true;
+        this.scheduleSave();
+        setTimeout(() => UI.showRoundCompleteModal(), 300);
+      }
+    }
+  },
+
+  isRoundComplete() {
+    // Check if all players have scores for all 18 holes
+    const g = this.data.games[0];
+    if (!g) return false;
+    for (const p of this.data.players) {
+      const scores = g.gross[p.id];
+      if (!scores) return false;
+      for (let i = 0; i < 18; i++) {
+        if (scores[i] === null || scores[i] === undefined) return false;
+      }
+    }
+    return true;
   },
   
   scheduleSave() {
@@ -605,6 +626,7 @@ const State = {
       if (obj.presets) this.presets = obj.presets;
       if (obj.settings) this.data.settings = obj.settings;
       if (obj.lastActiveDate) this.data.lastActiveDate = obj.lastActiveDate;
+      this.data.roundCompleteShown = !!obj.roundCompleteShown;
       this.data.tab = obj.tab || 'setup';
       this.data.debugStatus = !!obj.debugStatus;
       return true;
@@ -1125,6 +1147,7 @@ const Wizard = {
     this.active = false;
     this.removeOverlay();
     State.data.tab = 'scores';
+    State.data.roundCompleteShown = false;
     State.scheduleSave();
     State.scheduleRender();
     Err.toast('Game ready! Enter scores.');
@@ -2617,6 +2640,67 @@ const UI = {
     return xfers;
   },
 
+  showRoundCompleteModal() {
+    // Build quick summary
+    const net = {};
+    State.data.players.forEach(p => net[p.id] = 0);
+    State.data.games.forEach(g => {
+      let tot;
+      if (g.gameType === 'vegas') {
+        const res = Game.computeVegasResult(g);
+        tot = res.totalValue;
+      } else {
+        const res = Game.computeResult(g);
+        tot = res.teamTotals.total;
+      }
+      const szA = (g.teamA||[]).length || 1;
+      const szB = (g.teamB||[]).length || 1;
+      const aShare = szA ? tot/szA : 0;
+      const bShare = szB ? -tot/szB : 0;
+      (g.teamA||[]).forEach(id => net[id] += aShare);
+      (g.teamB||[]).forEach(id => net[id] += bShare);
+    });
+
+    const xfers = this.calcTransfers(net);
+    let transfersHtml = '<p class="muted">All square!</p>';
+    if (xfers.length) {
+      transfersHtml = '<ul style="margin:0;padding-left:20px;">' +
+        xfers.map(x => `<li>${this.playerName(x.from)} → ${this.playerName(x.to)}: ${Utils.fmt(x.amount)}</li>`).join('') +
+        '</ul>';
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:340px;">
+        <h2 style="text-align:center;margin-bottom:8px;">Round Complete!</h2>
+        <p class="muted" style="text-align:center;margin-bottom:16px;">Great round! Here's the settlement:</p>
+        <div style="background:var(--card);border-radius:8px;padding:12px;margin-bottom:16px;">
+          <div style="font-weight:600;margin-bottom:8px;">Payments:</div>
+          ${transfersHtml}
+        </div>
+        <div class="modal-actions" style="flex-direction:column;gap:8px;">
+          <button class="btn primary" id="shareResultsBtn" style="width:100%;">Share Results</button>
+          <button class="btn" id="viewPaymentsBtn" style="width:100%;">View Full Details</button>
+          <button class="btn secondary" id="dismissCompleteBtn" style="width:100%;">Dismiss</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    document.getElementById('shareResultsBtn').onclick = () => {
+      overlay.remove();
+      this.share();
+    };
+    document.getElementById('viewPaymentsBtn').onclick = () => {
+      overlay.remove();
+      State.data.tab = 'transactions';
+      State.scheduleRender();
+    };
+    document.getElementById('dismissCompleteBtn').onclick = () => overlay.remove();
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  },
+
   share() {
     try {
       const lines = ['Round Summary from Bunch Bets:',''];
@@ -2871,6 +2955,7 @@ document.getElementById('resetBtn').onclick = () => {
   State.data.games = [Game.create()];
   State.data.course = keepCourse;
   State.presets = keepPresets;
+  State.data.roundCompleteShown = false;
   State.scheduleSave();
   State.scheduleRender();
   Err.toast('Round reset');
