@@ -134,9 +134,17 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 
 /* Wizard Styles */
 .wizard-overlay { position:fixed; inset:0; z-index:200; display:flex; flex-direction:column; }
-.wizard-splash { background:linear-gradient(135deg, #16a34a 0%, #15803d 50%, #166534 100%); display:flex; align-items:center; justify-content:center; flex:1; }
-.wizard-splash img { width:180px; height:180px; border-radius:24px; opacity:0; animation:wizardFadeIn 1.5s ease-out forwards; box-shadow:0 8px 32px rgba(0,0,0,0.3); }
-@keyframes wizardFadeIn { from { opacity:0; transform:scale(0.9); } to { opacity:1; transform:scale(1); } }
+.wizard-splash {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 50%, #166534 100%);
+  flex:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  opacity:0;
+  animation: wizardFadeIn 1.5s ease-out forwards;
+}
+.wizard-splash img { width:45%; max-width:280px; height:auto; border-radius:24px; box-shadow:0 8px 32px rgba(0,0,0,0.3); }
+@keyframes wizardFadeIn { from { opacity:0; } to { opacity:1; } }
 .wizard-screen { background:var(--bg); flex:1; display:flex; flex-direction:column; overflow:hidden; }
 .wizard-header { padding:20px 16px 12px; text-align:center; }
 .wizard-header h2 { margin:0 0 4px 0; font-size:22px; }
@@ -335,6 +343,10 @@ window.LiveSync = {
         if (val && val.data) {
           State.data = val.data;
           State.presets = val.presets || [];
+          // Sanitize games to ensure all player entries exist
+          if (State.data.games && Array.isArray(State.data.games)) {
+            State.data.games = State.data.games.map(g => Game.sanitize(g));
+          }
           State.scheduleRender();
         }
       });
@@ -446,6 +458,7 @@ window.LiveSync = {
         <div class="modal-actions">
           <button class="btn" onclick="this.closest('.modal-overlay').remove()">Close</button>
           <button class="copy-btn" onclick="navigator.clipboard.writeText('${code}');Err.toast('Code copied!');">Copy Code</button>
+          <button class="copy-btn" onclick="navigator.clipboard.writeText('${url}');Err.toast('Link copied!');">Copy Link</button>
         </div>
       </div>
     `;
@@ -532,13 +545,14 @@ const State = {
     tab: 'setup',
     players: [{id:'p1',name:'P1'},{id:'p2',name:'P2'},{id:'p3',name:'P3'},{id:'p4',name:'P4'},{id:'p5',name:'P5'}],
     games: [],
-    course: { 
-      name: 'El Macero', 
-      hcp: [7,15,9,1,11,3,17,13,5,4,2,10,8,12,14,18,6,16], 
-      par: [4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5] 
+    course: {
+      name: 'El Macero',
+      hcp: [7,15,9,1,11,3,17,13,5,4,2,10,8,12,14,18,6,16],
+      par: [4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5]
     },
     settings: { thTop: 12, thMin: 5 },
-    debugStatus: false
+    debugStatus: false,
+    lastActiveDate: null
   },
   presets: {
     'El Macero': { hcp:[7,15,9,1,11,3,17,13,5,4,2,10,8,12,14,18,6,16], par:[4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5] },
@@ -561,6 +575,8 @@ const State = {
     clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(() => {
       try {
+        // Update lastActiveDate to today
+        this.data.lastActiveDate = new Date().toDateString();
         const saveData = {...this.data, presets: this.presets};
         localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
         // Sync to Firebase if hosting
@@ -590,6 +606,7 @@ const State = {
       if (obj.course) this.data.course = obj.course;
       if (obj.presets) this.presets = obj.presets;
       if (obj.settings) this.data.settings = obj.settings;
+      if (obj.lastActiveDate) this.data.lastActiveDate = obj.lastActiveDate;
       this.data.tab = obj.tab || 'setup';
       this.data.debugStatus = !!obj.debugStatus;
       return true;
@@ -984,13 +1001,13 @@ const Wizard = {
     this.currentGameIndex = 0;
     this.data.games.push(this.createGameData());
     this.render();
-    // Auto-advance from splash after 2 seconds
+    // Auto-advance from splash after 4 seconds
     setTimeout(() => {
       if (this.step === 'splash') {
         this.step = 'course';
         this.render();
       }
-    }, 2000);
+    }, 4000);
   },
 
   getCurrentGame() {
@@ -1980,6 +1997,8 @@ const UI = {
     parRow.push(h('th',{}),h('th',{}),h('th',{}));
 
     const rows = State.data.players.map((p, ri) => {
+      // Ensure gross array exists for this player
+      if (!g.gross[p.id]) g.gross[p.id] = Utils.make18(null);
       const cells = [h('td',{class:'sticky'},p.name)];
       for (let hole = 0; hole < 18; hole++) {
         const tabIdx = (hole * State.data.players.length) + ri + 1;
@@ -1994,7 +2013,7 @@ const UI = {
               oninput:(e)=>{
                 e.target.value = Utils.sanitize(e.target.value);
                 const v = e.target.value===''?null:parseInt(e.target.value);
-                State.data.games.forEach(gm => gm.gross[p.id][hole] = v);
+                State.data.games.forEach(gm => { if (gm.gross[p.id]) gm.gross[p.id][hole] = v; });
               },
               onkeydown:(e)=>{
                 if (e.key==='Enter') {
@@ -2014,9 +2033,9 @@ const UI = {
                 if (v!==null && (v<MIN_SCORE || v>MAX_SCORE)) {
                   Err.show(`Invalid score ${v}. Use ${MIN_SCORE}-${MAX_SCORE}`);
                   e.target.value = '';
-                  State.data.games.forEach(gm => gm.gross[p.id][hole] = null);
+                  State.data.games.forEach(gm => { if (gm.gross[p.id]) gm.gross[p.id][hole] = null; });
                 } else {
-                  State.data.games.forEach(gm => gm.gross[p.id][hole] = v);
+                  State.data.games.forEach(gm => { if (gm.gross[p.id]) gm.gross[p.id][hole] = v; });
                   e.target.value = v==null?'':String(v);
                 }
                 updateSums(p.id);
@@ -2908,7 +2927,39 @@ document.getElementById('startWizardBtn').onclick = () => { UI.closeMenu(); Wiza
 
 UI.render();
 UI.initMenu();
-Err.toast('App loaded');
+
+// Intelligent launch detection
+(function() {
+  const today = new Date().toDateString();
+  const lastActive = State.data.lastActiveDate;
+
+  // Check if there's an active game with scores
+  const hasActiveGame = () => {
+    // Check if any game has at least one score entered
+    for (const g of State.data.games) {
+      for (const pid of Object.keys(g.gross || {})) {
+        const scores = g.gross[pid];
+        if (scores && scores.some(s => s !== null)) return true;
+      }
+    }
+    return false;
+  };
+
+  // If it's a new day, show wizard for fresh start
+  // If same day with active game, go to scores
+  if (lastActive !== today) {
+    // New day - show wizard
+    Wizard.start();
+  } else if (hasActiveGame()) {
+    // Same day with active game - go to scores tab
+    State.data.tab = 'live';
+    State.scheduleRender();
+    Err.toast('Welcome back');
+  } else {
+    // Same day but no active game - show wizard
+    Wizard.start();
+  }
+})();
 
 })();
 </script>
