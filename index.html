@@ -2665,7 +2665,7 @@ const UI = {
             rows.push(h('div',{style:'padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;'},[
               h('div',{style:'display:flex;justify-content:space-between;align-items:center;'},[
                 h('span',{style:'font-weight:600;'},`#${hole+1}`),
-                h('span',{class:ptClass,style:'font-weight:600;'},`Run: ${fmtPts(runningTotal)}`)
+                h('span',{class:ptClass,style:'font-weight:600;'},`${fmtPts(detail.pointsToA)} pts`)
               ]),
               h('div',{style:'margin-top:4px;color:var(--muted);'},[
                 h('div',{},`A: ${detail.numA}${aFlipTxt}  |  B: ${detail.numB}${bFlipTxt}`),
@@ -2712,14 +2712,14 @@ const UI = {
             h('div',{class:'card',style:'margin-top:12px;'},[
               h('div',{class:'row',style:'justify-content:space-between;'},[
                 h('div',{class:'muted'},'Junk:'),
-                h('div',{style:'font-weight:600;'},Utils.fmt(result.junkValue))
+                h('div',{style:'font-weight:600;'},Utils.fmt(result.junkValue) + ' (' + Utils.fmt(result.junkValue / ((g.teamA||[]).length || 1)) + '/ea)')
               ])
             ]),
             h('div',{class:'card',style:'margin-top:12px;background:linear-gradient(135deg,rgba(59,130,246,0.1),rgba(22,163,74,0.1));'},[
               h('div',{class:'row',style:'justify-content:space-between;align-items:center;'},[
                 h('div',{},[
                   h('div',{class:'muted'},'TOTAL TO TEAM A'),
-                  h('div',{class:'muted',style:'font-size:11px;margin-top:2px;'},Utils.fmt((frontVal+backVal)/1)+' per player')
+                  h('div',{class:'muted',style:'font-size:11px;margin-top:2px;'},Utils.fmt(result.totalValue / ((g.teamA||[]).length || 1))+' per player')
                 ]),
                 h('div',{style:'font-size:24px;font-weight:700;',class:result.totalValue>0?'points-positive':'points-negative'},
                   Utils.fmt(result.totalValue))
@@ -2738,13 +2738,23 @@ const UI = {
         return h('div',{class:theme},[h('div',{class:'card'},[h('div',{},'Error calculating Nassau result: ' + e.message)])]);
       }
 
-      const buildNassauHoleRows = (startHole, endHole) => {
-        let cumulative = 0;
+      const buildNassauHoleRows = (startHole, endHole, autoPress) => {
         const rows = [];
         const A = g.teamA || [];
         const B = g.teamB || [];
 
+        // Pre-calculate all hole diffs for this segment
+        const diffs = [];
+        for (let h = startHole; h <= endHole; h++) {
+          diffs.push(Game.holeDiff(g, h));
+        }
+
+        // Track bet lines - each has a start hole and we track cumulative
+        const betLines = [{ start: startHole, pressesTriggered: 0 }];
+
         for (let hole = startHole; hole <= endHole; hole++) {
+          const holeIdx = hole - startHole;
+
           // Get net scores for each player
           const getNetScore = (pid) => {
             const gr = g.gross[pid] && g.gross[pid][hole];
@@ -2763,7 +2773,7 @@ const UI = {
             continue;
           }
 
-          // Calculate high/low results
+          // Calculate high/low results for this hole
           const aLow = Math.min(...aNets.map(p => p.net));
           const aHi = Math.max(...aNets.map(p => p.net));
           const bLow = Math.min(...bNets.map(p => p.net));
@@ -2776,18 +2786,46 @@ const UI = {
           if (aLow < bLow) holeDiff++; else if (bLow < aLow) holeDiff--;
           if (aHi < bHi) holeDiff++; else if (bHi < aHi) holeDiff--;
 
-          cumulative += holeDiff;
+          // Calculate cumulative for each bet line and check for new presses
+          const lineStatuses = [];
+          betLines.forEach((line, li) => {
+            if (line.start > hole) return; // Press hasn't started yet
+
+            // Calculate cumulative from line start to current hole
+            let cum = 0;
+            for (let h = line.start; h <= hole; h++) {
+              const d = diffs[h - startHole];
+              if (d != null) cum += d;
+            }
+
+            lineStatuses.push(cum > 0 ? `+${cum}` : cum === 0 ? 'E' : String(cum));
+
+            // Check if new press should be triggered (auto-press logic)
+            if (autoPress && hole < endHole) {
+              const pressLevel = Math.floor(Math.abs(cum) / 2);
+              if (pressLevel > line.pressesTriggered) {
+                // Add new press starting next hole if not already there
+                const nextHole = hole + 1;
+                if (!betLines.some(l => l.start === nextHole)) {
+                  betLines.push({ start: nextHole, pressesTriggered: 0 });
+                }
+                line.pressesTriggered = pressLevel;
+              }
+            }
+          });
+
+          const betStatusTxt = lineStatuses.join('/');
+          const statusClass = lineStatuses[0]?.startsWith('+') ? 'points-positive' : lineStatuses[0]?.startsWith('-') ? 'points-negative' : '';
 
           const aNetsTxt = aNets.map(p => `${p.name.split(' ')[0]}: ${p.net}`).join(' / ');
           const bNetsTxt = bNets.map(p => `${p.name.split(' ')[0]}: ${p.net}`).join(' / ');
 
           const resultTxt = `Low: ${lowWinner} | Hi: ${hiWinner}`;
-          const cumClass = cumulative > 0 ? 'points-positive' : cumulative < 0 ? 'points-negative' : '';
 
           rows.push(h('div',{style:'padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;'},[
             h('div',{style:'display:flex;justify-content:space-between;align-items:center;'},[
               h('span',{style:'font-weight:600;'},`#${hole+1}`),
-              h('span',{class:cumClass,style:'font-weight:600;'},`Cum: ${fmtPts(cumulative)}`)
+              h('span',{class:statusClass,style:'font-weight:600;'},betStatusTxt)
             ]),
             h('div',{style:'margin-top:4px;color:var(--muted);'},[
               h('div',{},`A Net: ${aNetsTxt}`),
@@ -2796,11 +2834,18 @@ const UI = {
             ])
           ]));
         }
-        return { rows, cumulative };
+
+        // Final cumulative for the segment
+        let finalCum = 0;
+        for (let h = 0; h < diffs.length; h++) {
+          if (diffs[h] != null) finalCum += diffs[h];
+        }
+
+        return { rows, cumulative: finalCum };
       };
 
-      const front = buildNassauHoleRows(0, 8);
-      const back = buildNassauHoleRows(9, 17);
+      const front = buildNassauHoleRows(0, 8, g.autoPress.front);
+      const back = buildNassauHoleRows(9, 17, g.autoPress.back);
 
       const fmtTP = (tot, sz) => {
         const s = Math.max(1, sz||1);
