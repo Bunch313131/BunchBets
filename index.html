@@ -142,10 +142,10 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .wizard-header h2 { margin:0 0 4px 0; font-size:22px; }
 .wizard-header p { margin:0; color:var(--muted); font-size:14px; }
 .wizard-content { flex:1; overflow-y:auto; padding:12px 16px; }
-.wizard-footer { padding:16px; border-top:1px solid var(--border); background:var(--card); }
-.wizard-footer .btn { width:100%; padding:14px; font-size:16px; }
-.wizard-footer .btn + .btn { margin-top:10px; }
-.wizard-skip { text-align:center; margin-top:16px; }
+.wizard-footer { padding:12px 16px; border-top:1px solid var(--border); background:var(--card); display:flex; flex-wrap:wrap; gap:8px; }
+.wizard-footer .btn { flex:1; min-width:120px; padding:10px 12px; font-size:14px; }
+.wizard-footer .btn.secondary { flex:0 0 auto; min-width:80px; background:var(--card); }
+.wizard-skip { width:100%; text-align:center; margin-top:4px; }
 .wizard-skip a { color:var(--muted); font-size:13px; text-decoration:underline; cursor:pointer; }
 .wizard-skip a:hover { color:var(--acc); }
 .wizard-player-row { display:grid; grid-template-columns:1fr 80px 40px; gap:8px; align-items:center; margin-bottom:12px; }
@@ -1207,8 +1207,8 @@ const Wizard = {
         ${this.data.players.length < 5 ? '<button class="wizard-add-btn" id="wizardAddPlayer">+ Add Player</button>' : ''}
       </div>
       <div class="wizard-footer">
+        <button class="btn secondary" id="wizardPlayersBack">Back</button>
         <button class="btn primary" id="wizardPlayersNext">Next</button>
-        <button class="btn" id="wizardPlayersBack">Back</button>
       </div>
     `;
 
@@ -1381,9 +1381,9 @@ const Wizard = {
         </div>
       </div>
       <div class="wizard-footer">
-        <button class="btn primary" id="wizardGameNext">Add Another Game</button>
-        <button class="btn" id="wizardStartScoring" style="background:var(--success);border-color:var(--success);color:#fff;">Start Scoring</button>
-        <button class="btn" id="wizardGameBack">Back</button>
+        <button class="btn secondary" id="wizardGameBack">Back</button>
+        <button class="btn" id="wizardGameNext">+ Add Game</button>
+        <button class="btn primary" id="wizardStartScoring" style="background:var(--success);border-color:var(--success);">Start Scoring</button>
       </div>
     `;
 
