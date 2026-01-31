@@ -673,17 +673,18 @@ const Game = {
     const g = {
       id: Utils.uid(),
       gameType: 'nassau',
-      teamA: ['p1','p2'], 
+      teamA: ['p1','p2'],
       teamB: ['p3','p4'],
-      teamSize: 2, 
+      teamSize: 2,
       scoringMode: 'hi_low',
       stakes: {front:2, back:4, overall:2},
       autoPress: {front:true, back:true, overall:false},
+      withJunk: true,
       junkValue: {front:1, back:2},
       pointValue: {front:1, back:1},
       presses: Utils.make18(''),
-      gross: {}, 
-      junkCounts: {}, 
+      gross: {},
+      junkCounts: {},
       strokesCount: {}
     };
     State.data.players.forEach(p => {
@@ -1135,6 +1136,7 @@ const Wizard = {
       g.teamA = wg.teamA;
       g.teamB = wg.teamB;
       g.stakes = {...wg.stakes};
+      g.withJunk = wg.withJunk;
       g.junkValue = wg.withJunk ? {...wg.junkValue} : {front:0, back:0};
       g.pointValue = {...wg.pointValue};
 
