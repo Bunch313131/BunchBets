@@ -2339,17 +2339,15 @@ const UI = {
 
       // Get junk breakdown for front/back if junk is enabled
       const junk = game.withJunk ? Game.computeJunk(game) : null;
-      const szA = (game.teamA||[]).length || 1;
-      const szB = (game.teamB||[]).length || 1;
 
-      // Calculate per-player junk values for front/back
-      const frontJunkTeam = junk ? (junk.frontNetVal > 0 ? junk.frontNetVal * szB : junk.frontNetVal < 0 ? junk.frontNetVal * szA : 0) : 0;
-      const backJunkTeam = junk ? (junk.backNetVal > 0 ? junk.backNetVal * szB : junk.backNetVal < 0 ? junk.backNetVal * szA : 0) : 0;
+      // Junk per-player = delta pts × junk value (simple flat amount per player)
+      const frontJunkVal = junk ? junk.frontNetVal : 0;
+      const backJunkVal = junk ? junk.backNetVal : 0;
 
       if (game.gameType === 'vegas') {
         const result = Game.computeVegasResult(game);
-        const frontTotal = result.frontValue + frontJunkTeam;
-        const backTotal = result.backValue + backJunkTeam;
+        const frontTotal = result.frontValue + frontJunkVal;
+        const backTotal = result.backValue + backJunkVal;
         frontLine = junk
           ? `Front: ${fmtPts(result.frontPoints)} pts | Junk: ${fmtPts(junk.frontNetPts)} | Tot: ${Utils.fmt(frontTotal)}/ea`
           : `Front: ${fmtPts(result.frontPoints)} pts (${Utils.fmt(result.frontValue)}/ea)`;
@@ -2361,8 +2359,8 @@ const UI = {
         const seg = result.segments;
         // Format Nassau status: show each bet line result (always from Team A perspective)
         const fmtSeg = (s) => s.winners.join('/');
-        const frontTotal = seg.front.teamPayA + frontJunkTeam;
-        const backTotal = seg.back.teamPayA + backJunkTeam;
+        const frontTotal = seg.front.teamPayA + frontJunkVal;
+        const backTotal = seg.back.teamPayA + backJunkVal;
         frontLine = junk
           ? `Front: ${fmtSeg(seg.front)} | Junk: ${fmtPts(junk.frontNetPts)} | Tot: ${Utils.fmt(frontTotal)}/ea`
           : `Front: ${fmtSeg(seg.front)} (${Utils.fmt(seg.front.teamPayA)}/ea)`;
