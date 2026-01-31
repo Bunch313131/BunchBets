@@ -135,12 +135,15 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 /* Wizard Styles */
 .wizard-overlay { position:fixed; inset:0; z-index:200; display:flex; flex-direction:column; }
 .wizard-splash {
-  background: url('https://raw.githubusercontent.com/Bunch313131/nassau-app/main/BunchBets180.png') center center no-repeat;
-  background-size: cover;
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 50%, #166534 100%);
   flex:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
   opacity:0;
   animation: wizardFadeIn 1.5s ease-out forwards;
 }
+.wizard-splash img { width:45%; max-width:280px; height:auto; border-radius:24px; box-shadow:0 8px 32px rgba(0,0,0,0.3); }
 @keyframes wizardFadeIn { from { opacity:0; } to { opacity:1; } }
 .wizard-screen { background:var(--bg); flex:1; display:flex; flex-direction:column; overflow:hidden; }
 .wizard-header { padding:20px 16px 12px; text-align:center; }
@@ -1149,6 +1152,7 @@ const Wizard = {
   renderSplash() {
     const div = document.createElement('div');
     div.className = 'wizard-splash';
+    div.innerHTML = `<img src="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/BunchBets180.png" alt="Bunch Bets">`;
     return div;
   },
 
