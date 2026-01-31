@@ -2190,6 +2190,14 @@ const UI = {
                 wrap.classList.remove('eagle','birdie','bogey','double-bogey');
                 const cls = getScoreClass(v, par);
                 if (cls) wrap.classList.add(cls);
+                // Check if all players have scores for this hole - if so, update status bars
+                const allHaveScore = State.data.players.every(pl => {
+                  const s = g.gross[pl.id] && g.gross[pl.id][hole];
+                  return s != null;
+                });
+                if (allHaveScore) {
+                  updateStatusBars();
+                }
               },
               onkeydown:(e)=>{
                 if (e.key==='Enter') {
@@ -2278,8 +2286,8 @@ const UI = {
       } catch(e) {}
     },0);
 
-    // Calculate current standings for ALL games
-    const gameStatusRows = State.data.games.map((game, idx) => {
+    // Function to build status bars - called on render and on score updates
+    const buildGameStatusRows = () => State.data.games.map((game, idx) => {
       const theme = `theme-g${(idx%6)+1}`;
 
       // Check if ANY scores have been entered
@@ -2334,6 +2342,17 @@ const UI = {
       ]);
     });
 
+    // Update status bars without full re-render
+    const updateStatusBars = () => {
+      const container = document.getElementById('gameStatusBars');
+      if (container) {
+        container.innerHTML = '';
+        buildGameStatusRows().forEach(el => container.appendChild(el));
+      }
+    };
+
+    const gameStatusRows = buildGameStatusRows();
+
     const toggleBar = h('div',{class:'scoring-toggle'},[
       h('button',{class:'scoring-toggle-btn active',onclick:()=>{}},'Scores'),
       h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.tab='junk';State.scheduleRender();}},'Junk')
@@ -2346,7 +2365,7 @@ const UI = {
         h('div',{class:'note'},'Press rows show below for Vegas games (Press=2x, Blind=4x)')
       ]),
       scroller,
-      h('div',{style:'margin-top:12px;'},gameStatusRows)
+      h('div',{id:'gameStatusBars',style:'margin-top:12px;'},gameStatusRows)
     ]);
   },
 
