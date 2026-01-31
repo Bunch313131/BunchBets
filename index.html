@@ -172,6 +172,12 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .wizard-player-chip:hover { background:rgba(59,130,246,0.3); }
 .wizard-player-chip.team-a { background:rgba(22,163,74,0.2); border-color:#16a34a; }
 .wizard-player-chip.team-b { background:rgba(220,38,38,0.2); border-color:#dc2626; }
+.wizard-game-tabs { display:flex; gap:8px; justify-content:center; margin-top:8px; flex-wrap:wrap; }
+.wizard-game-tab { padding:6px 14px; border-radius:20px; font-size:13px; cursor:pointer; border:1px solid var(--border); background:var(--card); transition:all 0.2s; }
+.wizard-game-tab:hover { border-color:var(--acc); }
+.wizard-game-tab.active { background:var(--acc); color:#fff; border-color:var(--acc); }
+.wizard-game-tab .delete-game { margin-left:6px; opacity:0.7; }
+.wizard-game-tab .delete-game:hover { opacity:1; }
 </style>
 </head>
 <body>
@@ -965,7 +971,7 @@ const Wizard = {
     selectedCourse: null,
     games: []
   },
-  currentGame: null,
+  currentGameIndex: 0,
 
   start() {
     this.active = true;
@@ -975,7 +981,8 @@ const Wizard = {
       selectedCourse: null,
       games: []
     };
-    this.currentGame = this.createGameData();
+    this.currentGameIndex = 0;
+    this.data.games.push(this.createGameData());
     this.render();
     // Auto-advance from splash after 2 seconds
     setTimeout(() => {
@@ -984,6 +991,37 @@ const Wizard = {
         this.render();
       }
     }, 2000);
+  },
+
+  getCurrentGame() {
+    return this.data.games[this.currentGameIndex];
+  },
+
+  switchToGame(index) {
+    if (index >= 0 && index < this.data.games.length) {
+      this.currentGameIndex = index;
+      this.render();
+    }
+  },
+
+  addNewGame() {
+    const lastGame = this.getCurrentGame();
+    const newGame = this.createGameData();
+    // Copy team assignments from last game
+    newGame.teamA = [...lastGame.teamA];
+    newGame.teamB = [...lastGame.teamB];
+    this.data.games.push(newGame);
+    this.currentGameIndex = this.data.games.length - 1;
+    this.render();
+  },
+
+  deleteGame(index) {
+    if (this.data.games.length <= 1) return;
+    this.data.games.splice(index, 1);
+    if (this.currentGameIndex >= this.data.games.length) {
+      this.currentGameIndex = this.data.games.length - 1;
+    }
+    this.render();
   },
 
   createGameData() {
@@ -1246,17 +1284,20 @@ const Wizard = {
           Err.toast('Need at least 2 players');
           return;
         }
-        // Auto-assign teams for first game
-        const pids = validPlayers.map((p, i) => 'p' + (i+1));
-        if (pids.length >= 4) {
-          this.currentGame.teamA = [pids[0], pids[1]];
-          this.currentGame.teamB = [pids[2], pids[3]];
-        } else if (pids.length === 3) {
-          this.currentGame.teamA = [pids[0]];
-          this.currentGame.teamB = [pids[1]];
-        } else {
-          this.currentGame.teamA = [pids[0]];
-          this.currentGame.teamB = [pids[1]];
+        // Auto-assign teams for first game if not already set
+        const g = this.getCurrentGame();
+        if (g.teamA.length === 0 && g.teamB.length === 0) {
+          const pids = validPlayers.map((p, i) => 'p' + (i+1));
+          if (pids.length >= 4) {
+            g.teamA = [pids[0], pids[1]];
+            g.teamB = [pids[2], pids[3]];
+          } else if (pids.length === 3) {
+            g.teamA = [pids[0]];
+            g.teamB = [pids[1]];
+          } else {
+            g.teamA = [pids[0]];
+            g.teamB = [pids[1]];
+          }
         }
         this.step = 'game';
         this.render();
@@ -1274,7 +1315,7 @@ const Wizard = {
   renderGame() {
     const div = document.createElement('div');
     div.className = 'wizard-screen';
-    const g = this.currentGame;
+    const g = this.getCurrentGame();
     const validPlayers = this.data.players.filter(p => p.name.trim()).map((p, i) => ({id: 'p'+(i+1), name: p.name}));
 
     const teamAHtml = g.teamA.map(pid => {
@@ -1290,10 +1331,20 @@ const Wizard = {
     const unassigned = validPlayers.filter(p => !g.teamA.includes(p.id) && !g.teamB.includes(p.id));
     const unassignedHtml = unassigned.map(p => `<span class="wizard-player-chip" data-pid="${p.id}">${p.name}</span>`).join('');
 
+    // Build game tabs
+    const gameTabsHtml = this.data.games.map((game, idx) => {
+      const isActive = idx === this.currentGameIndex;
+      const canDelete = this.data.games.length > 1;
+      const gameLabel = game.gameType === 'vegas' ? 'Vegas' : 'Nassau';
+      return `<span class="wizard-game-tab ${isActive ? 'active' : ''}" data-game-idx="${idx}">
+        Game ${idx + 1}${canDelete && isActive ? '<span class="delete-game" data-delete-idx="' + idx + '">&times;</span>' : ''}
+      </span>`;
+    }).join('');
+
     div.innerHTML = `
       <div class="wizard-header">
         <h2>Game Setup</h2>
-        <p>Game ${this.data.games.length + 1}</p>
+        <div class="wizard-game-tabs">${gameTabsHtml}<span class="wizard-game-tab" data-add-game="1">+ New</span></div>
       </div>
       <div class="wizard-content">
         <div class="wizard-section">
@@ -1388,6 +1439,27 @@ const Wizard = {
     `;
 
     setTimeout(() => {
+      // Game tabs - switch between games
+      div.querySelectorAll('[data-game-idx]').forEach(tab => {
+        tab.onclick = (e) => {
+          if (e.target.classList.contains('delete-game')) return;
+          this.switchToGame(parseInt(tab.dataset.gameIdx));
+        };
+      });
+
+      // Add new game tab
+      div.querySelectorAll('[data-add-game]').forEach(tab => {
+        tab.onclick = () => this.addNewGame();
+      });
+
+      // Delete game buttons
+      div.querySelectorAll('[data-delete-idx]').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          this.deleteGame(parseInt(btn.dataset.deleteIdx));
+        };
+      });
+
       // Game type
       div.querySelectorAll('[data-type]').forEach(opt => {
         opt.onclick = () => {
@@ -1457,23 +1529,19 @@ const Wizard = {
           Err.toast('Assign players to both teams');
           return;
         }
-        // Save current game
-        this.data.games.push({...g});
-        // Create new game
-        this.currentGame = this.createGameData();
-        // Pre-assign teams same as last
-        this.currentGame.teamA = [...g.teamA];
-        this.currentGame.teamB = [...g.teamB];
-        this.render();
+        this.addNewGame();
       };
 
       document.getElementById('wizardStartScoring').onclick = () => {
-        if (g.teamA.length === 0 || g.teamB.length === 0) {
-          Err.toast('Assign players to both teams');
-          return;
+        // Validate all games have teams assigned
+        for (let i = 0; i < this.data.games.length; i++) {
+          const game = this.data.games[i];
+          if (game.teamA.length === 0 || game.teamB.length === 0) {
+            Err.toast(`Game ${i+1} needs teams assigned`);
+            this.switchToGame(i);
+            return;
+          }
         }
-        // Save current game
-        this.data.games.push({...g});
         this.finish();
       };
 
