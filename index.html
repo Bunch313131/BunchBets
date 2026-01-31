@@ -65,6 +65,16 @@ th.sticky, td.sticky { position:sticky; left:0; background:var(--card); z-index:
 .cellWrap .dot.g4 { background-color:#6366f1; }
 .cellWrap .dot.g5 { background-color:#14b8a6; }
 .cellWrap .dot.g6 { background-color:#db2777; }
+/* Score indicators - circles for under par, squares for over par */
+.cellWrap .score-indicator { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
+.cellWrap .score-indicator::before { content:''; position:absolute; width:28px; height:28px; border:2px solid transparent; }
+.cellWrap .score-indicator::after { content:''; position:absolute; width:36px; height:36px; border:2px solid transparent; }
+.cellWrap.birdie .score-indicator::before { border-color:#16a34a; border-radius:50%; }
+.cellWrap.eagle .score-indicator::before { border-color:#16a34a; border-radius:50%; }
+.cellWrap.eagle .score-indicator::after { border-color:#16a34a; border-radius:50%; }
+.cellWrap.bogey .score-indicator::before { border-color:#dc2626; border-radius:4px; }
+.cellWrap.double-bogey .score-indicator::before { border-color:#dc2626; border-radius:4px; }
+.cellWrap.double-bogey .score-indicator::after { border-color:#dc2626; border-radius:4px; }
 .junkWrap { position:relative; display:inline-block; }
 .junkBox { width:48px; height:36px; text-align:center; font-size:20px; padding:6px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.22); position:relative; z-index:2; border-radius:6px; }
 .junkVal { position:absolute; top:8px; right:6px; font-size:12px; pointer-events:none; z-index:1; }
@@ -877,16 +887,18 @@ const Game = {
 
   computeVegasHole(g, hole) {
     const par = State.data.course.par[hole] || 4;
-    
+    const maxNet = par + 3; // Triple bogey max for Vegas
+
     const getTeamScores = (team) => {
       if (team.length < 2) return null;
       const p1gross = g.gross[team[0]] && g.gross[team[0]][hole];
       const p2gross = g.gross[team[1]] && g.gross[team[1]][hole];
       if (p1gross == null || p2gross == null) return null;
-      
-      const p1net = this.net(p1gross, this.strokes(g, team[0], hole));
-      const p2net = this.net(p2gross, this.strokes(g, team[1], hole));
-      
+
+      // Calculate net scores, capped at triple bogey
+      const p1net = Math.min(this.net(p1gross, this.strokes(g, team[0], hole)), maxNet);
+      const p2net = Math.min(this.net(p2gross, this.strokes(g, team[1], hole)), maxNet);
+
       return {
         p1gross, p2gross, p1net, p2net,
         scores: [p1net, p2net].sort((a,b) => a-b)
@@ -2130,17 +2142,31 @@ const UI = {
     for (let i = 0; i < 18; i++) parRow.push(h('th',{},String(State.data.course.par[i]||'')));
     parRow.push(h('th',{}),h('th',{}),h('th',{}));
 
+    // Get score indicator class based on gross score vs par
+    const getScoreClass = (score, par) => {
+      if (score == null) return '';
+      const diff = score - par;
+      if (diff <= -2) return 'eagle';
+      if (diff === -1) return 'birdie';
+      if (diff === 0) return '';
+      if (diff === 1) return 'bogey';
+      return 'double-bogey';
+    };
+
     const rows = State.data.players.map((p, ri) => {
       // Ensure gross array exists for this player
       if (!g.gross[p.id]) g.gross[p.id] = Utils.make18(null);
       const cells = [h('td',{class:'sticky'},p.name)];
       for (let hole = 0; hole < 18; hole++) {
         const tabIdx = (hole * State.data.players.length) + ri + 1;
+        const score = g.gross[p.id][hole];
+        const par = State.data.course.par[hole] || 4;
+        const scoreClass = getScoreClass(score, par);
         cells.push(h('td',{},[
-          h('div',{class:'cellWrap'},[
+          h('div',{class:'cellWrap' + (scoreClass ? ' ' + scoreClass : '')},[
             h('input',{
               type:'tel',inputmode:'numeric',tabindex:tabIdx,
-              value:g.gross[p.id][hole]==null?'':String(g.gross[p.id][hole]),
+              value:score==null?'':String(score),
               style:'width:54px;text-align:center;',
               placeholder:'-',
               onfocus:()=>State.begin(),
@@ -2176,6 +2202,7 @@ const UI = {
                 State.end();
               }
             }),
+            h('div',{class:'score-indicator'}),
             createDots(p.id, hole) || ''
           ])
         ]));
