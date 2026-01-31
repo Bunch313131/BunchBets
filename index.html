@@ -2348,27 +2348,33 @@ const UI = {
 
       if (game.gameType === 'vegas') {
         const result = Game.computeVegasResult(game);
-        const frontTotal = result.frontValue + frontJunkVal;
-        const backTotal = result.backValue + backJunkVal;
+        // Per-player value = points × $/point (no team multiplier)
+        const frontPerPlayer = result.frontPoints * (game.pointValue.front || 0);
+        const backPerPlayer = result.backPoints * (game.pointValue.back || 0);
+        const frontTotal = frontPerPlayer + frontJunkVal;
+        const backTotal = backPerPlayer + backJunkVal;
         frontLine = junk
           ? `Front: ${fmtPts(result.frontPoints)} pts | Junk: ${fmtPts(junk.frontNetPts)} | Tot: ${Utils.fmt(frontTotal)}/ea`
-          : `Front: ${fmtPts(result.frontPoints)} pts (${Utils.fmt(result.frontValue)}/ea)`;
+          : `Front: ${fmtPts(result.frontPoints)} pts (${Utils.fmt(frontPerPlayer)}/ea)`;
         backLine = hasBack9Score ? (junk
           ? `Back: ${fmtPts(result.backPoints)} pts | Junk: ${fmtPts(junk.backNetPts)} | Tot: ${Utils.fmt(backTotal)}/ea`
-          : `Back: ${fmtPts(result.backPoints)} pts (${Utils.fmt(result.backValue)}/ea)`) : null;
+          : `Back: ${fmtPts(result.backPoints)} pts (${Utils.fmt(backPerPlayer)}/ea)`) : null;
       } else {
         const result = Game.computeResult(game);
         const seg = result.segments;
         // Format Nassau status: show each bet line result (always from Team A perspective)
         const fmtSeg = (s) => s.winners.join('/');
-        const frontTotal = seg.front.teamPayA + frontJunkVal;
-        const backTotal = seg.back.teamPayA + backJunkVal;
+        // Per-player value = just the stake, no team multiplier (payA not teamPayA)
+        const frontPerPlayer = seg.front.payA;
+        const backPerPlayer = seg.back.payA;
+        const frontTotal = frontPerPlayer + frontJunkVal;
+        const backTotal = backPerPlayer + backJunkVal;
         frontLine = junk
           ? `Front: ${fmtSeg(seg.front)} | Junk: ${fmtPts(junk.frontNetPts)} | Tot: ${Utils.fmt(frontTotal)}/ea`
-          : `Front: ${fmtSeg(seg.front)} (${Utils.fmt(seg.front.teamPayA)}/ea)`;
+          : `Front: ${fmtSeg(seg.front)} (${Utils.fmt(frontPerPlayer)}/ea)`;
         backLine = hasBack9Score ? (junk
           ? `Back: ${fmtSeg(seg.back)} | Junk: ${fmtPts(junk.backNetPts)} | Tot: ${Utils.fmt(backTotal)}/ea`
-          : `Back: ${fmtSeg(seg.back)} (${Utils.fmt(seg.back.teamPayA)}/ea)`) : null;
+          : `Back: ${fmtSeg(seg.back)} (${Utils.fmt(backPerPlayer)}/ea)`) : null;
       }
 
       return h('div',{class:theme,style:'margin-bottom:6px;'},[
