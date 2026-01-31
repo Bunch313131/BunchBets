@@ -41,7 +41,7 @@ input:focus, select:focus { outline:2px solid var(--acc); outline-offset:1px; }
 ::placeholder { color:var(--muted); opacity:0.9; }
 table { border-collapse:collapse; width:100%; font-size:14px; }
 th, td { border:1px solid var(--border); padding:6px; text-align:center; vertical-align:middle; }
-th.sticky, td.sticky { position:sticky; left:0; background:var(--card); z-index:10; text-align:left; transform:translateZ(0); backface-visibility:hidden; }
+th.sticky, td.sticky { position:sticky; left:0; background:var(--card); z-index:10; text-align:left; transform:translateZ(0); backface-visibility:hidden; box-shadow:2px 0 4px rgba(0,0,0,0.15); clip-path:inset(0 -5px 0 0); }
 .tabs { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 10px; }
 .tabs .btn.active { background:var(--acc); color:#fff; border-color:var(--acc); }
 .scroll { overflow:auto; isolation:isolate; }
