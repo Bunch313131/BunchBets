@@ -108,21 +108,109 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .viewer-mode input, .viewer-mode select, .viewer-mode button:not(.btn) { pointer-events:none; opacity:0.7; }
 .viewer-mode .tabs .btn { pointer-events:auto; opacity:1; }
 .viewer-mode #joinBtn { display:none; }
+
+/* Hamburger Menu Styles */
+.header-brand { display:flex; align-items:center; gap:10px; }
+.header-brand img { width:36px; height:36px; border-radius:8px; }
+.header-brand h1 { font-size:18px; margin:0; }
+.hamburger { background:none; border:none; color:var(--txt); font-size:28px; cursor:pointer; padding:4px 8px; line-height:1; }
+.hamburger:hover { color:var(--acc); }
+.menu-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100; opacity:0; visibility:hidden; transition:opacity 0.3s, visibility 0.3s; }
+.menu-overlay.open { opacity:1; visibility:visible; }
+.slide-menu { position:fixed; top:0; right:-280px; width:280px; height:100%; background:var(--card); border-left:1px solid var(--border); z-index:101; transition:right 0.3s ease; overflow-y:auto; display:flex; flex-direction:column; }
+.slide-menu.open { right:0; }
+.menu-header { padding:16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.menu-header h2 { margin:0; font-size:16px; }
+.menu-close { background:none; border:none; color:var(--txt); font-size:24px; cursor:pointer; padding:4px; line-height:1; }
+.menu-close:hover { color:var(--danger); }
+.menu-section { padding:12px 0; border-bottom:1px solid var(--border); }
+.menu-section:last-child { border-bottom:none; }
+.menu-section-title { padding:8px 16px; font-size:11px; text-transform:uppercase; color:var(--muted); letter-spacing:0.5px; }
+.menu-item { display:block; width:100%; padding:12px 16px; background:none; border:none; color:var(--txt); font-size:15px; text-align:left; cursor:pointer; transition:background 0.2s; }
+.menu-item:hover { background:rgba(255,255,255,0.05); }
+.menu-item.active { color:var(--acc); background:rgba(59,130,246,0.1); }
+.menu-item.danger { color:var(--danger); }
+.menu-item.primary { color:var(--acc); font-weight:600; }
+
+/* Wizard Styles */
+.wizard-overlay { position:fixed; inset:0; z-index:200; display:flex; flex-direction:column; }
+.wizard-splash { background:linear-gradient(135deg, #16a34a 0%, #15803d 50%, #166534 100%); display:flex; align-items:center; justify-content:center; flex:1; }
+.wizard-splash img { width:180px; height:180px; border-radius:24px; opacity:0; animation:wizardFadeIn 1.5s ease-out forwards; box-shadow:0 8px 32px rgba(0,0,0,0.3); }
+@keyframes wizardFadeIn { from { opacity:0; transform:scale(0.9); } to { opacity:1; transform:scale(1); } }
+.wizard-screen { background:var(--bg); flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.wizard-header { padding:20px 16px 12px; text-align:center; }
+.wizard-header h2 { margin:0 0 4px 0; font-size:22px; }
+.wizard-header p { margin:0; color:var(--muted); font-size:14px; }
+.wizard-content { flex:1; overflow-y:auto; padding:12px 16px; }
+.wizard-footer { padding:16px; border-top:1px solid var(--border); background:var(--card); }
+.wizard-footer .btn { width:100%; padding:14px; font-size:16px; }
+.wizard-footer .btn + .btn { margin-top:10px; }
+.wizard-skip { text-align:center; margin-top:16px; }
+.wizard-skip a { color:var(--muted); font-size:13px; text-decoration:underline; cursor:pointer; }
+.wizard-skip a:hover { color:var(--acc); }
+.wizard-player-row { display:grid; grid-template-columns:1fr 80px 40px; gap:8px; align-items:center; margin-bottom:12px; }
+.wizard-player-row.header { font-size:12px; color:var(--muted); margin-bottom:8px; }
+.wizard-player-row input { min-height:44px; }
+.wizard-player-row .delete-btn { background:none; border:none; color:var(--danger); font-size:20px; cursor:pointer; padding:8px; }
+.wizard-player-row .delete-btn:hover { opacity:0.7; }
+.wizard-add-btn { background:rgba(59,130,246,0.1); border:1px dashed var(--acc); color:var(--acc); padding:12px; border-radius:10px; width:100%; cursor:pointer; font-size:14px; margin-top:8px; }
+.wizard-add-btn:hover { background:rgba(59,130,246,0.2); }
+.wizard-course-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px; margin-bottom:10px; cursor:pointer; transition:all 0.2s; }
+.wizard-course-card:hover { border-color:var(--acc); }
+.wizard-course-card.selected { border-color:var(--acc); background:rgba(59,130,246,0.1); }
+.wizard-course-card h3 { margin:0 0 4px 0; font-size:15px; }
+.wizard-course-card p { margin:0; font-size:12px; color:var(--muted); }
+.wizard-section { margin-bottom:20px; }
+.wizard-section-title { font-size:13px; color:var(--muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px; }
+.wizard-option { display:flex; align-items:center; gap:10px; padding:12px; background:var(--card); border:1px solid var(--border); border-radius:10px; margin-bottom:8px; cursor:pointer; }
+.wizard-option:hover { border-color:var(--acc); }
+.wizard-option.selected { border-color:var(--acc); background:rgba(59,130,246,0.1); }
+.wizard-option input[type="radio"] { width:18px; height:18px; }
+.wizard-team-zone { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; min-height:100px; }
+.wizard-team-zone h4 { margin:0 0 8px 0; font-size:13px; color:var(--muted); }
+.wizard-player-chip { display:inline-block; background:rgba(59,130,246,0.2); border:1px solid var(--acc); border-radius:20px; padding:6px 12px; margin:4px; font-size:13px; cursor:pointer; }
+.wizard-player-chip:hover { background:rgba(59,130,246,0.3); }
+.wizard-player-chip.team-a { background:rgba(22,163,74,0.2); border-color:#16a34a; }
+.wizard-player-chip.team-b { background:rgba(220,38,38,0.2); border-color:#dc2626; }
 </style>
 </head>
 <body>
 <header>
   <div class="row" style="align-items:center; justify-content:space-between;">
-    <h1>Bunch Bets V6.0 Complete</h1>
-    <div class="row">
-      <button class="btn small primary" id="hostBtn">Host Live</button>
-      <button class="btn small" id="joinBtn">Join Game</button>
-      <button class="btn small" id="resetBtn">New Round</button>
-      <button class="btn small" id="clearBtn">Clear Scores</button>
-      <button class="btn small" id="factoryBtn">Factory Reset</button>
+    <div class="header-brand">
+      <img src="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/BunchBets180.png" alt="Bunch Bets">
+      <h1>Bunch Bets</h1>
     </div>
+    <button class="hamburger" id="menuToggle" aria-label="Menu">&#9776;</button>
   </div>
 </header>
+
+<!-- Slide-out Menu -->
+<div class="menu-overlay" id="menuOverlay"></div>
+<div class="slide-menu" id="slideMenu">
+  <div class="menu-header">
+    <h2>Menu</h2>
+    <button class="menu-close" id="menuClose">&times;</button>
+  </div>
+  <div class="menu-section">
+    <button class="menu-item primary" id="startWizardBtn" style="background:var(--success);color:#fff;font-weight:600;text-align:center;border-radius:8px;margin:0 12px;">Start New Game</button>
+  </div>
+  <div class="menu-section">
+    <div class="menu-section-title">Navigate</div>
+    <div id="menuNav"></div>
+  </div>
+  <div class="menu-section">
+    <div class="menu-section-title">Live Sharing</div>
+    <button class="menu-item primary" id="hostBtn">Host Live Game</button>
+    <button class="menu-item" id="joinBtn">Join Game</button>
+  </div>
+  <div class="menu-section">
+    <div class="menu-section-title">Actions</div>
+    <button class="menu-item" id="resetBtn">New Round</button>
+    <button class="menu-item" id="clearBtn">Clear Scores</button>
+    <button class="menu-item danger" id="factoryBtn">Factory Reset</button>
+  </div>
+</div>
 <div id="liveBanner" class="live-banner" style="display:none;"></div>
 <main>
   <div id="tabs"></div>
@@ -868,6 +956,537 @@ const h = (tag, attrs = {}, children = []) => {
   return el;
 };
 
+// === WIZARD ===
+const Wizard = {
+  active: false,
+  step: 'splash', // splash, course, players, game, done
+  data: {
+    players: [{name:'', handicap:0}, {name:'', handicap:0}],
+    selectedCourse: null,
+    games: []
+  },
+  currentGame: null,
+
+  start() {
+    this.active = true;
+    this.step = 'splash';
+    this.data = {
+      players: [{name:'', handicap:0}, {name:'', handicap:0}],
+      selectedCourse: null,
+      games: []
+    };
+    this.currentGame = this.createGameData();
+    this.render();
+    // Auto-advance from splash after 2 seconds
+    setTimeout(() => {
+      if (this.step === 'splash') {
+        this.step = 'course';
+        this.render();
+      }
+    }, 2000);
+  },
+
+  createGameData() {
+    return {
+      gameType: 'nassau',
+      teamA: [],
+      teamB: [],
+      withJunk: true,
+      handicapMode: 'full', // full, off_low, team_delta
+      stakes: {front:2, back:2, overall:2},
+      junkValue: {front:1, back:1},
+      pointValue: {front:1, back:1}
+    };
+  },
+
+  skip() {
+    this.active = false;
+    this.removeOverlay();
+    State.data.tab = 'setup';
+    State.scheduleRender();
+  },
+
+  finish() {
+    // Apply wizard data to State
+    // Players
+    State.data.players = this.data.players.filter(p => p.name.trim()).map((p, i) => ({
+      id: 'p' + (i+1),
+      name: p.name.trim()
+    }));
+
+    // Course (if new one was selected/created, it's already in State.data.course)
+
+    // Games
+    State.data.games = this.data.games.map((wg, idx) => {
+      const g = Game.create();
+      g.gameType = wg.gameType;
+      g.teamA = wg.teamA;
+      g.teamB = wg.teamB;
+      g.stakes = {...wg.stakes};
+      g.junkValue = wg.withJunk ? {...wg.junkValue} : {front:0, back:0};
+      g.pointValue = {...wg.pointValue};
+
+      // Apply handicap strokes based on mode
+      const playerHandicaps = {};
+      this.data.players.forEach((p, i) => {
+        if (p.name.trim()) playerHandicaps['p'+(i+1)] = p.handicap || 0;
+      });
+
+      if (wg.handicapMode === 'full') {
+        // Everyone gets full strokes
+        Object.keys(playerHandicaps).forEach(pid => {
+          g.strokesCount[pid] = playerHandicaps[pid];
+        });
+      } else if (wg.handicapMode === 'off_low') {
+        // Reduce by lowest
+        const min = Math.min(...Object.values(playerHandicaps));
+        Object.keys(playerHandicaps).forEach(pid => {
+          g.strokesCount[pid] = playerHandicaps[pid] - min;
+        });
+      } else if (wg.handicapMode === 'team_delta') {
+        // High player on high team gets delta
+        const teamATotal = wg.teamA.reduce((s, pid) => s + (playerHandicaps[pid]||0), 0);
+        const teamBTotal = wg.teamB.reduce((s, pid) => s + (playerHandicaps[pid]||0), 0);
+        Object.keys(playerHandicaps).forEach(pid => g.strokesCount[pid] = 0);
+
+        if (teamATotal > teamBTotal) {
+          // Team A is high, find high player on Team A
+          let highPid = wg.teamA[0], highVal = playerHandicaps[wg.teamA[0]] || 0;
+          wg.teamA.forEach(pid => {
+            if ((playerHandicaps[pid]||0) > highVal) { highPid = pid; highVal = playerHandicaps[pid]||0; }
+          });
+          g.strokesCount[highPid] = teamATotal - teamBTotal;
+        } else if (teamBTotal > teamATotal) {
+          // Team B is high
+          let highPid = wg.teamB[0], highVal = playerHandicaps[wg.teamB[0]] || 0;
+          wg.teamB.forEach(pid => {
+            if ((playerHandicaps[pid]||0) > highVal) { highPid = pid; highVal = playerHandicaps[pid]||0; }
+          });
+          g.strokesCount[highPid] = teamBTotal - teamATotal;
+        }
+      }
+
+      return Game.sanitize(g);
+    });
+
+    this.active = false;
+    this.removeOverlay();
+    State.data.tab = 'scores';
+    State.scheduleSave();
+    State.scheduleRender();
+    Err.toast('Game ready! Enter scores.');
+  },
+
+  removeOverlay() {
+    const overlay = document.getElementById('wizardOverlay');
+    if (overlay) overlay.remove();
+  },
+
+  render() {
+    this.removeOverlay();
+    if (!this.active) return;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'wizardOverlay';
+    overlay.className = 'wizard-overlay';
+
+    let content;
+    switch(this.step) {
+      case 'splash': content = this.renderSplash(); break;
+      case 'course': content = this.renderCourse(); break;
+      case 'players': content = this.renderPlayers(); break;
+      case 'game': content = this.renderGame(); break;
+      default: content = document.createElement('div');
+    }
+
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+  },
+
+  renderSplash() {
+    const div = document.createElement('div');
+    div.className = 'wizard-splash';
+    div.innerHTML = `<img src="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/BunchBets180.png" alt="Bunch Bets">`;
+    return div;
+  },
+
+  renderCourse() {
+    const div = document.createElement('div');
+    div.className = 'wizard-screen';
+
+    const presetNames = Object.keys(State.presets || {});
+    const coursesHtml = presetNames.map(name => `
+      <div class="wizard-course-card" data-course="${name}">
+        <h3>${name}</h3>
+        <p>Saved course preset</p>
+      </div>
+    `).join('');
+
+    div.innerHTML = `
+      <div class="wizard-header">
+        <h2>Select Course</h2>
+        <p>Choose a saved course or use current setup</p>
+      </div>
+      <div class="wizard-content">
+        <div class="wizard-course-card selected" data-course="__current__">
+          <h3>Current Course</h3>
+          <p>Use existing course configuration</p>
+        </div>
+        ${coursesHtml}
+        <div class="wizard-course-card" data-course="__new__">
+          <h3>+ Set Up New Course</h3>
+          <p>Configure par and handicap for each hole</p>
+        </div>
+      </div>
+      <div class="wizard-footer">
+        <button class="btn primary" id="wizardCourseNext">Next</button>
+        <div class="wizard-skip">
+          <a id="wizardSkip">Skip to Advanced Setup</a>
+        </div>
+      </div>
+    `;
+
+    // Event handlers
+    setTimeout(() => {
+      div.querySelectorAll('.wizard-course-card').forEach(card => {
+        card.onclick = () => {
+          div.querySelectorAll('.wizard-course-card').forEach(c => c.classList.remove('selected'));
+          card.classList.add('selected');
+          this.data.selectedCourse = card.dataset.course;
+        };
+      });
+
+      document.getElementById('wizardCourseNext').onclick = () => {
+        if (this.data.selectedCourse === '__new__') {
+          // For now, just proceed - they can set up course in advanced setup
+          this.skip();
+          return;
+        }
+        if (this.data.selectedCourse && this.data.selectedCourse !== '__current__') {
+          // Load preset
+          const preset = State.presets[this.data.selectedCourse];
+          if (preset) {
+            State.data.course.par = [...preset.par];
+            State.data.course.hcp = [...preset.hcp];
+          }
+        }
+        this.step = 'players';
+        this.render();
+      };
+
+      document.getElementById('wizardSkip').onclick = () => this.skip();
+    }, 0);
+
+    return div;
+  },
+
+  renderPlayers() {
+    const div = document.createElement('div');
+    div.className = 'wizard-screen';
+
+    const playersHtml = this.data.players.map((p, i) => `
+      <div class="wizard-player-row">
+        <input type="text" placeholder="Player ${i+1} name" value="${p.name}" data-idx="${i}" data-field="name">
+        <input type="number" placeholder="HCP" value="${p.handicap || ''}" data-idx="${i}" data-field="handicap" min="0" max="54">
+        ${i >= 2 ? `<button class="delete-btn" data-idx="${i}">&times;</button>` : '<div></div>'}
+      </div>
+    `).join('');
+
+    div.innerHTML = `
+      <div class="wizard-header">
+        <h2>Who's Playing?</h2>
+        <p>Add players and their course handicaps</p>
+      </div>
+      <div class="wizard-content">
+        <div class="wizard-player-row header">
+          <div>Name</div>
+          <div>Handicap</div>
+          <div></div>
+        </div>
+        <div id="wizardPlayersList">${playersHtml}</div>
+        ${this.data.players.length < 5 ? '<button class="wizard-add-btn" id="wizardAddPlayer">+ Add Player</button>' : ''}
+      </div>
+      <div class="wizard-footer">
+        <button class="btn primary" id="wizardPlayersNext">Next</button>
+        <button class="btn" id="wizardPlayersBack">Back</button>
+      </div>
+    `;
+
+    setTimeout(() => {
+      div.querySelectorAll('input[data-field="name"]').forEach(input => {
+        input.oninput = (e) => {
+          this.data.players[parseInt(e.target.dataset.idx)].name = e.target.value;
+        };
+      });
+
+      div.querySelectorAll('input[data-field="handicap"]').forEach(input => {
+        input.oninput = (e) => {
+          this.data.players[parseInt(e.target.dataset.idx)].handicap = parseInt(e.target.value) || 0;
+        };
+      });
+
+      div.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.onclick = (e) => {
+          this.data.players.splice(parseInt(e.target.dataset.idx), 1);
+          this.render();
+        };
+      });
+
+      const addBtn = document.getElementById('wizardAddPlayer');
+      if (addBtn) {
+        addBtn.onclick = () => {
+          this.data.players.push({name:'', handicap:0});
+          this.render();
+        };
+      }
+
+      document.getElementById('wizardPlayersNext').onclick = () => {
+        const validPlayers = this.data.players.filter(p => p.name.trim());
+        if (validPlayers.length < 2) {
+          Err.toast('Need at least 2 players');
+          return;
+        }
+        // Auto-assign teams for first game
+        const pids = validPlayers.map((p, i) => 'p' + (i+1));
+        if (pids.length >= 4) {
+          this.currentGame.teamA = [pids[0], pids[1]];
+          this.currentGame.teamB = [pids[2], pids[3]];
+        } else if (pids.length === 3) {
+          this.currentGame.teamA = [pids[0]];
+          this.currentGame.teamB = [pids[1]];
+        } else {
+          this.currentGame.teamA = [pids[0]];
+          this.currentGame.teamB = [pids[1]];
+        }
+        this.step = 'game';
+        this.render();
+      };
+
+      document.getElementById('wizardPlayersBack').onclick = () => {
+        this.step = 'course';
+        this.render();
+      };
+    }, 0);
+
+    return div;
+  },
+
+  renderGame() {
+    const div = document.createElement('div');
+    div.className = 'wizard-screen';
+    const g = this.currentGame;
+    const validPlayers = this.data.players.filter(p => p.name.trim()).map((p, i) => ({id: 'p'+(i+1), name: p.name}));
+
+    const teamAHtml = g.teamA.map(pid => {
+      const p = validPlayers.find(x => x.id === pid);
+      return p ? `<span class="wizard-player-chip team-a" data-pid="${pid}">${p.name}</span>` : '';
+    }).join('');
+
+    const teamBHtml = g.teamB.map(pid => {
+      const p = validPlayers.find(x => x.id === pid);
+      return p ? `<span class="wizard-player-chip team-b" data-pid="${pid}">${p.name}</span>` : '';
+    }).join('');
+
+    const unassigned = validPlayers.filter(p => !g.teamA.includes(p.id) && !g.teamB.includes(p.id));
+    const unassignedHtml = unassigned.map(p => `<span class="wizard-player-chip" data-pid="${p.id}">${p.name}</span>`).join('');
+
+    div.innerHTML = `
+      <div class="wizard-header">
+        <h2>Game Setup</h2>
+        <p>Game ${this.data.games.length + 1}</p>
+      </div>
+      <div class="wizard-content">
+        <div class="wizard-section">
+          <div class="wizard-section-title">Game Type</div>
+          <div class="wizard-option ${g.gameType==='nassau'?'selected':''}" data-type="nassau">
+            <input type="radio" name="gameType" ${g.gameType==='nassau'?'checked':''}>
+            <div><strong>Nassau</strong><br><span class="muted">Front 9, Back 9, Overall</span></div>
+          </div>
+          <div class="wizard-option ${g.gameType==='vegas'?'selected':''}" data-type="vegas">
+            <input type="radio" name="gameType" ${g.gameType==='vegas'?'checked':''}>
+            <div><strong>Vegas</strong><br><span class="muted">2v2 with flip scoring</span></div>
+          </div>
+        </div>
+
+        <div class="wizard-section">
+          <div class="wizard-section-title">Teams (tap to reassign)</div>
+          <div class="grid grid-2" style="gap:12px;">
+            <div class="wizard-team-zone" id="teamAZone">
+              <h4>Team A</h4>
+              ${teamAHtml || '<span class="muted">Tap players below</span>'}
+            </div>
+            <div class="wizard-team-zone" id="teamBZone">
+              <h4>Team B</h4>
+              ${teamBHtml || '<span class="muted">Tap players below</span>'}
+            </div>
+          </div>
+          ${unassignedHtml ? `<div style="margin-top:12px;text-align:center;">${unassignedHtml}</div>` : ''}
+        </div>
+
+        <div class="wizard-section">
+          <div class="wizard-section-title">Handicap Mode</div>
+          <div class="wizard-option ${g.handicapMode==='full'?'selected':''}" data-hcp="full">
+            <input type="radio" name="hcpMode" ${g.handicapMode==='full'?'checked':''}>
+            <div><strong>Full Strokes</strong><br><span class="muted">Everyone gets their full handicap</span></div>
+          </div>
+          <div class="wizard-option ${g.handicapMode==='off_low'?'selected':''}" data-hcp="off_low">
+            <input type="radio" name="hcpMode" ${g.handicapMode==='off_low'?'checked':''}>
+            <div><strong>Off the Low</strong><br><span class="muted">Reduce all by lowest handicap</span></div>
+          </div>
+          <div class="wizard-option ${g.handicapMode==='team_delta'?'selected':''}" data-hcp="team_delta">
+            <input type="radio" name="hcpMode" ${g.handicapMode==='team_delta'?'checked':''}>
+            <div><strong>Team Delta</strong><br><span class="muted">High player on high team gets difference</span></div>
+          </div>
+        </div>
+
+        <div class="wizard-section">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="wizardJunkToggle" ${g.withJunk?'checked':''} style="width:20px;height:20px;">
+            <span>Include Junk (birdies, sandies, etc.)</span>
+          </label>
+        </div>
+
+        <div class="wizard-section">
+          <div class="wizard-section-title">${g.gameType==='vegas'?'Points':'Stakes'}</div>
+          <div class="grid grid-3" style="gap:8px;">
+            <div>
+              <div class="muted" style="font-size:12px;margin-bottom:4px;">Front</div>
+              <input type="number" id="wizardStakesFront" value="${g.gameType==='vegas'?g.pointValue.front:g.stakes.front}" min="0" step="0.5">
+            </div>
+            <div>
+              <div class="muted" style="font-size:12px;margin-bottom:4px;">Back</div>
+              <input type="number" id="wizardStakesBack" value="${g.gameType==='vegas'?g.pointValue.back:g.stakes.back}" min="0" step="0.5">
+            </div>
+            ${g.gameType==='nassau'?`
+            <div>
+              <div class="muted" style="font-size:12px;margin-bottom:4px;">Overall</div>
+              <input type="number" id="wizardStakesOverall" value="${g.stakes.overall}" min="0" step="0.5">
+            </div>
+            `:'<div></div>'}
+          </div>
+        </div>
+
+        <div class="wizard-section" id="wizardJunkStakes" style="${g.withJunk?'':'display:none;'}">
+          <div class="wizard-section-title">Junk $/point</div>
+          <div class="grid grid-2" style="gap:8px;">
+            <div>
+              <div class="muted" style="font-size:12px;margin-bottom:4px;">Front</div>
+              <input type="number" id="wizardJunkFront" value="${g.junkValue.front}" min="0" step="0.5">
+            </div>
+            <div>
+              <div class="muted" style="font-size:12px;margin-bottom:4px;">Back</div>
+              <input type="number" id="wizardJunkBack" value="${g.junkValue.back}" min="0" step="0.5">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="wizard-footer">
+        <button class="btn primary" id="wizardGameNext">Add Another Game</button>
+        <button class="btn" id="wizardStartScoring" style="background:var(--success);border-color:var(--success);color:#fff;">Start Scoring</button>
+        <button class="btn" id="wizardGameBack">Back</button>
+      </div>
+    `;
+
+    setTimeout(() => {
+      // Game type
+      div.querySelectorAll('[data-type]').forEach(opt => {
+        opt.onclick = () => {
+          g.gameType = opt.dataset.type;
+          this.render();
+        };
+      });
+
+      // Handicap mode
+      div.querySelectorAll('[data-hcp]').forEach(opt => {
+        opt.onclick = () => {
+          g.handicapMode = opt.dataset.hcp;
+          this.render();
+        };
+      });
+
+      // Team assignment
+      div.querySelectorAll('.wizard-player-chip').forEach(chip => {
+        chip.onclick = () => {
+          const pid = chip.dataset.pid;
+          // Cycle: unassigned -> A -> B -> unassigned
+          if (g.teamA.includes(pid)) {
+            g.teamA = g.teamA.filter(x => x !== pid);
+            g.teamB.push(pid);
+          } else if (g.teamB.includes(pid)) {
+            g.teamB = g.teamB.filter(x => x !== pid);
+          } else {
+            g.teamA.push(pid);
+          }
+          this.render();
+        };
+      });
+
+      // Junk toggle
+      document.getElementById('wizardJunkToggle').onchange = (e) => {
+        g.withJunk = e.target.checked;
+        document.getElementById('wizardJunkStakes').style.display = g.withJunk ? '' : 'none';
+      };
+
+      // Stakes inputs
+      document.getElementById('wizardStakesFront').onchange = (e) => {
+        const v = parseFloat(e.target.value) || 0;
+        if (g.gameType === 'vegas') g.pointValue.front = v;
+        else g.stakes.front = v;
+      };
+      document.getElementById('wizardStakesBack').onchange = (e) => {
+        const v = parseFloat(e.target.value) || 0;
+        if (g.gameType === 'vegas') g.pointValue.back = v;
+        else g.stakes.back = v;
+      };
+      const overallInput = document.getElementById('wizardStakesOverall');
+      if (overallInput) {
+        overallInput.onchange = (e) => {
+          g.stakes.overall = parseFloat(e.target.value) || 0;
+        };
+      }
+      document.getElementById('wizardJunkFront').onchange = (e) => {
+        g.junkValue.front = parseFloat(e.target.value) || 0;
+      };
+      document.getElementById('wizardJunkBack').onchange = (e) => {
+        g.junkValue.back = parseFloat(e.target.value) || 0;
+      };
+
+      // Navigation
+      document.getElementById('wizardGameNext').onclick = () => {
+        if (g.teamA.length === 0 || g.teamB.length === 0) {
+          Err.toast('Assign players to both teams');
+          return;
+        }
+        // Save current game
+        this.data.games.push({...g});
+        // Create new game
+        this.currentGame = this.createGameData();
+        // Pre-assign teams same as last
+        this.currentGame.teamA = [...g.teamA];
+        this.currentGame.teamB = [...g.teamB];
+        this.render();
+      };
+
+      document.getElementById('wizardStartScoring').onclick = () => {
+        if (g.teamA.length === 0 || g.teamB.length === 0) {
+          Err.toast('Assign players to both teams');
+          return;
+        }
+        // Save current game
+        this.data.games.push({...g});
+        this.finish();
+      };
+
+      document.getElementById('wizardGameBack').onclick = () => {
+        this.step = 'players';
+        this.render();
+      };
+    }, 0);
+
+    return div;
+  }
+};
+
 // === UI ===
 const UI = {
   playerName(id) {
@@ -926,29 +1545,55 @@ const UI = {
       case 'rules': view = this.rules(); break;
       default: view = h('div', {class:'card'}, 'Unknown tab');
     }
-    document.querySelector('header').style.display = State.data.tab === 'setup' ? '' : 'none';
+    // Header always visible now (contains hamburger menu)
     root.appendChild(view);
   },
 
   renderTabs() {
     const tabs = [
-      ['setup','SETUP'],['scores','SCORES'],['junk','JUNK'],
-      ['status','STATUS'],['game','GAME'],['transactions','PAYMENTS'],['highlights','HIGH'],['rules','RULES']
+      ['scores','Scores'],['junk','Junk'],
+      ['status','Status'],['game','Game Details'],['transactions','Payments'],['highlights','Highlights'],['rules','Rules'],
+      ['setup','Setup (Advanced)']
     ];
+
+    // Populate menu navigation
+    const menuNav = document.getElementById('menuNav');
+    if (menuNav) {
+      menuNav.innerHTML = '';
+      tabs.forEach(([id, label]) => {
+        const btn = document.createElement('button');
+        btn.className = `menu-item ${State.data.tab === id ? 'active' : ''}`;
+        btn.textContent = label;
+        btn.onclick = () => {
+          State.data.tab = id;
+          this.closeMenu();
+          State.scheduleRender();
+        };
+        menuNav.appendChild(btn);
+      });
+    }
+
+    // Hide old tabs bar (keeping element for compatibility)
     const tabsEl = document.getElementById('tabs');
-    tabsEl.innerHTML = '';
-    tabs.forEach(([id, label]) => {
-      tabsEl.appendChild(h('button', {
-        class: `btn small ${State.data.tab === id ? 'active primary' : ''}`,
-        onclick: () => { 
-          if (document.activeElement && document.activeElement.blur) {
-            try { document.activeElement.blur(); } catch(e) {}
-          }
-          State.data.tab = id; 
-          State.scheduleRender(); 
-        }
-      }, label));
-    });
+    if (tabsEl) tabsEl.style.display = 'none';
+  },
+
+  openMenu() {
+    document.getElementById('menuOverlay').classList.add('open');
+    document.getElementById('slideMenu').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  },
+
+  closeMenu() {
+    document.getElementById('menuOverlay').classList.remove('open');
+    document.getElementById('slideMenu').classList.remove('open');
+    document.body.style.overflow = '';
+  },
+
+  initMenu() {
+    document.getElementById('menuToggle').onclick = () => this.openMenu();
+    document.getElementById('menuClose').onclick = () => this.closeMenu();
+    document.getElementById('menuOverlay').onclick = () => this.closeMenu();
   },
 
   setup() {
@@ -2134,6 +2779,7 @@ if (!State.load() || !State.data.games.length) {
 State.data.games = State.data.games.map(Game.sanitize);
 
 document.getElementById('resetBtn').onclick = () => {
+  UI.closeMenu();
   if (!confirm('Start a new round? Scores & junk cleared, teams/stakes reset. Custom courses kept.')) return;
   const keepCourse = Utils.clone(State.data.course);
   const keepPresets = Utils.clone(State.presets);
@@ -2146,6 +2792,7 @@ document.getElementById('resetBtn').onclick = () => {
 };
 
 document.getElementById('clearBtn').onclick = () => {
+  UI.closeMenu();
   if (!confirm('Clear all scores & junk? Teams/stakes/course stay the same.')) return;
   State.data.games.forEach(g => {
     State.data.players.forEach(p => {
@@ -2159,14 +2806,18 @@ document.getElementById('clearBtn').onclick = () => {
 };
 
 document.getElementById('factoryBtn').onclick = () => {
+  UI.closeMenu();
   if (!confirm('Factory reset? EVERYTHING erased: scores, teams, strokes, players, ALL presets!')) return;
   localStorage.removeItem(STORAGE_KEY);
   location.reload();
 };
 
 // Live sharing buttons
-document.getElementById('hostBtn').onclick = () => LiveSync.showHostModal();
-document.getElementById('joinBtn').onclick = () => LiveSync.showJoinModal();
+document.getElementById('hostBtn').onclick = () => { UI.closeMenu(); LiveSync.showHostModal(); };
+document.getElementById('joinBtn').onclick = () => { UI.closeMenu(); LiveSync.showJoinModal(); };
+
+// Wizard button
+document.getElementById('startWizardBtn').onclick = () => { UI.closeMenu(); Wizard.start(); };
 
 // Check URL for join code on load
 (function() {
@@ -2188,6 +2839,7 @@ document.getElementById('joinBtn').onclick = () => LiveSync.showJoinModal();
 })();
 
 UI.render();
+UI.initMenu();
 Err.toast('App loaded');
 
 })();
