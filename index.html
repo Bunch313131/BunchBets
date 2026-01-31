@@ -97,6 +97,17 @@ th.sticky, td.sticky { position:sticky; left:0; background:var(--card); z-index:
 .ios .junkWrap .junkVal { position:absolute; inset:0; display:flex !important; align-items:center; justify-content:center; z-index:2; color:var(--txt); -webkit-text-fill-color:var(--txt); transform:translateZ(0); }
 select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .press-row { background:rgba(255,255,255,0.02); }
+.press-row.theme-g1 { background:rgba(22,163,74,0.15); }
+.press-row.theme-g2 { background:rgba(220,38,38,0.15); }
+.press-row.theme-g3 { background:rgba(217,119,6,0.15); }
+.press-row.theme-g4 { background:rgba(99,102,241,0.15); }
+.press-row.theme-g5 { background:rgba(20,184,166,0.15); }
+.press-row.theme-g6 { background:rgba(219,39,119,0.15); }
+/* Scores/Junk Toggle Bar */
+.scoring-toggle { display:flex; background:var(--card); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:12px; }
+.scoring-toggle-btn { flex:1; padding:10px 16px; text-align:center; font-size:14px; font-weight:500; cursor:pointer; transition:all 0.2s; border:none; background:transparent; color:var(--muted); }
+.scoring-toggle-btn.active { background:var(--acc); color:#fff; }
+.scoring-toggle-btn:not(.active):hover { background:rgba(255,255,255,0.05); }
 .press-label { font-weight:600; font-size:12px; }
 .digits-display { font-size:20px; font-weight:700; font-family:monospace; color:var(--acc); }
 .points-positive { color:var(--success); font-weight:600; }
@@ -2270,66 +2281,66 @@ const UI = {
     // Calculate current standings for ALL games
     const gameStatusRows = State.data.games.map((game, idx) => {
       const theme = `theme-g${(idx%6)+1}`;
-      let statusMsg = '';
-      let statusClass = '';
-      
+
       // Check if ANY scores have been entered
       const hasAnyScore = State.data.players.some(p => {
         const arr = game.gross[p.id] || [];
         return arr.some(score => score != null);
       });
-      
+
+      // Check if back 9 has any scores (hole 10+)
+      const hasBack9Score = State.data.players.some(p => {
+        const arr = game.gross[p.id] || [];
+        return arr.slice(9).some(score => score != null);
+      });
+
       if (!hasAnyScore) {
-        statusMsg = 'No scores yet';
-        statusClass = 'muted';
-      } else if (game.gameType === 'vegas') {
+        return h('div',{class:theme,style:'margin-bottom:6px;'},[
+          h('div',{class:'card',style:'padding:8px 12px;'},[
+            h('div',{class:'row',style:'align-items:center;justify-content:space-between;gap:12px;'},[
+              h('div',{class:'pill',style:'font-size:12px;'},UI.gameLabel(game)),
+              h('div',{class:'muted',style:'font-size:14px;'},'No scores yet')
+            ])
+          ])
+        ]);
+      }
+
+      let frontLine, backLine;
+
+      if (game.gameType === 'vegas') {
         const result = Game.computeVegasResult(game);
-        const total = result.totalValue;
-        const perPerson = total / 2;
-        const teamANames = (game.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
-        const teamBNames = (game.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
-        
-        if (total > 0) {
-          statusMsg = `${teamANames} +${Utils.fmt(total)} (${Utils.fmt(perPerson)}/player)`;
-          statusClass = 'points-positive';
-        } else if (total < 0) {
-          statusMsg = `${teamBNames} +${Utils.fmt(Math.abs(total))} (${Utils.fmt(Math.abs(perPerson))}/player)`;
-          statusClass = 'points-negative';
-        } else {
-          statusMsg = 'Tied';
-          statusClass = '';
-        }
+        const fmtPts = (pts) => pts > 0 ? `+${pts}` : pts === 0 ? 'E' : String(pts);
+        frontLine = `Front: ${fmtPts(result.frontPoints)} pts (${Utils.fmt(result.frontValue)})`;
+        backLine = hasBack9Score ? `Back: ${fmtPts(result.backPoints)} pts (${Utils.fmt(result.backValue)})` : null;
       } else {
         const result = Game.computeResult(game);
-        const total = result.teamTotals.total;
-        const teamSize = (game.teamA||[]).length || 1;
-        const perPerson = total / teamSize;
-        const teamANames = (game.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
-        const teamBNames = (game.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
-        
-        if (total > 0) {
-          statusMsg = `${teamANames} +${Utils.fmt(total)} (${Utils.fmt(perPerson)}/player)`;
-          statusClass = 'points-positive';
-        } else if (total < 0) {
-          statusMsg = `${teamBNames} +${Utils.fmt(Math.abs(total))} (${Utils.fmt(Math.abs(perPerson))}/player)`;
-          statusClass = 'points-negative';
-        } else {
-          statusMsg = 'Tied';
-          statusClass = '';
-        }
+        const seg = result.segments;
+        // Format Nassau status: show each bet line result
+        const fmtSeg = (s) => s.winners.join('/');
+        frontLine = `Front: ${fmtSeg(seg.front)} (${Utils.fmt(seg.front.teamPayA)})`;
+        backLine = hasBack9Score ? `Back: ${fmtSeg(seg.back)} (${Utils.fmt(seg.back.teamPayA)})` : null;
       }
-      
+
       return h('div',{class:theme,style:'margin-bottom:6px;'},[
         h('div',{class:'card',style:'padding:8px 12px;'},[
-          h('div',{class:'row',style:'align-items:center;justify-content:space-between;gap:12px;'},[
+          h('div',{class:'row',style:'align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;'},[
             h('div',{class:'pill',style:'font-size:12px;'},UI.gameLabel(game)),
-            h('div',{class:statusClass || 'muted',style:`font-weight:${statusClass?'600':'400'};font-size:14px;`},statusMsg || 'No scores yet')
+            h('div',{style:'text-align:right;font-size:13px;'},[
+              h('div',{},frontLine),
+              backLine ? h('div',{style:'margin-top:2px;'},backLine) : ''
+            ])
           ])
         ])
       ]);
     });
 
+    const toggleBar = h('div',{class:'scoring-toggle'},[
+      h('button',{class:'scoring-toggle-btn active',onclick:()=>{}},'Scores'),
+      h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.tab='junk';State.scheduleRender();}},'Junk')
+    ]);
+
     return h('div',{},[
+      toggleBar,
       h('div',{class:'row',style:'align-items:center;justify-content:space-between;margin-bottom:8px;'},[
         h('div',{class:'pill'},'Entering GROSS for all players'),
         h('div',{class:'note'},'Press rows show below for Vegas games (Press=2x, Blind=4x)')
@@ -2633,7 +2644,12 @@ const UI = {
       ]);
     });
 
-    return h('div',{},blocks);
+    const toggleBar = h('div',{class:'scoring-toggle'},[
+      h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.tab='scores';State.scheduleRender();}},'Scores'),
+      h('button',{class:'scoring-toggle-btn active',onclick:()=>{}},'Junk')
+    ]);
+
+    return h('div',{},[toggleBar, ...blocks]);
   },
 
   transactions() {
