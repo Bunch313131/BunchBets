@@ -343,6 +343,10 @@ window.LiveSync = {
         if (val && val.data) {
           State.data = val.data;
           State.presets = val.presets || [];
+          // Sanitize games to ensure all player entries exist
+          if (State.data.games && Array.isArray(State.data.games)) {
+            State.data.games = State.data.games.map(g => Game.sanitize(g));
+          }
           State.scheduleRender();
         }
       });
@@ -454,6 +458,7 @@ window.LiveSync = {
         <div class="modal-actions">
           <button class="btn" onclick="this.closest('.modal-overlay').remove()">Close</button>
           <button class="copy-btn" onclick="navigator.clipboard.writeText('${code}');Err.toast('Code copied!');">Copy Code</button>
+          <button class="copy-btn" onclick="navigator.clipboard.writeText('${url}');Err.toast('Link copied!');">Copy Link</button>
         </div>
       </div>
     `;
@@ -1992,6 +1997,8 @@ const UI = {
     parRow.push(h('th',{}),h('th',{}),h('th',{}));
 
     const rows = State.data.players.map((p, ri) => {
+      // Ensure gross array exists for this player
+      if (!g.gross[p.id]) g.gross[p.id] = Utils.make18(null);
       const cells = [h('td',{class:'sticky'},p.name)];
       for (let hole = 0; hole < 18; hole++) {
         const tabIdx = (hole * State.data.players.length) + ri + 1;
@@ -2006,7 +2013,7 @@ const UI = {
               oninput:(e)=>{
                 e.target.value = Utils.sanitize(e.target.value);
                 const v = e.target.value===''?null:parseInt(e.target.value);
-                State.data.games.forEach(gm => gm.gross[p.id][hole] = v);
+                State.data.games.forEach(gm => { if (gm.gross[p.id]) gm.gross[p.id][hole] = v; });
               },
               onkeydown:(e)=>{
                 if (e.key==='Enter') {
@@ -2026,9 +2033,9 @@ const UI = {
                 if (v!==null && (v<MIN_SCORE || v>MAX_SCORE)) {
                   Err.show(`Invalid score ${v}. Use ${MIN_SCORE}-${MAX_SCORE}`);
                   e.target.value = '';
-                  State.data.games.forEach(gm => gm.gross[p.id][hole] = null);
+                  State.data.games.forEach(gm => { if (gm.gross[p.id]) gm.gross[p.id][hole] = null; });
                 } else {
-                  State.data.games.forEach(gm => gm.gross[p.id][hole] = v);
+                  State.data.games.forEach(gm => { if (gm.gross[p.id]) gm.gross[p.id][hole] = v; });
                   e.target.value = v==null?'':String(v);
                 }
                 updateSums(p.id);
