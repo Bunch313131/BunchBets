@@ -97,6 +97,17 @@ th.sticky, td.sticky { position:sticky; left:0; background:var(--card); z-index:
 .ios .junkWrap .junkVal { position:absolute; inset:0; display:flex !important; align-items:center; justify-content:center; z-index:2; color:var(--txt); -webkit-text-fill-color:var(--txt); transform:translateZ(0); }
 select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .press-row { background:rgba(255,255,255,0.02); }
+.press-row.theme-g1 { background:rgba(22,163,74,0.15); }
+.press-row.theme-g2 { background:rgba(220,38,38,0.15); }
+.press-row.theme-g3 { background:rgba(217,119,6,0.15); }
+.press-row.theme-g4 { background:rgba(99,102,241,0.15); }
+.press-row.theme-g5 { background:rgba(20,184,166,0.15); }
+.press-row.theme-g6 { background:rgba(219,39,119,0.15); }
+/* Scores/Junk Toggle Bar */
+.scoring-toggle { display:flex; background:var(--card); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:12px; }
+.scoring-toggle-btn { flex:1; padding:10px 16px; text-align:center; font-size:14px; font-weight:500; cursor:pointer; transition:all 0.2s; border:none; background:transparent; color:var(--muted); }
+.scoring-toggle-btn.active { background:var(--acc); color:#fff; }
+.scoring-toggle-btn:not(.active):hover { background:rgba(255,255,255,0.05); }
 .press-label { font-weight:600; font-size:12px; }
 .digits-display { font-size:20px; font-weight:700; font-family:monospace; color:var(--acc); }
 .points-positive { color:var(--success); font-weight:600; }
@@ -182,8 +193,8 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .wizard-option:hover { border-color:var(--acc); }
 .wizard-option.selected { border-color:var(--acc); background:rgba(59,130,246,0.1); }
 .wizard-option input[type="radio"] { width:18px; height:18px; }
-.wizard-team-zone { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; min-height:100px; }
-.wizard-team-zone h4 { margin:0 0 8px 0; font-size:13px; color:var(--muted); }
+.wizard-team-zone { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; min-height:100px; text-align:center; }
+.wizard-team-zone h4 { margin:0 0 8px 0; font-size:13px; color:var(--muted); text-align:center; }
 .wizard-player-chip { display:inline-block; background:rgba(59,130,246,0.2); border:1px solid var(--acc); border-radius:20px; padding:6px 12px; margin:4px; font-size:13px; cursor:pointer; }
 .wizard-player-chip:hover { background:rgba(59,130,246,0.3); }
 .wizard-player-chip.team-a { background:rgba(22,163,74,0.2); border-color:#16a34a; }
@@ -199,6 +210,10 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .wizard-hole-num { font-size:11px; font-weight:600; color:var(--muted); }
 .wizard-hole-input { width:100%; min-width:0; padding:6px 2px; text-align:center; font-size:13px; border:1px solid var(--border); border-radius:6px; background:var(--card); }
 .wizard-hole-input:focus { border-color:var(--acc); outline:none; }
+/* Currency input styling for stakes/points */
+.currency-input-wrap { position:relative; display:flex; align-items:center; }
+.currency-input-wrap::before { content:'$'; position:absolute; left:10px; color:var(--muted); font-size:14px; pointer-events:none; z-index:1; }
+.currency-input { width:80px; padding:8px 8px 8px 22px; font-size:14px; min-height:40px; text-align:right; }
 </style>
 </head>
 <body>
@@ -658,17 +673,18 @@ const Game = {
     const g = {
       id: Utils.uid(),
       gameType: 'nassau',
-      teamA: ['p1','p2'], 
+      teamA: ['p1','p2'],
       teamB: ['p3','p4'],
-      teamSize: 2, 
+      teamSize: 2,
       scoringMode: 'hi_low',
       stakes: {front:2, back:4, overall:2},
       autoPress: {front:true, back:true, overall:false},
+      withJunk: true,
       junkValue: {front:1, back:2},
       pointValue: {front:1, back:1},
       presses: Utils.make18(''),
-      gross: {}, 
-      junkCounts: {}, 
+      gross: {},
+      junkCounts: {},
       strokesCount: {}
     };
     State.data.players.forEach(p => {
@@ -824,9 +840,9 @@ const Game = {
         return;
       }
       
-      // Show current standing even if incomplete
-      if (cum > 0) { winners.push(`A +${cum}`); payA += line.stake; teamPayA += line.stake * szB; }
-      else if (cum < 0) { winners.push(`B ${cum}`); payA -= line.stake; teamPayA -= line.stake * szA; }
+      // Show current standing even if incomplete (always from Team A perspective)
+      if (cum > 0) { winners.push(`+${cum}`); payA += line.stake; teamPayA += line.stake * szB; }
+      else if (cum < 0) { winners.push(`${cum}`); payA -= line.stake; teamPayA -= line.stake * szA; }
       else winners.push('E');
     });
 
@@ -855,7 +871,12 @@ const Game = {
     const bB = sumTeam(g.teamB||[], 9, 17);
     const aVal = aF * (g.junkValue.front||0) + aB * (g.junkValue.back||0);
     const bVal = bF * (g.junkValue.front||0) + bB * (g.junkValue.back||0);
-    return {aVal, bVal, netA: aVal - bVal};
+    // Front/back point differentials and values
+    const frontNetPts = aF - bF;
+    const backNetPts = aB - bB;
+    const frontNetVal = frontNetPts * (g.junkValue.front||0);
+    const backNetVal = backNetPts * (g.junkValue.back||0);
+    return {aVal, bVal, netA: aVal - bVal, frontNetPts, backNetPts, frontNetVal, backNetVal};
   },
 
   computeResult(g) {
@@ -941,6 +962,8 @@ const Game = {
       numB,
       aFlip,
       bFlip,
+      aHasBirdie: hasBirdie(teamA),
+      bHasBirdie: hasBirdie(teamB),
       basePoints,
       multiplier,
       pointsToA: basePoints * multiplier
@@ -1115,6 +1138,7 @@ const Wizard = {
       g.teamA = wg.teamA;
       g.teamB = wg.teamB;
       g.stakes = {...wg.stakes};
+      g.withJunk = wg.withJunk;
       g.junkValue = wg.withJunk ? {...wg.junkValue} : {front:0, back:0};
       g.pointValue = {...wg.pointValue};
 
@@ -1534,7 +1558,7 @@ const Wizard = {
               ${teamBHtml || '<span class="muted">Tap players below</span>'}
             </div>
           </div>
-          ${unassignedHtml ? `<div style="margin-top:12px;text-align:center;">${unassignedHtml}</div>` : ''}
+          ${unassignedHtml ? `<div style="margin-top:12px;text-align:center;"><div class="muted" style="font-size:12px;margin-bottom:6px;">Not in game:</div>${unassignedHtml}</div>` : ''}
         </div>
 
         <div class="wizard-section">
@@ -1561,20 +1585,26 @@ const Wizard = {
         </div>
 
         <div class="wizard-section">
-          <div class="wizard-section-title">${g.gameType==='vegas'?'Points':'Stakes'}</div>
+          <div class="wizard-section-title">${g.gameType==='vegas'?'$/Point':'Stakes'}</div>
           <div class="grid grid-3" style="gap:8px;">
             <div>
               <div class="muted" style="font-size:12px;margin-bottom:4px;">Front</div>
-              <input type="number" id="wizardStakesFront" value="${g.gameType==='vegas'?g.pointValue.front:g.stakes.front}" min="0" step="0.5">
+              <div class="currency-input-wrap">
+                <input type="number" class="currency-input" id="wizardStakesFront" value="${(g.gameType==='vegas'?g.pointValue.front:g.stakes.front).toFixed(2)}" min="0" step="0.01">
+              </div>
             </div>
             <div>
               <div class="muted" style="font-size:12px;margin-bottom:4px;">Back</div>
-              <input type="number" id="wizardStakesBack" value="${g.gameType==='vegas'?g.pointValue.back:g.stakes.back}" min="0" step="0.5">
+              <div class="currency-input-wrap">
+                <input type="number" class="currency-input" id="wizardStakesBack" value="${(g.gameType==='vegas'?g.pointValue.back:g.stakes.back).toFixed(2)}" min="0" step="0.01">
+              </div>
             </div>
             ${g.gameType==='nassau'?`
             <div>
               <div class="muted" style="font-size:12px;margin-bottom:4px;">Overall</div>
-              <input type="number" id="wizardStakesOverall" value="${g.stakes.overall}" min="0" step="0.5">
+              <div class="currency-input-wrap">
+                <input type="number" class="currency-input" id="wizardStakesOverall" value="${g.stakes.overall.toFixed(2)}" min="0" step="0.01">
+              </div>
             </div>
             `:'<div></div>'}
           </div>
@@ -1585,11 +1615,15 @@ const Wizard = {
           <div class="grid grid-2" style="gap:8px;">
             <div>
               <div class="muted" style="font-size:12px;margin-bottom:4px;">Front</div>
-              <input type="number" id="wizardJunkFront" value="${g.junkValue.front}" min="0" step="0.5">
+              <div class="currency-input-wrap">
+                <input type="number" class="currency-input" id="wizardJunkFront" value="${g.junkValue.front.toFixed(2)}" min="0" step="0.01">
+              </div>
             </div>
             <div>
               <div class="muted" style="font-size:12px;margin-bottom:4px;">Back</div>
-              <input type="number" id="wizardJunkBack" value="${g.junkValue.back}" min="0" step="0.5">
+              <div class="currency-input-wrap">
+                <input type="number" class="currency-input" id="wizardJunkBack" value="${g.junkValue.back.toFixed(2)}" min="0" step="0.01">
+              </div>
             </div>
           </div>
         </div>
@@ -1639,18 +1673,20 @@ const Wizard = {
         };
       });
 
-      // Team assignment
+      // Team assignment (max 2 per team)
       div.querySelectorAll('.wizard-player-chip').forEach(chip => {
         chip.onclick = () => {
           const pid = chip.dataset.pid;
-          // Cycle: unassigned -> A -> B -> unassigned
+          // Cycle: unassigned -> A -> B -> unassigned (max 2 per team)
           if (g.teamA.includes(pid)) {
             g.teamA = g.teamA.filter(x => x !== pid);
-            g.teamB.push(pid);
+            if (g.teamB.length < 2) g.teamB.push(pid);
           } else if (g.teamB.includes(pid)) {
             g.teamB = g.teamB.filter(x => x !== pid);
           } else {
-            g.teamA.push(pid);
+            // Unassigned - try to add to Team A first, then B
+            if (g.teamA.length < 2) g.teamA.push(pid);
+            else if (g.teamB.length < 2) g.teamB.push(pid);
           }
           this.render();
         };
@@ -2179,6 +2215,14 @@ const UI = {
                 wrap.classList.remove('eagle','birdie','bogey','double-bogey');
                 const cls = getScoreClass(v, par);
                 if (cls) wrap.classList.add(cls);
+                // Check if all players have scores for this hole - if so, update status bars
+                const allHaveScore = State.data.players.every(pl => {
+                  const s = g.gross[pl.id] && g.gross[pl.id][hole];
+                  return s != null;
+                });
+                if (allHaveScore) {
+                  updateStatusBars();
+                }
               },
               onkeydown:(e)=>{
                 if (e.key==='Enter') {
@@ -2267,75 +2311,111 @@ const UI = {
       } catch(e) {}
     },0);
 
-    // Calculate current standings for ALL games
-    const gameStatusRows = State.data.games.map((game, idx) => {
+    // Function to build status bars - called on render and on score updates
+    const buildGameStatusRows = () => State.data.games.map((game, idx) => {
       const theme = `theme-g${(idx%6)+1}`;
-      let statusMsg = '';
-      let statusClass = '';
-      
+
       // Check if ANY scores have been entered
       const hasAnyScore = State.data.players.some(p => {
         const arr = game.gross[p.id] || [];
         return arr.some(score => score != null);
       });
-      
+
+      // Check if back 9 has any scores (hole 10+)
+      const hasBack9Score = State.data.players.some(p => {
+        const arr = game.gross[p.id] || [];
+        return arr.slice(9).some(score => score != null);
+      });
+
       if (!hasAnyScore) {
-        statusMsg = 'No scores yet';
-        statusClass = 'muted';
-      } else if (game.gameType === 'vegas') {
+        return h('div',{class:theme,style:'margin-bottom:6px;'},[
+          h('div',{class:'card',style:'padding:8px 12px;'},[
+            h('div',{class:'row',style:'align-items:center;justify-content:space-between;gap:12px;'},[
+              h('div',{class:'pill',style:'font-size:12px;'},UI.gameLabel(game)),
+              h('div',{class:'muted',style:'font-size:14px;'},'No scores yet')
+            ])
+          ])
+        ]);
+      }
+
+      let frontLine, backLine;
+      const fmtPts = (pts) => pts > 0 ? `+${pts}` : pts === 0 ? 'E' : String(pts);
+
+      // Get junk breakdown for front/back if junk is enabled
+      const junk = game.withJunk ? Game.computeJunk(game) : null;
+
+      // Junk per-player = delta pts × junk value (simple flat amount per player)
+      const frontJunkVal = junk ? junk.frontNetVal : 0;
+      const backJunkVal = junk ? junk.backNetVal : 0;
+
+      if (game.gameType === 'vegas') {
         const result = Game.computeVegasResult(game);
-        const total = result.totalValue;
-        const perPerson = total / 2;
-        const teamANames = (game.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
-        const teamBNames = (game.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
-        
-        if (total > 0) {
-          statusMsg = `${teamANames} +${Utils.fmt(total)} (${Utils.fmt(perPerson)}/player)`;
-          statusClass = 'points-positive';
-        } else if (total < 0) {
-          statusMsg = `${teamBNames} +${Utils.fmt(Math.abs(total))} (${Utils.fmt(Math.abs(perPerson))}/player)`;
-          statusClass = 'points-negative';
-        } else {
-          statusMsg = 'Tied';
-          statusClass = '';
-        }
+        // Per-player value = points × $/point (no team multiplier)
+        const frontPerPlayer = result.frontPoints * (game.pointValue.front || 0);
+        const backPerPlayer = result.backPoints * (game.pointValue.back || 0);
+        const frontTotal = frontPerPlayer + frontJunkVal;
+        const backTotal = backPerPlayer + backJunkVal;
+        frontLine = junk
+          ? `Front: ${fmtPts(result.frontPoints)} pts | Junk: ${fmtPts(junk.frontNetPts)} | Tot: ${Utils.fmt(frontTotal)}/ea`
+          : `Front: ${fmtPts(result.frontPoints)} pts (${Utils.fmt(frontPerPlayer)}/ea)`;
+        backLine = hasBack9Score ? (junk
+          ? `Back: ${fmtPts(result.backPoints)} pts | Junk: ${fmtPts(junk.backNetPts)} | Tot: ${Utils.fmt(backTotal)}/ea`
+          : `Back: ${fmtPts(result.backPoints)} pts (${Utils.fmt(backPerPlayer)}/ea)`) : null;
       } else {
         const result = Game.computeResult(game);
-        const total = result.teamTotals.total;
-        const teamSize = (game.teamA||[]).length || 1;
-        const perPerson = total / teamSize;
-        const teamANames = (game.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
-        const teamBNames = (game.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
-        
-        if (total > 0) {
-          statusMsg = `${teamANames} +${Utils.fmt(total)} (${Utils.fmt(perPerson)}/player)`;
-          statusClass = 'points-positive';
-        } else if (total < 0) {
-          statusMsg = `${teamBNames} +${Utils.fmt(Math.abs(total))} (${Utils.fmt(Math.abs(perPerson))}/player)`;
-          statusClass = 'points-negative';
-        } else {
-          statusMsg = 'Tied';
-          statusClass = '';
-        }
+        const seg = result.segments;
+        // Format Nassau status: show each bet line result (always from Team A perspective)
+        const fmtSeg = (s) => s.winners.join('/');
+        // Per-player value = just the stake, no team multiplier (payA not teamPayA)
+        const frontPerPlayer = seg.front.payA;
+        const backPerPlayer = seg.back.payA;
+        const frontTotal = frontPerPlayer + frontJunkVal;
+        const backTotal = backPerPlayer + backJunkVal;
+        frontLine = junk
+          ? `Front: ${fmtSeg(seg.front)} | Junk: ${fmtPts(junk.frontNetPts)} | Tot: ${Utils.fmt(frontTotal)}/ea`
+          : `Front: ${fmtSeg(seg.front)} (${Utils.fmt(frontPerPlayer)}/ea)`;
+        backLine = hasBack9Score ? (junk
+          ? `Back: ${fmtSeg(seg.back)} | Junk: ${fmtPts(junk.backNetPts)} | Tot: ${Utils.fmt(backTotal)}/ea`
+          : `Back: ${fmtSeg(seg.back)} (${Utils.fmt(backPerPlayer)}/ea)`) : null;
       }
-      
+
       return h('div',{class:theme,style:'margin-bottom:6px;'},[
         h('div',{class:'card',style:'padding:8px 12px;'},[
-          h('div',{class:'row',style:'align-items:center;justify-content:space-between;gap:12px;'},[
+          h('div',{class:'row',style:'align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;'},[
             h('div',{class:'pill',style:'font-size:12px;'},UI.gameLabel(game)),
-            h('div',{class:statusClass || 'muted',style:`font-weight:${statusClass?'600':'400'};font-size:14px;`},statusMsg || 'No scores yet')
+            h('div',{style:'text-align:right;font-size:13px;'},[
+              h('div',{},frontLine),
+              backLine ? h('div',{style:'margin-top:2px;'},backLine) : ''
+            ])
           ])
         ])
       ]);
     });
 
+    // Update status bars without full re-render
+    const updateStatusBars = () => {
+      const container = document.getElementById('gameStatusBars');
+      if (container) {
+        container.innerHTML = '';
+        buildGameStatusRows().forEach(el => container.appendChild(el));
+      }
+    };
+
+    const gameStatusRows = buildGameStatusRows();
+
+    const toggleBar = h('div',{class:'scoring-toggle'},[
+      h('button',{class:'scoring-toggle-btn active',onclick:()=>{}},'Scores'),
+      h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.tab='junk';State.scheduleRender();}},'Junk')
+    ]);
+
     return h('div',{},[
+      toggleBar,
       h('div',{class:'row',style:'align-items:center;justify-content:space-between;margin-bottom:8px;'},[
         h('div',{class:'pill'},'Entering GROSS for all players'),
         h('div',{class:'note'},'Press rows show below for Vegas games (Press=2x, Blind=4x)')
       ]),
       scroller,
-      h('div',{style:'margin-top:12px;'},gameStatusRows)
+      h('div',{id:'gameStatusBars',style:'margin-top:12px;'},gameStatusRows)
     ]);
   },
 
@@ -2419,7 +2499,13 @@ const UI = {
       return h('div',{class:theme},scroller);
     });
 
+    const toggleBar = h('div',{class:'scoring-toggle'},[
+      h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.tab='scores';State.scheduleRender();}},'Scores'),
+      h('button',{class:'scoring-toggle-btn active',onclick:()=>{}},'Junk')
+    ]);
+
     return h('div',{},[
+      toggleBar,
       h('div',{class:'note',style:'margin-bottom:8px;'},'Sweeps (+3) Sweeps/Quads (+6) on last Par 3'),
       ...blocks
     ]);
@@ -2521,7 +2607,7 @@ const UI = {
   game() {
     const blocks = State.data.games.map((g,idx) => {
       const theme = `theme-g${(idx%6)+1}`;
-      
+
       // Check if any scores entered
       if (!Game.hasAnyScores(g)) {
         return h('div',{class:theme},[
@@ -2531,50 +2617,119 @@ const UI = {
           ])
         ]);
       }
-      
+
+      const teamANames = (g.teamA||[]).map(pid => UI.playerName(pid));
+      const teamBNames = (g.teamB||[]).map(pid => UI.playerName(pid));
+      const fmtPts = (p) => p > 0 ? `+${p}` : p === 0 ? 'E' : String(p);
+
       if (g.gameType === 'vegas') {
         const result = Game.computeVegasResult(g);
-        const teamANames = (g.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
-        const teamBNames = (g.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
+        const par = State.data.course.par;
+
+        // Build hole-by-hole rows for Vegas
+        const buildVegasHoleRows = (startHole, endHole) => {
+          let runningTotal = 0;
+          const rows = [];
+
+          for (let hole = startHole; hole <= endHole; hole++) {
+            const detail = result.holeDetails[hole];
+            if (!detail) {
+              rows.push(h('div',{style:'padding:6px 0;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;'},
+                `Hole ${hole+1}: No scores`));
+              continue;
+            }
+
+            runningTotal += detail.pointsToA;
+
+            // Build flip reason text
+            let flipReasonA = '', flipReasonB = '';
+            if (detail.aFlip) {
+              if (detail.bHasBirdie) flipReasonA = '(B birdie)';
+              else flipReasonA = '(no net par)';
+            }
+            if (detail.bFlip) {
+              if (detail.aHasBirdie) flipReasonB = '(A birdie)';
+              else flipReasonB = '(no net par)';
+            }
+
+            const aFlipTxt = detail.aFlip ? ' FLIP' + flipReasonA : '';
+            const bFlipTxt = detail.bFlip ? ' FLIP' + flipReasonB : '';
+
+            const diffAbs = Math.abs(detail.numA - detail.numB);
+            const winner = detail.numA < detail.numB ? 'A' : detail.numA > detail.numB ? 'B' : 'TIE';
+            const mathTxt = winner === 'TIE' ? `${detail.numA} vs ${detail.numB} = Push`
+              : `${Math.min(detail.numA,detail.numB)} vs ${Math.max(detail.numA,detail.numB)} = ${winner} +${diffAbs}`;
+
+            const ptClass = detail.pointsToA > 0 ? 'points-positive' : detail.pointsToA < 0 ? 'points-negative' : '';
+
+            rows.push(h('div',{style:'padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;'},[
+              h('div',{style:'display:flex;justify-content:space-between;align-items:center;'},[
+                h('span',{style:'font-weight:600;'},`#${hole+1}`),
+                h('span',{class:ptClass,style:'font-weight:600;'},`${fmtPts(detail.pointsToA)} pts`)
+              ]),
+              h('div',{style:'margin-top:4px;color:var(--muted);'},[
+                h('div',{},`A: ${detail.numA}${aFlipTxt}  |  B: ${detail.numB}${bFlipTxt}`),
+                h('div',{style:'margin-top:2px;'},mathTxt + (detail.multiplier > 1 ? ` ×${detail.multiplier}` : ''))
+              ])
+            ]));
+          }
+          return rows;
+        };
+
+        const frontRows = buildVegasHoleRows(0, 8);
+        const backRows = buildVegasHoleRows(9, 17);
+        const frontPts = result.frontPoints;
+        const backPts = result.backPoints;
+        const frontVal = frontPts * (g.pointValue.front || 0);
+        const backVal = backPts * (g.pointValue.back || 0);
 
         return h('div',{class:theme},[
           h('div',{class:'card'},[
             h('div',{class:'pill'},UI.gameLabel(g)),
-            h('div',{class:'note',style:'margin-top:6px;'},`Team A: ${teamANames}  |  Team B: ${teamBNames}`),
+            h('div',{class:'note',style:'margin-top:6px;'},`Team A: ${teamANames.join(' & ')}  |  Team B: ${teamBNames.join(' & ')}`),
+
+            // Front 9
             h('div',{style:'margin-top:12px;'},[
-              h('div',{class:'grid grid-2'},[
-                h('div',{class:'card'},[
-                  h('div',{class:'muted'},'Front'),
-                  h('div',{},`${result.frontPoints>0?'+':''}${result.frontPoints} pts`),
-                  h('div',{style:'font-weight:600;'},Utils.fmt(result.frontValue))
+              h('div',{style:'font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between;'},[
+                h('span',{},'Front 9'),
+                h('span',{class:frontPts>0?'points-positive':frontPts<0?'points-negative':''},
+                  `${fmtPts(frontPts)} pts = ${Utils.fmt(frontVal)}/ea`)
+              ]),
+              ...frontRows
+            ]),
+
+            // Back 9
+            h('div',{style:'margin-top:16px;'},[
+              h('div',{style:'font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between;'},[
+                h('span',{},'Back 9'),
+                h('span',{class:backPts>0?'points-positive':backPts<0?'points-negative':''},
+                  `${fmtPts(backPts)} pts = ${Utils.fmt(backVal)}/ea`)
+              ]),
+              ...backRows
+            ]),
+
+            // Junk & Total
+            h('div',{class:'card',style:'margin-top:12px;'},[
+              h('div',{class:'row',style:'justify-content:space-between;'},[
+                h('div',{class:'muted'},'Junk:'),
+                h('div',{style:'font-weight:600;'},Utils.fmt(result.junkValue) + ' (' + Utils.fmt(result.junkValue / ((g.teamA||[]).length || 1)) + '/ea)')
+              ])
+            ]),
+            h('div',{class:'card',style:'margin-top:12px;background:linear-gradient(135deg,rgba(59,130,246,0.1),rgba(22,163,74,0.1));'},[
+              h('div',{class:'row',style:'justify-content:space-between;align-items:center;'},[
+                h('div',{},[
+                  h('div',{class:'muted'},'TOTAL TO TEAM A'),
+                  h('div',{class:'muted',style:'font-size:11px;margin-top:2px;'},Utils.fmt(result.totalValue / ((g.teamA||[]).length || 1))+' per player')
                 ]),
-                h('div',{class:'card'},[
-                  h('div',{class:'muted'},'Back'),
-                  h('div',{},`${result.backPoints>0?'+':''}${result.backPoints} pts`),
-                  h('div',{style:'font-weight:600;'},Utils.fmt(result.backValue))
-                ])
-              ]),
-              h('div',{class:'card',style:'margin-top:12px;'},[
-                h('div',{class:'row',style:'justify-content:space-between;'},[
-                  h('div',{class:'muted'},'Junk:'),
-                  h('div',{style:'font-weight:600;'},Utils.fmt(result.junkValue))
-                ])
-              ]),
-              h('div',{class:'card',style:'margin-top:12px;background:linear-gradient(135deg,rgba(59,130,246,0.1),rgba(22,163,74,0.1));'},[
-                h('div',{class:'row',style:'justify-content:space-between;align-items:center;'},[
-                  h('div',{},[
-                    h('div',{class:'muted'},'TOTAL TO TEAM A'),
-                    h('div',{class:'muted',style:'font-size:11px;margin-top:2px;'},Utils.fmt(result.totalValue/2)+' per player')
-                  ]),
-                  h('div',{style:'font-size:24px;font-weight:700;',class:result.totalValue>0?'points-positive':'points-negative'},
-                    Utils.fmt(result.totalValue))
-                ])
+                h('div',{style:'font-size:24px;font-weight:700;',class:result.totalValue>0?'points-positive':'points-negative'},
+                  Utils.fmt(result.totalValue))
               ])
             ])
           ])
         ]);
       }
-      
+
+      // Nassau - detailed hole-by-hole view
       let res;
       try {
         res = Game.computeResult(g);
@@ -2583,30 +2738,122 @@ const UI = {
         return h('div',{class:theme},[h('div',{class:'card'},[h('div',{},'Error calculating Nassau result: ' + e.message)])]);
       }
 
+      const buildNassauHoleRows = (startHole, endHole, autoPress) => {
+        const rows = [];
+        const A = g.teamA || [];
+        const B = g.teamB || [];
+
+        // Pre-calculate all hole diffs for this segment
+        const diffs = [];
+        for (let h = startHole; h <= endHole; h++) {
+          diffs.push(Game.holeDiff(g, h));
+        }
+
+        // Track bet lines - each has a start hole and we track cumulative
+        const betLines = [{ start: startHole, pressesTriggered: 0 }];
+
+        for (let hole = startHole; hole <= endHole; hole++) {
+          const holeIdx = hole - startHole;
+
+          // Get net scores for each player
+          const getNetScore = (pid) => {
+            const gr = g.gross[pid] && g.gross[pid][hole];
+            if (gr == null) return null;
+            return Game.net(gr, Game.strokes(g, pid, hole));
+          };
+
+          const aNets = A.map(pid => ({ name: UI.playerName(pid), net: getNetScore(pid) }));
+          const bNets = B.map(pid => ({ name: UI.playerName(pid), net: getNetScore(pid) }));
+
+          // Check if all scores are in
+          const allScored = aNets.every(p => p.net !== null) && bNets.every(p => p.net !== null);
+          if (!allScored) {
+            rows.push(h('div',{style:'padding:6px 0;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;'},
+              `Hole ${hole+1}: Incomplete`));
+            continue;
+          }
+
+          // Calculate high/low results for this hole
+          const aLow = Math.min(...aNets.map(p => p.net));
+          const aHi = Math.max(...aNets.map(p => p.net));
+          const bLow = Math.min(...bNets.map(p => p.net));
+          const bHi = Math.max(...bNets.map(p => p.net));
+
+          const lowWinner = aLow < bLow ? 'A' : bLow < aLow ? 'B' : 'T';
+          const hiWinner = aHi < bHi ? 'A' : bHi < aHi ? 'B' : 'T';
+
+          let holeDiff = 0;
+          if (aLow < bLow) holeDiff++; else if (bLow < aLow) holeDiff--;
+          if (aHi < bHi) holeDiff++; else if (bHi < aHi) holeDiff--;
+
+          // Calculate cumulative for each bet line and check for new presses
+          const lineStatuses = [];
+          betLines.forEach((line, li) => {
+            if (line.start > hole) return; // Press hasn't started yet
+
+            // Calculate cumulative from line start to current hole
+            let cum = 0;
+            for (let h = line.start; h <= hole; h++) {
+              const d = diffs[h - startHole];
+              if (d != null) cum += d;
+            }
+
+            lineStatuses.push(cum > 0 ? `+${cum}` : cum === 0 ? 'E' : String(cum));
+
+            // Check if new press should be triggered (auto-press logic)
+            if (autoPress && hole < endHole) {
+              const pressLevel = Math.floor(Math.abs(cum) / 2);
+              if (pressLevel > line.pressesTriggered) {
+                // Add new press starting next hole if not already there
+                const nextHole = hole + 1;
+                if (!betLines.some(l => l.start === nextHole)) {
+                  betLines.push({ start: nextHole, pressesTriggered: 0 });
+                }
+                line.pressesTriggered = pressLevel;
+              }
+            }
+          });
+
+          const betStatusTxt = lineStatuses.join('/');
+          const statusClass = lineStatuses[0]?.startsWith('+') ? 'points-positive' : lineStatuses[0]?.startsWith('-') ? 'points-negative' : '';
+
+          const aNetsTxt = aNets.map(p => `${p.name.split(' ')[0]}: ${p.net}`).join(' / ');
+          const bNetsTxt = bNets.map(p => `${p.name.split(' ')[0]}: ${p.net}`).join(' / ');
+
+          const resultTxt = `Low: ${lowWinner} | Hi: ${hiWinner}`;
+
+          rows.push(h('div',{style:'padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;'},[
+            h('div',{style:'display:flex;justify-content:space-between;align-items:center;'},[
+              h('span',{style:'font-weight:600;'},`#${hole+1}`),
+              h('span',{class:statusClass,style:'font-weight:600;'},betStatusTxt)
+            ]),
+            h('div',{style:'margin-top:4px;color:var(--muted);'},[
+              h('div',{},`A Net: ${aNetsTxt}`),
+              h('div',{},`B Net: ${bNetsTxt}`),
+              h('div',{style:'margin-top:2px;'},resultTxt + ` | Hole: ${fmtPts(holeDiff)}`)
+            ])
+          ]));
+        }
+
+        // Final cumulative for the segment
+        let finalCum = 0;
+        for (let h = 0; h < diffs.length; h++) {
+          if (diffs[h] != null) finalCum += diffs[h];
+        }
+
+        return { rows, cumulative: finalCum };
+      };
+
+      const front = buildNassauHoleRows(0, 8, g.autoPress.front);
+      const back = buildNassauHoleRows(9, 17, g.autoPress.back);
+
       const fmtTP = (tot, sz) => {
         const s = Math.max(1, sz||1);
         return `${Utils.fmt(tot)} / ${Utils.fmt(tot/s)}`;
       };
 
-      const renderSeg = (lbl, segRes) => {
-        const pills = segRes.lines.map((line, li) => {
-          const typ = line.pressedBy ? 'Press' : 'Main';
-          const holes = `${line.start+1}–${line.end+1}`;
-          const win = segRes.winners[li];
-          return h('div',{class:'pill'},`${typ} • ${holes} • ${win}`);
-        });
-        const teamTot = segRes.teamPayA;
-        return h('div',{class:'card'},[
-          h('div',{class:'row',style:'align-items:center;justify-content:space-between;'},[
-            h('div',{},lbl),
-            h('div',{class:'muted'},`Net to Team A (Team/Player): ${fmtTP(teamTot,(g.teamA||[]).length)}`)
-          ]),
-          h('div',{class:'row'},pills)
-        ]);
-      };
-
-      const aN = (g.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
-      const bN = (g.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
+      const aN = teamANames.join(' & ');
+      const bN = teamBNames.join(' & ');
 
       return h('div',{class:theme},[
         h('div',{class:'card'},[
@@ -2615,11 +2862,38 @@ const UI = {
             h('div',{class:'note'},'Positive = Team A')
           ]),
           h('div',{class:'note'},`A: ${aN||'—'}  |  B: ${bN||'—'}`),
-          renderSeg('Front (1–9)',res.segments.front),
-          renderSeg('Back (10–18)',res.segments.back),
-          renderSeg('Overall (1–18)',res.segments.overall),
-          h('div',{class:'card'},[h('div',{class:'pill'},`Junk to Team A (Team/Player): ${fmtTP(res.teamTotals.junk,(g.teamA||[]).length)}`)]),
-          h('div',{class:'card',style:'background:linear-gradient(135deg,rgba(59,130,246,0.05),rgba(22,163,74,0.05));'},[
+
+          // Front 9 details
+          h('div',{style:'margin-top:12px;'},[
+            h('div',{style:'font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between;'},[
+              h('span',{},'Front 9'),
+              h('span',{class:front.cumulative>0?'points-positive':front.cumulative<0?'points-negative':''},
+                `${fmtPts(front.cumulative)} (${Utils.fmt(res.segments.front.payA)})`)
+            ]),
+            ...front.rows
+          ]),
+
+          // Back 9 details
+          h('div',{style:'margin-top:16px;'},[
+            h('div',{style:'font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between;'},[
+              h('span',{},'Back 9'),
+              h('span',{class:back.cumulative>0?'points-positive':back.cumulative<0?'points-negative':''},
+                `${fmtPts(back.cumulative)} (${Utils.fmt(res.segments.back.payA)})`)
+            ]),
+            ...back.rows
+          ]),
+
+          // Overall summary
+          h('div',{class:'card',style:'margin-top:12px;'},[
+            h('div',{style:'font-weight:600;margin-bottom:4px;'},'Overall (1-18)'),
+            h('div',{class:'muted'},`Result: ${res.segments.overall.winners.join(' / ')} = ${Utils.fmt(res.segments.overall.payA)}`)
+          ]),
+
+          // Junk
+          h('div',{class:'card',style:'margin-top:8px;'},[h('div',{class:'pill'},`Junk to Team A: ${fmtTP(res.teamTotals.junk,(g.teamA||[]).length)}`)]),
+
+          // Total
+          h('div',{class:'card',style:'margin-top:8px;background:linear-gradient(135deg,rgba(59,130,246,0.05),rgba(22,163,74,0.05));'},[
             h('div',{class:'row',style:'justify-content:space-between;align-items:center;'},[
               h('div',{},[
                 h('div',{style:'font-weight:600;'},'GAME TOTAL TO TEAM A'),
