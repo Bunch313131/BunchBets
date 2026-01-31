@@ -839,9 +839,9 @@ const Game = {
         return;
       }
       
-      // Show current standing even if incomplete
-      if (cum > 0) { winners.push(`A +${cum}`); payA += line.stake; teamPayA += line.stake * szB; }
-      else if (cum < 0) { winners.push(`B ${cum}`); payA -= line.stake; teamPayA -= line.stake * szA; }
+      // Show current standing even if incomplete (always from Team A perspective)
+      if (cum > 0) { winners.push(`+${cum}`); payA += line.stake; teamPayA += line.stake * szB; }
+      else if (cum < 0) { winners.push(`${cum}`); payA -= line.stake; teamPayA -= line.stake * szA; }
       else winners.push('E');
     });
 
@@ -2334,15 +2334,15 @@ const UI = {
       if (game.gameType === 'vegas') {
         const result = Game.computeVegasResult(game);
         const fmtPts = (pts) => pts > 0 ? `+${pts}` : pts === 0 ? 'E' : String(pts);
-        frontLine = `Front: ${fmtPts(result.frontPoints)} pts (${Utils.fmt(result.frontValue)})`;
-        backLine = hasBack9Score ? `Back: ${fmtPts(result.backPoints)} pts (${Utils.fmt(result.backValue)})` : null;
+        frontLine = `Front: ${fmtPts(result.frontPoints)} pts (${Utils.fmt(result.frontValue)}/ea)`;
+        backLine = hasBack9Score ? `Back: ${fmtPts(result.backPoints)} pts (${Utils.fmt(result.backValue)}/ea)` : null;
       } else {
         const result = Game.computeResult(game);
         const seg = result.segments;
-        // Format Nassau status: show each bet line result
+        // Format Nassau status: show each bet line result (always from Team A perspective)
         const fmtSeg = (s) => s.winners.join('/');
-        frontLine = `Front: ${fmtSeg(seg.front)} (${Utils.fmt(seg.front.teamPayA)})`;
-        backLine = hasBack9Score ? `Back: ${fmtSeg(seg.back)} (${Utils.fmt(seg.back.teamPayA)})` : null;
+        frontLine = `Front: ${fmtSeg(seg.front)} (${Utils.fmt(seg.front.teamPayA)}/ea)`;
+        backLine = hasBack9Score ? `Back: ${fmtSeg(seg.back)} (${Utils.fmt(seg.back.teamPayA)}/ea)` : null;
       }
 
       return h('div',{class:theme,style:'margin-bottom:6px;'},[
