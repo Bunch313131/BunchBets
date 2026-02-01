@@ -214,6 +214,9 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .currency-input-wrap { position:relative; display:flex; align-items:center; }
 .currency-input-wrap::before { content:'$'; position:absolute; left:10px; color:var(--muted); font-size:14px; pointer-events:none; z-index:1; }
 .currency-input { width:80px; padding:8px 8px 8px 22px; font-size:14px; min-height:40px; text-align:right; }
+/* Help button for game explanations */
+.help-btn { width:28px; height:28px; border-radius:50%; border:1px solid var(--border); background:var(--card); color:var(--acc); font-weight:700; font-size:14px; cursor:pointer; flex-shrink:0; }
+.help-btn:hover { background:var(--acc); color:#fff; }
 </style>
 </head>
 <body>
@@ -1540,11 +1543,13 @@ const Wizard = {
           <div class="wizard-section-title">Game Type</div>
           <div class="wizard-option ${g.gameType==='nassau'?'selected':''}" data-type="nassau">
             <input type="radio" name="gameType" ${g.gameType==='nassau'?'checked':''}>
-            <div><strong>Nassau</strong><br><span class="muted">Front 9, Back 9, Overall</span></div>
+            <div style="flex:1;"><strong>Nassau</strong><br><span class="muted">2v2 match play - high/low ball with presses</span></div>
+            <button type="button" class="help-btn" data-help="nassau">?</button>
           </div>
           <div class="wizard-option ${g.gameType==='vegas'?'selected':''}" data-type="vegas">
             <input type="radio" name="gameType" ${g.gameType==='vegas'?'checked':''}>
-            <div><strong>Vegas</strong><br><span class="muted">2v2 with flip scoring</span></div>
+            <div style="flex:1;"><strong>Vegas</strong><br><span class="muted">2v2 team digits - combine scores, birdies flip</span></div>
+            <button type="button" class="help-btn" data-help="vegas">?</button>
           </div>
         </div>
 
@@ -1661,9 +1666,54 @@ const Wizard = {
 
       // Game type
       div.querySelectorAll('[data-type]').forEach(opt => {
-        opt.onclick = () => {
+        opt.onclick = (e) => {
+          if (e.target.classList.contains('help-btn')) return; // Don't select if clicking help
           g.gameType = opt.dataset.type;
           this.render();
+        };
+      });
+
+      // Help buttons for game explanations
+      div.querySelectorAll('.help-btn').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const gameType = btn.dataset.help;
+          const helpContent = {
+            nassau: {
+              title: 'Nassau',
+              text: `<p><strong>2v2 Team Match Play</strong></p>
+<p>Each hole, both teams compare their <em>net</em> scores. The team with the lower "low ball" wins a point; the team with the lower "high ball" wins a point.</p>
+<p><strong>Three separate bets:</strong> Front 9, Back 9, and Overall (1-18). Each has its own stake.</p>
+<p><strong>Auto-press:</strong> When a team falls 2 down on any bet, a new "press" bet automatically starts from the next hole.</p>
+<p><strong>Example:</strong> If the front 9 bet is $5 and Team A wins +3, Team B owes each Team A player $5.</p>`
+            },
+            vegas: {
+              title: 'Vegas (Team Digits)',
+              text: `<p><strong>2v2 Point Differential Game</strong></p>
+<p>Each hole, combine your team's two <em>net</em> scores into a 2-digit number, low digit first (4 and 5 = 45). Lower number wins the point difference.</p>
+<p><strong>Example:</strong> Team A has 45, Team B has 54. Team A wins 9 points (54-45).</p>
+<p><strong>Flip rule:</strong> If the opponent makes a <em>gross birdie</em>, your team's digits flip (45 becomes 54). You can also flip yourself if neither player makes net par or better.</p>
+<p><strong>Triple bogey max:</strong> Net scores are capped at +3 over par to prevent blowouts.</p>
+<p><strong>Presses:</strong> The trailing team can press after the first team tees off (2x points) or blind press before anyone tees off (4x points).</p>
+<p><strong>Scoring:</strong> Set a $/point value. Points are tallied separately for front and back 9.</p>`
+            }
+          };
+          const help = helpContent[gameType];
+          if (help) {
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = \`
+              <div class="modal">
+                <h2>\${help.title}</h2>
+                <div style="font-size:14px;line-height:1.5;">\${help.text}</div>
+                <div class="modal-actions">
+                  <button class="btn primary" onclick="this.closest('.modal-overlay').remove()">Got it</button>
+                </div>
+              </div>
+            \`;
+            document.body.appendChild(modal);
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+          }
         };
       });
 
