@@ -657,7 +657,9 @@ const State = {
       if (obj.settings) this.data.settings = obj.settings;
       if (obj.lastActiveDate) this.data.lastActiveDate = obj.lastActiveDate;
       this.data.roundCompleteShown = !!obj.roundCompleteShown;
-      this.data.tab = obj.tab || 'setup';
+      // Validate tab value - only allow known tabs
+      const validTabs = ['setup','scores','junk','status','game','transactions','highlights','rules','live'];
+      this.data.tab = validTabs.includes(obj.tab) ? obj.tab : 'scores';
       this.data.debugStatus = !!obj.debugStatus;
       return true;
     } catch(e) { 
@@ -1810,7 +1812,8 @@ const UI = {
       case 'transactions': view = this.transactions(); break;
       case 'highlights': view = this.highlights(); break;
       case 'rules': view = this.rules(); break;
-      default: view = h('div', {class:'card'}, 'Unknown tab');
+      case 'live': view = this.scores(); break; // Live tab defaults to scores view
+      default: view = this.scores(); // Default to scores instead of error
     }
     // Header always visible now (contains hamburger menu)
     root.appendChild(view);
