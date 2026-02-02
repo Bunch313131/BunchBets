@@ -1702,15 +1702,15 @@ const Wizard = {
           if (help) {
             const modal = document.createElement('div');
             modal.className = 'modal-overlay';
-            modal.innerHTML = \`
+            modal.innerHTML = `
               <div class="modal">
-                <h2>\${help.title}</h2>
-                <div style="font-size:14px;line-height:1.5;">\${help.text}</div>
+                <h2>${help.title}</h2>
+                <div style="font-size:14px;line-height:1.5;">${help.text}</div>
                 <div class="modal-actions">
                   <button class="btn primary" onclick="this.closest('.modal-overlay').remove()">Got it</button>
                 </div>
               </div>
-            \`;
+            `;
             document.body.appendChild(modal);
             modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
           }
