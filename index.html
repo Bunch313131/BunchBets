@@ -199,6 +199,9 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .wizard-player-chip:hover { background:rgba(59,130,246,0.3); }
 .wizard-player-chip.team-a { background:rgba(22,163,74,0.2); border-color:#16a34a; }
 .wizard-player-chip.team-b { background:rgba(220,38,38,0.2); border-color:#dc2626; }
+.wizard-player-chip.skins-selected { background:#16a34a; border-color:#16a34a; color:#fff; font-weight:600; }
+.wizard-player-chip.skins-selected::before { content:'✓ '; }
+.wizard-player-chip.skins-unselected { background:rgba(100,100,100,0.15); border-color:rgba(100,100,100,0.3); color:var(--muted); }
 .wizard-game-tabs { display:flex; gap:8px; justify-content:center; margin-top:8px; flex-wrap:wrap; }
 .wizard-game-tab { padding:6px 14px; border-radius:20px; font-size:13px; cursor:pointer; border:1px solid var(--border); background:var(--card); transition:all 0.2s; }
 .wizard-game-tab:hover { border-color:var(--acc); }
@@ -1726,7 +1729,7 @@ const Wizard = {
             ${this.data.players.filter(p=>p.name.trim()).map((p,i) => {
               const pid = 'p'+(i+1);
               const inGame = (g.skinsPlayers || []).includes(pid);
-              return `<div class="wizard-player-chip ${inGame?'teamA':''}" data-skins-pid="${pid}" style="cursor:pointer;">${p.name}</div>`;
+              return `<div class="wizard-player-chip ${inGame?'skins-selected':'skins-unselected'}" data-skins-pid="${pid}" style="cursor:pointer;">${p.name}</div>`;
             }).join('')}
           </div>
           <div class="muted" style="font-size:12px;margin-top:8px;text-align:center;">${(g.skinsPlayers||[]).length} player${(g.skinsPlayers||[]).length!==1?'s':''} selected</div>
