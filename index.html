@@ -682,7 +682,7 @@ const Game = {
       teamB: ['p3','p4'],
       teamSize: 2,
       scoringMode: 'hi_low',
-      stakes: {front:2, back:4, overall:2},
+      stakes: {front:2, back:5, overall:2},
       autoPress: {front:true, back:true, overall:false},
       withJunk: true,
       junkValue: {front:1, back:2},
@@ -703,20 +703,23 @@ const Game = {
   sanitize(g) {
     if (!g) return this.create();
     g.id = g.id || Utils.uid();
-    g.gameType = ['nassau','vegas'].includes(g.gameType) ? g.gameType : 'nassau';
-    
+    g.gameType = ['nassau','vegas','skins'].includes(g.gameType) ? g.gameType : 'nassau';
+
     const maxTeamSize = g.gameType === 'vegas' ? 2 : (g.teamSize || 2);
     g.teamSize = [1,2].includes(g.teamSize) ? g.teamSize : 2;
     g.scoringMode = ['hi_low','low_net'].includes(g.scoringMode) ? g.scoringMode : 'hi_low';
     g.teamA = (g.teamA || []).slice(0, maxTeamSize);
     g.teamB = (g.teamB || []).slice(0, maxTeamSize);
-    g.stakes = g.stakes || {front:2,back:4,overall:2};
+    g.stakes = g.stakes || {front:2,back:5,overall:2};
     ['front','back','overall'].forEach(k => g.stakes[k] = Math.max(0, parseInt(g.stakes[k])||0));
     g.autoPress = g.autoPress || {front:true,back:true,overall:false};
     g.junkValue = g.junkValue || {front:1,back:2};
     ['front','back'].forEach(k => g.junkValue[k] = Math.max(0, parseInt(g.junkValue[k])||0));
     g.pointValue = g.pointValue || {front:1,back:1};
     ['front','back'].forEach(k => g.pointValue[k] = Math.max(0, parseFloat(g.pointValue[k])||1));
+    // Skins-specific
+    g.skinsMode = ['net','gross','both'].includes(g.skinsMode) ? g.skinsMode : 'net';
+    g.skinsPlayers = Array.isArray(g.skinsPlayers) ? g.skinsPlayers : [];
     
     let pa = Array.isArray(g.presses) ? g.presses.slice(0,18) : Utils.make18('');
     while (pa.length < 18) pa.push('');
@@ -1010,6 +1013,161 @@ const Game = {
     };
   },
 
+  computeSkinsResult(g) {
+    const players = (g.skinsPlayers || []);
+    const mode = g.skinsMode || 'net';
+    const buyIn = g.stakes.front || 20;
+    const totalPot = buyIn * players.length;
+
+    // Initialize result tracking
+    const grossSkins = {}; // pid -> count
+    const netSkins = {};   // pid -> count
+    players.forEach(pid => { grossSkins[pid] = 0; netSkins[pid] = 0; });
+
+    let grossCarry = 0, netCarry = 0;
+    const holeDetails = [];
+
+    for (let h = 0; h < 18; h++) {
+      const detail = { hole: h + 1, grossWinner: null, netWinner: null, grossCarry: 0, netCarry: 0, grossSkins: 0, netSkins: 0 };
+
+      // Get scores for this hole
+      const scores = [];
+      let allScored = true;
+      players.forEach(pid => {
+        const gross = g.gross[pid] && g.gross[pid][h];
+        if (gross == null || gross === '') {
+          allScored = false;
+        } else {
+          const strokes = g.strokesCount[pid] || 0;
+          const hdcpHoles = State.data.course.hdcp || [];
+          const getsStroke = hdcpHoles[h] <= strokes;
+          const net = gross - (getsStroke ? 1 : 0);
+          scores.push({ pid, gross, net });
+        }
+      });
+
+      if (!allScored || scores.length === 0) {
+        detail.grossCarry = grossCarry;
+        detail.netCarry = netCarry;
+        holeDetails.push(detail);
+        continue;
+      }
+
+      // Check for gross winner (lowest gross, no ties)
+      if (mode === 'gross' || mode === 'both') {
+        const minGross = Math.min(...scores.map(s => s.gross));
+        const grossLeaders = scores.filter(s => s.gross === minGross);
+        grossCarry++;
+
+        if (grossLeaders.length === 1) {
+          // Outright winner
+          const winner = grossLeaders[0].pid;
+          grossSkins[winner] += grossCarry;
+          detail.grossWinner = winner;
+          detail.grossSkins = grossCarry;
+          grossCarry = 0;
+        } else if (h === 17 && grossCarry > 0) {
+          // Final hole tie with carryovers - split among tied
+          const split = grossCarry / grossLeaders.length;
+          grossLeaders.forEach(s => { grossSkins[s.pid] += split; });
+          detail.grossWinner = 'split';
+          detail.grossSkins = grossCarry;
+          grossCarry = 0;
+        }
+      }
+
+      // Check for net winner (lowest net, no ties)
+      if (mode === 'net' || mode === 'both') {
+        const minNet = Math.min(...scores.map(s => s.net));
+        const netLeaders = scores.filter(s => s.net === minNet);
+        netCarry++;
+
+        if (netLeaders.length === 1) {
+          // Outright winner
+          const winner = netLeaders[0].pid;
+          netSkins[winner] += netCarry;
+          detail.netWinner = winner;
+          detail.netSkins = netCarry;
+          netCarry = 0;
+        } else if (h === 17 && netCarry > 0) {
+          // Final hole tie with carryovers - split among tied
+          const split = netCarry / netLeaders.length;
+          netLeaders.forEach(s => { netSkins[s.pid] += split; });
+          detail.netWinner = 'split';
+          detail.netSkins = netCarry;
+          netCarry = 0;
+        }
+      }
+
+      detail.grossCarry = grossCarry;
+      detail.netCarry = netCarry;
+      holeDetails.push(detail);
+    }
+
+    // Calculate totals and pot distribution
+    const totalGrossSkins = Object.values(grossSkins).reduce((a, b) => a + b, 0);
+    const totalNetSkins = Object.values(netSkins).reduce((a, b) => a + b, 0);
+
+    // Pot division depends on mode
+    let grossPot = 0, netPot = 0;
+    if (mode === 'gross') {
+      grossPot = totalPot;
+    } else if (mode === 'net') {
+      netPot = totalPot;
+    } else if (mode === 'both') {
+      // Split pot, but if no skins in one category, all goes to other
+      if (totalGrossSkins === 0 && totalNetSkins === 0) {
+        grossPot = totalPot / 2;
+        netPot = totalPot / 2;
+      } else if (totalGrossSkins === 0) {
+        netPot = totalPot;
+      } else if (totalNetSkins === 0) {
+        grossPot = totalPot;
+      } else {
+        grossPot = totalPot / 2;
+        netPot = totalPot / 2;
+      }
+    }
+
+    // Calculate per-skin value
+    const grossSkinValue = totalGrossSkins > 0 ? grossPot / totalGrossSkins : 0;
+    const netSkinValue = totalNetSkins > 0 ? netPot / totalNetSkins : 0;
+
+    // Calculate player winnings
+    const playerResults = {};
+    players.forEach(pid => {
+      const grossWin = grossSkins[pid] * grossSkinValue;
+      const netWin = netSkins[pid] * netSkinValue;
+      const totalWin = grossWin + netWin;
+      const profit = totalWin - buyIn;
+      playerResults[pid] = {
+        grossSkins: grossSkins[pid],
+        netSkins: netSkins[pid],
+        grossWin,
+        netWin,
+        totalWin,
+        profit
+      };
+    });
+
+    return {
+      holeDetails,
+      grossSkins,
+      netSkins,
+      totalGrossSkins,
+      totalNetSkins,
+      grossPot,
+      netPot,
+      grossSkinValue,
+      netSkinValue,
+      grossCarry,
+      netCarry,
+      totalPot,
+      buyIn,
+      playerResults
+    };
+  },
+
   getLastScored() {
     const g = State.data.games[0];
     if (!g || !g.gross) return -1;
@@ -1113,8 +1271,8 @@ const Wizard = {
       teamB: [],
       withJunk: true,
       handicapMode: 'full', // full, off_low, team_delta
-      stakes: {front:2, back:2, overall:2},
-      junkValue: {front:1, back:1},
+      stakes: {front:2, back:5, overall:2},
+      junkValue: {front:1, back:2},
       pointValue: {front:1, back:1}
     };
   },
@@ -1146,6 +1304,9 @@ const Wizard = {
       g.withJunk = wg.withJunk;
       g.junkValue = wg.withJunk ? {...wg.junkValue} : {front:0, back:0};
       g.pointValue = {...wg.pointValue};
+      // Skins-specific
+      g.skinsMode = wg.skinsMode || 'net';
+      g.skinsPlayers = wg.skinsPlayers || [];
 
       // Apply handicap strokes based on mode
       const playerHandicaps = {};
@@ -1527,7 +1688,7 @@ const Wizard = {
     const gameTabsHtml = this.data.games.map((game, idx) => {
       const isActive = idx === this.currentGameIndex;
       const canDelete = this.data.games.length > 1;
-      const gameLabel = game.gameType === 'vegas' ? 'Vegas' : 'Nassau';
+      const gameLabel = game.gameType === 'vegas' ? 'Vegas' : game.gameType === 'skins' ? 'Skins' : 'Nassau';
       return `<span class="wizard-game-tab ${isActive ? 'active' : ''}" data-game-idx="${idx}">
         Game ${idx + 1}${canDelete && isActive ? '<span class="delete-game" data-delete-idx="' + idx + '">&times;</span>' : ''}
       </span>`;
@@ -1551,8 +1712,41 @@ const Wizard = {
             <div style="flex:1;"><strong>Vegas</strong><br><span class="muted">2v2 team digits - combine scores, birdies flip</span></div>
             <button type="button" class="help-btn" data-help="vegas">?</button>
           </div>
+          <div class="wizard-option ${g.gameType==='skins'?'selected':''}" data-type="skins">
+            <input type="radio" name="gameType" ${g.gameType==='skins'?'checked':''}>
+            <div style="flex:1;"><strong>Skins</strong><br><span class="muted">2-5 players - win hole outright to take the skin</span></div>
+            <button type="button" class="help-btn" data-help="skins">?</button>
+          </div>
         </div>
 
+        ${g.gameType === 'skins' ? `
+        <div class="wizard-section">
+          <div class="wizard-section-title">Players (tap to toggle, 2-5 players)</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
+            ${this.data.players.filter(p=>p.name.trim()).map((p,i) => {
+              const pid = 'p'+(i+1);
+              const inGame = (g.skinsPlayers || []).includes(pid);
+              return `<div class="wizard-player-chip ${inGame?'teamA':''}" data-skins-pid="${pid}" style="cursor:pointer;">${p.name}</div>`;
+            }).join('')}
+          </div>
+          <div class="muted" style="font-size:12px;margin-top:8px;text-align:center;">${(g.skinsPlayers||[]).length} player${(g.skinsPlayers||[]).length!==1?'s':''} selected</div>
+        </div>
+        <div class="wizard-section">
+          <div class="wizard-section-title">Skins Mode</div>
+          <div class="wizard-option ${g.skinsMode==='net'?'selected':''}" data-skins-mode="net">
+            <input type="radio" name="skinsMode" ${g.skinsMode==='net'?'checked':''}>
+            <div><strong>Net</strong><br><span class="muted">Handicap strokes apply</span></div>
+          </div>
+          <div class="wizard-option ${g.skinsMode==='gross'?'selected':''}" data-skins-mode="gross">
+            <input type="radio" name="skinsMode" ${g.skinsMode==='gross'?'checked':''}>
+            <div><strong>Gross</strong><br><span class="muted">Raw scores only</span></div>
+          </div>
+          <div class="wizard-option ${g.skinsMode==='both'?'selected':''}" data-skins-mode="both">
+            <input type="radio" name="skinsMode" ${g.skinsMode==='both'?'checked':''}>
+            <div><strong>Net + Gross</strong><br><span class="muted">Two separate pots</span></div>
+          </div>
+        </div>
+        ` : `
         <div class="wizard-section">
           <div class="wizard-section-title">Teams (tap to reassign)</div>
           <div class="grid grid-2" style="gap:12px;">
@@ -1567,7 +1761,9 @@ const Wizard = {
           </div>
           ${unassignedHtml ? `<div style="margin-top:12px;text-align:center;"><div class="muted" style="font-size:12px;margin-bottom:6px;">Not in game:</div>${unassignedHtml}</div>` : ''}
         </div>
+        `}
 
+        ${g.gameType !== 'skins' || g.skinsMode !== 'gross' ? `
         <div class="wizard-section">
           <div class="wizard-section-title">Handicap Mode</div>
           <div class="wizard-option ${g.handicapMode==='full'?'selected':''}" data-hcp="full">
@@ -1578,19 +1774,35 @@ const Wizard = {
             <input type="radio" name="hcpMode" ${g.handicapMode==='off_low'?'checked':''}>
             <div><strong>Off the Low</strong><br><span class="muted">Reduce all by lowest handicap</span></div>
           </div>
+          ${g.gameType !== 'skins' ? `
           <div class="wizard-option ${g.handicapMode==='team_delta'?'selected':''}" data-hcp="team_delta">
             <input type="radio" name="hcpMode" ${g.handicapMode==='team_delta'?'checked':''}>
             <div><strong>Team Delta</strong><br><span class="muted">High player on high team gets difference</span></div>
           </div>
+          ` : ''}
         </div>
+        ` : ''}
 
+        ${g.gameType !== 'skins' ? `
         <div class="wizard-section">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
             <input type="checkbox" id="wizardJunkToggle" ${g.withJunk?'checked':''} style="width:20px;height:20px;">
             <span>Include Junk (birdies, sandies, etc.)</span>
           </label>
         </div>
+        ` : ''}
 
+        ${g.gameType === 'skins' ? `
+        <div class="wizard-section">
+          <div class="wizard-section-title">Buy-in (per player)</div>
+          <div style="max-width:120px;">
+            <div class="currency-input-wrap">
+              <input type="number" class="currency-input" id="wizardSkinsBuyIn" value="${(g.stakes.front||20).toFixed(2)}" min="0" step="1">
+            </div>
+          </div>
+          <div class="muted" style="font-size:12px;margin-top:8px;">Total pot: $${((g.stakes.front||20) * (g.skinsPlayers||[]).length).toFixed(2)}</div>
+        </div>
+        ` : `
         <div class="wizard-section">
           <div class="wizard-section-title">${g.gameType==='vegas'?'$/Point':'Stakes'}</div>
           <div class="grid grid-3" style="gap:8px;">
@@ -1616,8 +1828,9 @@ const Wizard = {
             `:'<div></div>'}
           </div>
         </div>
+        `}
 
-        <div class="wizard-section" id="wizardJunkStakes" style="${g.withJunk?'':'display:none;'}">
+        <div class="wizard-section" id="wizardJunkStakes" style="${g.withJunk && g.gameType !== 'skins'?'':'display:none;'}">
           <div class="wizard-section-title">Junk $/point</div>
           <div class="grid grid-2" style="gap:8px;">
             <div>
@@ -1667,7 +1880,23 @@ const Wizard = {
       // Game type
       div.querySelectorAll('[data-type]').forEach(opt => {
         opt.onclick = () => {
-          g.gameType = opt.dataset.type;
+          const newType = opt.dataset.type;
+          if (newType !== g.gameType) {
+            g.gameType = newType;
+            // Apply default stakes for game type
+            if (newType === 'nassau') {
+              g.stakes = {front:2, back:5, overall:2};
+              g.junkValue = {front:1, back:2};
+            } else if (newType === 'vegas') {
+              g.stakes = {front:1, back:2, overall:0};
+              g.junkValue = {front:1, back:2};
+            } else if (newType === 'skins') {
+              g.stakes = {front:20, back:0, overall:0};
+              g.junkValue = {front:0, back:0};
+              g.withJunk = false;
+              g.skinsMode = g.skinsMode || 'net';
+            }
+          }
           this.render();
         };
       });
@@ -1705,6 +1934,23 @@ const Wizard = {
               '<p><strong>Triple Bogey Max:</strong> No individual score counts higher than triple bogey to prevent blowouts.</p>' +
               '<p><strong>Presses:</strong> The trailing team can press after the first team tees off (2x points) or blind press before anyone tees off (4x points).</p>' +
               '<p><strong>Scoring:</strong> Point differential times stake value. Stakes are per player.</p>';
+          } else if (type === 'skins') {
+            title = 'Skins';
+            content = '<p><strong>Skins</strong> is an individual game for 2-5 players where each hole is worth a "skin."</p>' +
+              '<p><strong>How it works:</strong></p>' +
+              '<ul>' +
+              '<li>Win the hole outright (lowest score, no ties) to win the skin</li>' +
+              '<li>If two or more players tie for lowest, the skin <strong>carries over</strong> to the next hole</li>' +
+              '<li>Carryovers accumulate until someone wins outright</li>' +
+              '</ul>' +
+              '<p><strong>Modes:</strong></p>' +
+              '<ul>' +
+              '<li><strong>Net:</strong> Handicap strokes apply - lowest net score wins</li>' +
+              '<li><strong>Gross:</strong> Raw scores only - lowest gross score wins</li>' +
+              '<li><strong>Net + Gross:</strong> Two separate pots - can win both on same hole</li>' +
+              '</ul>' +
+              '<p><strong>Payout:</strong> Total pot divided by number of skins won. If Net+Gross, each pot is calculated separately.</p>' +
+              '<p><strong>Final hole ties:</strong> If the last hole ties with carryovers, the pot splits evenly among tied players.</p>';
           }
           // Show modal
           const modal = document.createElement('div');
@@ -1743,39 +1989,90 @@ const Wizard = {
         };
       });
 
-      // Junk toggle
-      document.getElementById('wizardJunkToggle').onchange = (e) => {
-        g.withJunk = e.target.checked;
-        document.getElementById('wizardJunkStakes').style.display = g.withJunk ? '' : 'none';
-      };
+      // Junk toggle (only exists for non-skins games)
+      const junkToggle = document.getElementById('wizardJunkToggle');
+      if (junkToggle) {
+        junkToggle.onchange = (e) => {
+          g.withJunk = e.target.checked;
+          document.getElementById('wizardJunkStakes').style.display = g.withJunk ? '' : 'none';
+        };
+      }
 
-      // Stakes inputs
-      document.getElementById('wizardStakesFront').onchange = (e) => {
-        const v = parseFloat(e.target.value) || 0;
-        if (g.gameType === 'vegas') g.pointValue.front = v;
-        else g.stakes.front = v;
-      };
-      document.getElementById('wizardStakesBack').onchange = (e) => {
-        const v = parseFloat(e.target.value) || 0;
-        if (g.gameType === 'vegas') g.pointValue.back = v;
-        else g.stakes.back = v;
-      };
+      // Skins player toggle
+      div.querySelectorAll('[data-skins-pid]').forEach(chip => {
+        chip.onclick = () => {
+          const pid = chip.dataset.skinsPid;
+          g.skinsPlayers = g.skinsPlayers || [];
+          if (g.skinsPlayers.includes(pid)) {
+            g.skinsPlayers = g.skinsPlayers.filter(x => x !== pid);
+          } else if (g.skinsPlayers.length < 5) {
+            g.skinsPlayers.push(pid);
+          }
+          this.render();
+        };
+      });
+
+      // Skins mode selection
+      div.querySelectorAll('[data-skins-mode]').forEach(opt => {
+        opt.onclick = () => {
+          g.skinsMode = opt.dataset.skinsMode;
+          this.render();
+        };
+      });
+
+      // Skins buy-in
+      const skinsBuyIn = document.getElementById('wizardSkinsBuyIn');
+      if (skinsBuyIn) {
+        skinsBuyIn.onchange = (e) => {
+          g.stakes.front = parseFloat(e.target.value) || 20;
+          this.render();
+        };
+      }
+
+      // Stakes inputs (only for non-skins games)
+      const stakesFront = document.getElementById('wizardStakesFront');
+      if (stakesFront) {
+        stakesFront.onchange = (e) => {
+          const v = parseFloat(e.target.value) || 0;
+          if (g.gameType === 'vegas') g.pointValue.front = v;
+          else g.stakes.front = v;
+        };
+      }
+      const stakesBack = document.getElementById('wizardStakesBack');
+      if (stakesBack) {
+        stakesBack.onchange = (e) => {
+          const v = parseFloat(e.target.value) || 0;
+          if (g.gameType === 'vegas') g.pointValue.back = v;
+          else g.stakes.back = v;
+        };
+      }
       const overallInput = document.getElementById('wizardStakesOverall');
       if (overallInput) {
         overallInput.onchange = (e) => {
           g.stakes.overall = parseFloat(e.target.value) || 0;
         };
       }
-      document.getElementById('wizardJunkFront').onchange = (e) => {
-        g.junkValue.front = parseFloat(e.target.value) || 0;
-      };
-      document.getElementById('wizardJunkBack').onchange = (e) => {
-        g.junkValue.back = parseFloat(e.target.value) || 0;
-      };
+      const junkFront = document.getElementById('wizardJunkFront');
+      if (junkFront) {
+        junkFront.onchange = (e) => {
+          g.junkValue.front = parseFloat(e.target.value) || 0;
+        };
+      }
+      const junkBack = document.getElementById('wizardJunkBack');
+      if (junkBack) {
+        junkBack.onchange = (e) => {
+          g.junkValue.back = parseFloat(e.target.value) || 0;
+        };
+      }
 
       // Navigation
       document.getElementById('wizardGameNext').onclick = () => {
-        if (g.teamA.length === 0 || g.teamB.length === 0) {
+        if (g.gameType === 'skins') {
+          if ((g.skinsPlayers || []).length < 2) {
+            Err.toast('Select at least 2 players for Skins');
+            return;
+          }
+        } else if (g.teamA.length === 0 || g.teamB.length === 0) {
           Err.toast('Assign players to both teams');
           return;
         }
@@ -1783,10 +2080,16 @@ const Wizard = {
       };
 
       document.getElementById('wizardStartScoring').onclick = () => {
-        // Validate all games have teams assigned
+        // Validate all games have proper assignments
         for (let i = 0; i < this.data.games.length; i++) {
           const game = this.data.games[i];
-          if (game.teamA.length === 0 || game.teamB.length === 0) {
+          if (game.gameType === 'skins') {
+            if ((game.skinsPlayers || []).length < 2) {
+              Err.toast(`Game ${i+1} needs at least 2 players`);
+              this.switchToGame(i);
+              return;
+            }
+          } else if (game.teamA.length === 0 || game.teamB.length === 0) {
             Err.toast(`Game ${i+1} needs teams assigned`);
             this.switchToGame(i);
             return;
@@ -1838,7 +2141,11 @@ const UI = {
     const left = (a1 && a2) ? `${a1}/${a2}` : (a1 || a2 || 'Team A');
     const right = (b1 && b2) ? `${b1}/${b2}` : (b1 || b2 || 'Team B');
     
-    if (g.gameType === 'vegas') {
+    if (g.gameType === 'skins') {
+      const players = (g.skinsPlayers || []).map(pid => abbr(pid, used)).join('/');
+      const modeLabel = g.skinsMode === 'both' ? 'Net+Gross' : (g.skinsMode === 'gross' ? 'Gross' : 'Net');
+      return `Skins (${modeLabel}): ${players || 'No players'}`;
+    } else if (g.gameType === 'vegas') {
       return `Vegas: ${left} vs ${right}`;
     } else {
       const mode = g.scoringMode === 'low_net' ? 'Best Ball' : 'Hi/Low';
@@ -2400,7 +2707,21 @@ const UI = {
       const frontJunkVal = junk ? junk.frontNetVal : 0;
       const backJunkVal = junk ? junk.backNetVal : 0;
 
-      if (game.gameType === 'vegas') {
+      if (game.gameType === 'skins') {
+        const result = Game.computeSkinsResult(game);
+        const mode = game.skinsMode || 'net';
+        const carryLabel = mode === 'both'
+          ? `Carry: G${result.grossCarry}/N${result.netCarry}`
+          : `Carry: ${mode === 'gross' ? result.grossCarry : result.netCarry}`;
+        const skinLabel = mode === 'both'
+          ? `Skins: G${result.totalGrossSkins}/N${result.totalNetSkins}`
+          : `Skins: ${mode === 'gross' ? result.totalGrossSkins : result.totalNetSkins}`;
+        const skinValue = mode === 'both'
+          ? `G${Utils.fmt(result.grossSkinValue)}/N${Utils.fmt(result.netSkinValue)}`
+          : Utils.fmt(mode === 'gross' ? result.grossSkinValue : result.netSkinValue);
+        frontLine = `${skinLabel} | ${carryLabel} | $/Skin: ${skinValue}`;
+        backLine = `Pot: ${Utils.fmt(result.totalPot)}`;
+      } else if (game.gameType === 'vegas') {
         const result = Game.computeVegasResult(game);
         // Per-player value = points × $/point (no team multiplier)
         const frontPerPlayer = result.frontPoints * (game.pointValue.front || 0);
@@ -2781,6 +3102,105 @@ const UI = {
         ]);
       }
 
+      // Skins - hole-by-hole view with skin winners
+      if (g.gameType === 'skins') {
+        const result = Game.computeSkinsResult(g);
+        const mode = g.skinsMode || 'net';
+        const players = g.skinsPlayers || [];
+
+        const buildSkinsHoleRows = () => {
+          const rows = [];
+          for (let hole = 0; hole < 18; hole++) {
+            const detail = result.holeDetails[hole];
+            if (!detail) {
+              rows.push(h('div',{style:'padding:6px 0;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;'},
+                `Hole ${hole+1}: No scores`));
+              continue;
+            }
+
+            const winnerLines = [];
+            if (mode === 'gross' || mode === 'both') {
+              if (detail.grossWinner === 'split') {
+                winnerLines.push(h('span',{},`Gross: SPLIT (${detail.grossSkins} skins)`));
+              } else if (detail.grossWinner) {
+                winnerLines.push(h('span',{class:'points-positive'},`Gross: ${UI.playerName(detail.grossWinner)} wins ${detail.grossSkins} skin${detail.grossSkins>1?'s':''}`));
+              } else if (detail.grossCarry > 0) {
+                winnerLines.push(h('span',{class:'muted'},`Gross: Carry (${detail.grossCarry})`));
+              }
+            }
+            if (mode === 'net' || mode === 'both') {
+              if (detail.netWinner === 'split') {
+                winnerLines.push(h('span',{},`Net: SPLIT (${detail.netSkins} skins)`));
+              } else if (detail.netWinner) {
+                winnerLines.push(h('span',{class:'points-positive'},`Net: ${UI.playerName(detail.netWinner)} wins ${detail.netSkins} skin${detail.netSkins>1?'s':''}`));
+              } else if (detail.netCarry > 0) {
+                winnerLines.push(h('span',{class:'muted'},`Net: Carry (${detail.netCarry})`));
+              }
+            }
+
+            rows.push(h('div',{style:'padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;'},[
+              h('div',{style:'display:flex;justify-content:space-between;align-items:center;'},[
+                h('span',{style:'font-weight:600;'},`#${hole+1}`),
+                h('div',{style:'text-align:right;'},winnerLines.length > 0 ? winnerLines.map((w,i) => h('div',{key:i},w)) : h('span',{class:'muted'},'Carry'))
+              ])
+            ]));
+          }
+          return rows;
+        };
+
+        const holeRows = buildSkinsHoleRows();
+
+        // Player results table
+        const playerRows = players.map(pid => {
+          const pr = result.playerResults[pid];
+          const profitClass = pr.profit > 0 ? 'points-positive' : pr.profit < 0 ? 'points-negative' : '';
+          return h('div',{style:'display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);'},[
+            h('span',{},UI.playerName(pid)),
+            h('div',{style:'text-align:right;'},[
+              mode === 'both'
+                ? h('span',{class:'muted'},`G:${pr.grossSkins} N:${pr.netSkins} `)
+                : h('span',{class:'muted'},`${mode === 'gross' ? pr.grossSkins : pr.netSkins} skins `),
+              h('span',{class:profitClass,style:'font-weight:600;'},Utils.fmt(pr.profit))
+            ])
+          ]);
+        });
+
+        return h('div',{class:theme},[
+          h('div',{class:'card'},[
+            h('div',{class:'pill'},UI.gameLabel(g)),
+            h('div',{class:'note',style:'margin-top:6px;'},`Players: ${players.map(pid => UI.playerName(pid)).join(', ')}`),
+            h('div',{class:'note'},`Buy-in: ${Utils.fmt(result.buyIn)} | Pot: ${Utils.fmt(result.totalPot)}`),
+
+            // Hole-by-hole
+            h('div',{style:'margin-top:12px;'},[
+              h('div',{style:'font-weight:600;margin-bottom:8px;'},'Hole by Hole'),
+              ...holeRows
+            ]),
+
+            // Carryovers remaining
+            (result.grossCarry > 0 || result.netCarry > 0) ?
+              h('div',{class:'card',style:'margin-top:12px;background:rgba(234,179,8,0.1);'},[
+                h('div',{style:'font-weight:600;color:#ca8a04;'},
+                  mode === 'both' ? `Carryovers: Gross ${result.grossCarry} | Net ${result.netCarry}`
+                    : `${result.grossCarry + result.netCarry} skin${(result.grossCarry + result.netCarry) > 1 ? 's' : ''} carrying`)
+              ]) : '',
+
+            // Skin values
+            h('div',{class:'card',style:'margin-top:12px;'},[
+              h('div',{style:'font-weight:600;margin-bottom:4px;'},'Skin Values'),
+              mode === 'both' ? h('div',{class:'muted'},`Gross: ${Utils.fmt(result.grossSkinValue)}/skin (${result.totalGrossSkins} total) | Net: ${Utils.fmt(result.netSkinValue)}/skin (${result.totalNetSkins} total)`)
+                : h('div',{class:'muted'},`${Utils.fmt(mode === 'gross' ? result.grossSkinValue : result.netSkinValue)}/skin (${mode === 'gross' ? result.totalGrossSkins : result.totalNetSkins} total)`)
+            ]),
+
+            // Player results
+            h('div',{style:'margin-top:12px;'},[
+              h('div',{style:'font-weight:600;margin-bottom:8px;'},'Results (+/- from buy-in)'),
+              ...playerRows
+            ])
+          ])
+        ]);
+      }
+
       // Nassau - detailed hole-by-hole view
       let res;
       try {
@@ -2975,7 +3395,23 @@ const UI = {
       if (!Game.hasAnyScores(g)) {
         return h('li',{class:'muted'},`${this.gameLabel(g)}: No scores yet`);
       }
-      
+
+      if (g.gameType === 'skins') {
+        const res = Game.computeSkinsResult(g);
+        const players = g.skinsPlayers || [];
+        players.forEach(pid => {
+          const pr = res.playerResults[pid];
+          if (pr) net[pid] += pr.profit;
+        });
+        // Find biggest winner for display
+        let best = null, bestProfit = -Infinity;
+        players.forEach(pid => {
+          const pr = res.playerResults[pid];
+          if (pr && pr.profit > bestProfit) { best = pid; bestProfit = pr.profit; }
+        });
+        return h('li',{},`${this.gameLabel(g)}: ${best ? UI.playerName(best) + ' +' + Utils.fmt(bestProfit) : 'No winner yet'}`);
+      }
+
       let tot;
       if (g.gameType === 'vegas') {
         const res = Game.computeVegasResult(g);
@@ -3072,7 +3508,24 @@ const UI = {
         h('h3',{style:'margin:16px 0 8px 0;'},'Junk'),
         h('p',{},'Same as Nassau - optional side bets with $ values.')
       ]),
-      
+
+      h('div',{class:'card',style:'margin-bottom:16px;'},[
+        h('h2',{style:'margin:0 0 12px 0;'},'Skins'),
+        h('p',{},'Individual game for 2-5 players. Each hole is worth a "skin" - win the hole outright to claim it.'),
+        h('h3',{style:'margin:16px 0 8px 0;'},'Carryovers'),
+        h('p',{},'If two or more players tie for lowest score on a hole, the skin carries over to the next hole. Carryovers accumulate until someone wins outright.'),
+        h('h3',{style:'margin:16px 0 8px 0;'},'Modes'),
+        h('ul',{style:'margin:8px 0;padding-left:20px;'},[
+          h('li',{},h('strong',{},'Net:'),' Handicap strokes apply - lowest net score wins'),
+          h('li',{},h('strong',{},'Gross:'),' Raw scores only - lowest gross score wins'),
+          h('li',{},h('strong',{},'Net + Gross:'),' Two separate pots - can win both on same hole')
+        ]),
+        h('h3',{style:'margin:16px 0 8px 0;'},'Payout'),
+        h('p',{},'Total pot (buy-in × players) divided by number of skins won. For Net+Gross, each pot is calculated separately.'),
+        h('h3',{style:'margin:16px 0 8px 0;'},'Final Hole Ties'),
+        h('p',{},'If the last hole ties with carryovers pending, the pot splits evenly among all tied players.')
+      ]),
+
       h('div',{class:'card'},[
         h('h2',{style:'margin:0 0 12px 0;'},'App Tips'),
         h('ul',{style:'margin:8px 0;padding-left:20px;'},[
