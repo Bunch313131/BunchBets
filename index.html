@@ -214,6 +214,9 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .currency-input-wrap { position:relative; display:flex; align-items:center; }
 .currency-input-wrap::before { content:'$'; position:absolute; left:10px; color:var(--muted); font-size:14px; pointer-events:none; z-index:1; }
 .currency-input { width:80px; padding:8px 8px 8px 22px; font-size:14px; min-height:40px; text-align:right; }
+/* Help button for game explanations */
+.help-btn { width:28px; height:28px; border-radius:50%; border:1px solid var(--border); background:var(--card); color:var(--acc); font-weight:700; font-size:14px; cursor:pointer; flex-shrink:0; }
+.help-btn:hover { background:var(--acc); color:#fff; }
 </style>
 </head>
 <body>
@@ -1540,11 +1543,13 @@ const Wizard = {
           <div class="wizard-section-title">Game Type</div>
           <div class="wizard-option ${g.gameType==='nassau'?'selected':''}" data-type="nassau">
             <input type="radio" name="gameType" ${g.gameType==='nassau'?'checked':''}>
-            <div><strong>Nassau</strong><br><span class="muted">Front 9, Back 9, Overall</span></div>
+            <div style="flex:1;"><strong>Nassau</strong><br><span class="muted">2v2 match play - high/low ball with presses</span></div>
+            <button type="button" class="help-btn" data-help="nassau">?</button>
           </div>
           <div class="wizard-option ${g.gameType==='vegas'?'selected':''}" data-type="vegas">
             <input type="radio" name="gameType" ${g.gameType==='vegas'?'checked':''}>
-            <div><strong>Vegas</strong><br><span class="muted">2v2 with flip scoring</span></div>
+            <div style="flex:1;"><strong>Vegas</strong><br><span class="muted">2v2 team digits - combine scores, birdies flip</span></div>
+            <button type="button" class="help-btn" data-help="vegas">?</button>
           </div>
         </div>
 
@@ -1664,6 +1669,50 @@ const Wizard = {
         opt.onclick = () => {
           g.gameType = opt.dataset.type;
           this.render();
+        };
+      });
+
+      // Help buttons for game types
+      div.querySelectorAll('.help-btn[data-help]').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const type = btn.dataset.help;
+          let title = '';
+          let content = '';
+          if (type === 'nassau') {
+            title = 'Nassau';
+            content = '<p><strong>Nassau</strong> is a 2v2 match play format with three separate bets: Front 9, Back 9, and Overall 18.</p>' +
+              '<p><strong>How it works:</strong></p>' +
+              '<ul>' +
+              '<li><strong>Low Ball:</strong> Best score on each team competes</li>' +
+              '<li><strong>High Ball:</strong> Worst score on each team competes</li>' +
+              '<li>Win both = win the hole (+1)</li>' +
+              '<li>Split = push (0)</li>' +
+              '<li>Lose both = lose the hole (-1)</li>' +
+              '</ul>' +
+              '<p><strong>Presses:</strong> When a team is down 2 or more, a new bet automatically starts (auto-press). All active bets run in parallel.</p>' +
+              '<p><strong>Scoring:</strong> Each bet pays out based on the final margin. Stakes are per player.</p>';
+          } else if (type === 'vegas') {
+            title = 'Vegas';
+            content = '<p><strong>Vegas</strong> is a 2v2 format where team scores are combined as digits, not added.</p>' +
+              '<p><strong>How it works:</strong></p>' +
+              '<ul>' +
+              '<li>If Team A shoots 4 and 5, their score is <strong>45</strong> (not 9)</li>' +
+              '<li>Lower digit always goes first (4-5 = 45, not 54)</li>' +
+              '<li>Point difference = higher team number minus lower</li>' +
+              '</ul>' +
+              '<p><strong>Flip Rule:</strong> If one team makes birdie and the other does not, the losing team\'s digits flip (45 becomes 54). This is a 9-point swing!</p>' +
+              '<p><strong>Triple Bogey Max:</strong> No individual score counts higher than triple bogey to prevent blowouts.</p>' +
+              '<p><strong>Presses:</strong> The trailing team can press after the first team tees off (2x points) or blind press before anyone tees off (4x points).</p>' +
+              '<p><strong>Scoring:</strong> Point differential times stake value. Stakes are per player.</p>';
+          }
+          // Show modal
+          const modal = document.createElement('div');
+          modal.className = 'modal-overlay';
+          modal.innerHTML = '<div class="modal" style="max-width:400px;"><div class="modal-header"><span class="modal-title">' + title + '</span><button class="modal-close">&times;</button></div><div class="modal-body" style="text-align:left;font-size:14px;">' + content + '</div></div>';
+          document.body.appendChild(modal);
+          modal.querySelector('.modal-close').onclick = () => modal.remove();
+          modal.onclick = (ev) => { if (ev.target === modal) modal.remove(); };
         };
       });
 
