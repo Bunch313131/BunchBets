@@ -2713,17 +2713,24 @@ const UI = {
       if (game.gameType === 'skins') {
         const result = Game.computeSkinsResult(game);
         const mode = game.skinsMode || 'net';
-        const carryLabel = mode === 'both'
-          ? `Carry: G${result.grossCarry}/N${result.netCarry}`
-          : `Carry: ${mode === 'gross' ? result.grossCarry : result.netCarry}`;
-        const skinLabel = mode === 'both'
-          ? `Skins: G${result.totalGrossSkins}/N${result.totalNetSkins}`
-          : `Skins: ${mode === 'gross' ? result.totalGrossSkins : result.totalNetSkins}`;
-        const skinValue = mode === 'both'
-          ? `G${Utils.fmt(result.grossSkinValue)}/N${Utils.fmt(result.netSkinValue)}`
-          : Utils.fmt(mode === 'gross' ? result.grossSkinValue : result.netSkinValue);
-        frontLine = `${skinLabel} | ${carryLabel} | $/Skin: ${skinValue}`;
-        backLine = `Pot: ${Utils.fmt(result.totalPot)}`;
+        const players = game.skinsPlayers || [];
+
+        // Build player skin counts (e.g., "Tom:1 Dick:0 Harry:2")
+        const playerCounts = players.map(pid => {
+          const name = UI.playerName(pid);
+          const abbr = name.length <= 4 ? name : name.slice(0,3);
+          const skins = mode === 'gross' ? result.grossSkins[pid] :
+                        mode === 'net' ? result.netSkins[pid] :
+                        (result.grossSkins[pid] + result.netSkins[pid]);
+          return `${abbr}:${skins || 0}`;
+        }).join(' ');
+
+        const carry = mode === 'gross' ? result.grossCarry :
+                      mode === 'net' ? result.netCarry :
+                      (result.grossCarry + result.netCarry);
+
+        frontLine = playerCounts + (carry > 0 ? ` | Carry:${carry}` : '');
+        backLine = `Pot: ${Utils.fmt(result.totalPot)} | $/Skin: ${Utils.fmt(mode === 'gross' ? result.grossSkinValue : result.netSkinValue)}`;
       } else if (game.gameType === 'vegas') {
         const result = Game.computeVegasResult(game);
         // Per-player value = points × $/point (no team multiplier)
