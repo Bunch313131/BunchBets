@@ -2145,9 +2145,9 @@ const UI = {
     const right = (b1 && b2) ? `${b1}/${b2}` : (b1 || b2 || 'Team B');
     
     if (g.gameType === 'skins') {
-      const players = (g.skinsPlayers || []).map(pid => abbr(pid, used)).join('/');
+      const count = (g.skinsPlayers || []).length;
       const modeLabel = g.skinsMode === 'both' ? 'Net+Gross' : (g.skinsMode === 'gross' ? 'Gross' : 'Net');
-      return `Skins (${modeLabel}): ${players || 'No players'}`;
+      return `Skins ${modeLabel} (${count}p)`;
     } else if (g.gameType === 'vegas') {
       return `Vegas: ${left} vs ${right}`;
     } else {
