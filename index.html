@@ -199,6 +199,9 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .wizard-player-chip:hover { background:rgba(59,130,246,0.3); }
 .wizard-player-chip.team-a { background:rgba(22,163,74,0.2); border-color:#16a34a; }
 .wizard-player-chip.team-b { background:rgba(220,38,38,0.2); border-color:#dc2626; }
+.wizard-player-chip.skins-selected { background:#16a34a; border-color:#16a34a; color:#fff; font-weight:600; }
+.wizard-player-chip.skins-selected::before { content:'✓ '; }
+.wizard-player-chip.skins-unselected { background:rgba(100,100,100,0.15); border-color:rgba(100,100,100,0.3); color:var(--muted); }
 .wizard-game-tabs { display:flex; gap:8px; justify-content:center; margin-top:8px; flex-wrap:wrap; }
 .wizard-game-tab { padding:6px 14px; border-radius:20px; font-size:13px; cursor:pointer; border:1px solid var(--border); background:var(--card); transition:all 0.2s; }
 .wizard-game-tab:hover { border-color:var(--acc); }
@@ -1726,7 +1729,7 @@ const Wizard = {
             ${this.data.players.filter(p=>p.name.trim()).map((p,i) => {
               const pid = 'p'+(i+1);
               const inGame = (g.skinsPlayers || []).includes(pid);
-              return `<div class="wizard-player-chip ${inGame?'teamA':''}" data-skins-pid="${pid}" style="cursor:pointer;">${p.name}</div>`;
+              return `<div class="wizard-player-chip ${inGame?'skins-selected':'skins-unselected'}" data-skins-pid="${pid}" style="cursor:pointer;">${p.name}</div>`;
             }).join('')}
           </div>
           <div class="muted" style="font-size:12px;margin-top:8px;text-align:center;">${(g.skinsPlayers||[]).length} player${(g.skinsPlayers||[]).length!==1?'s':''} selected</div>
@@ -2142,9 +2145,9 @@ const UI = {
     const right = (b1 && b2) ? `${b1}/${b2}` : (b1 || b2 || 'Team B');
     
     if (g.gameType === 'skins') {
-      const players = (g.skinsPlayers || []).map(pid => abbr(pid, used)).join('/');
+      const count = (g.skinsPlayers || []).length;
       const modeLabel = g.skinsMode === 'both' ? 'Net+Gross' : (g.skinsMode === 'gross' ? 'Gross' : 'Net');
-      return `Skins (${modeLabel}): ${players || 'No players'}`;
+      return `Skins ${modeLabel} (${count}p)`;
     } else if (g.gameType === 'vegas') {
       return `Vegas: ${left} vs ${right}`;
     } else {
@@ -2710,17 +2713,24 @@ const UI = {
       if (game.gameType === 'skins') {
         const result = Game.computeSkinsResult(game);
         const mode = game.skinsMode || 'net';
-        const carryLabel = mode === 'both'
-          ? `Carry: G${result.grossCarry}/N${result.netCarry}`
-          : `Carry: ${mode === 'gross' ? result.grossCarry : result.netCarry}`;
-        const skinLabel = mode === 'both'
-          ? `Skins: G${result.totalGrossSkins}/N${result.totalNetSkins}`
-          : `Skins: ${mode === 'gross' ? result.totalGrossSkins : result.totalNetSkins}`;
-        const skinValue = mode === 'both'
-          ? `G${Utils.fmt(result.grossSkinValue)}/N${Utils.fmt(result.netSkinValue)}`
-          : Utils.fmt(mode === 'gross' ? result.grossSkinValue : result.netSkinValue);
-        frontLine = `${skinLabel} | ${carryLabel} | $/Skin: ${skinValue}`;
-        backLine = `Pot: ${Utils.fmt(result.totalPot)}`;
+        const players = game.skinsPlayers || [];
+
+        // Build player skin counts (e.g., "Tom:1 Dick:0 Harry:2")
+        const playerCounts = players.map(pid => {
+          const name = UI.playerName(pid);
+          const abbr = name.length <= 4 ? name : name.slice(0,3);
+          const skins = mode === 'gross' ? result.grossSkins[pid] :
+                        mode === 'net' ? result.netSkins[pid] :
+                        (result.grossSkins[pid] + result.netSkins[pid]);
+          return `${abbr}:${skins || 0}`;
+        }).join(' ');
+
+        const carry = mode === 'gross' ? result.grossCarry :
+                      mode === 'net' ? result.netCarry :
+                      (result.grossCarry + result.netCarry);
+
+        frontLine = playerCounts + (carry > 0 ? ` | Carry:${carry}` : '');
+        backLine = `Pot: ${Utils.fmt(result.totalPot)} | $/Skin: ${Utils.fmt(mode === 'gross' ? result.grossSkinValue : result.netSkinValue)}`;
       } else if (game.gameType === 'vegas') {
         const result = Game.computeVegasResult(game);
         // Per-player value = points × $/point (no team multiplier)
