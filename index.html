@@ -387,6 +387,8 @@ window.LiveSync = {
 
       this.showBanner(`Viewing: ${code} (read-only)`, true);
       this.disableEditing();
+      State.data.tab = 'scores';
+      State.scheduleRender();
       Err.toast('Connected to game ' + code);
       return true;
     } catch (e) {
@@ -3924,10 +3926,12 @@ document.getElementById('joinBtn').onclick = () => { UI.closeMenu(); LiveSync.sh
 document.getElementById('startWizardBtn').onclick = () => { UI.closeMenu(); Wizard.start(); };
 
 // Check URL for join code on load
+let joiningViaUrl = false;
 (function() {
   const params = new URLSearchParams(window.location.search);
   const joinCode = params.get('join');
   if (joinCode) {
+    joiningViaUrl = true;
     // Remove code from URL to prevent re-joining on refresh
     window.history.replaceState({}, '', window.location.pathname);
     // Delay join to allow app to initialize
@@ -3961,6 +3965,9 @@ UI.initMenu();
     }
     return false;
   };
+
+  // If joining via URL, don't auto-launch wizard (joinGame will handle navigation)
+  if (joiningViaUrl) return;
 
   // If it's a new day, show wizard for fresh start
   // If same day with active game, go to scores
