@@ -3825,8 +3825,7 @@ const UI = {
         }).join(' ');
 
         frontLine = playerAmts;
-        const junkPart9 = totalJunkMoney9 > 0 ? ` | Junk: ${Utils.fmt(totalJunkMoney9)}` : '';
-        backLine = `$${game.ninePointValue}/pt | Total: ${Utils.fmt(result.totalMoney + totalJunkMoney9)}${junkPart9}`;
+        backLine = `$${game.ninePointValue}/pt`;
       } else if (game.gameType === 'vegas') {
         const result = Game.computeVegasResult(game);
         // Per-player value = points × $/point (no team multiplier)
@@ -4174,8 +4173,7 @@ const UI = {
             h('div',{class:'pill'},UI.gameLabel(g)),
             h('div',{class:'note',style:'margin-top:6px;'},`$${pointValue}/pt${rulesText}`),
             h('div',{style:'margin-top:12px;'},playerRows),
-            hasJunk ? h('div',{class:'muted',style:'margin-top:8px;'},`Junk in play: ${Utils.fmt(totalJunkMoney)}`) : '',
-            h('div',{style:'margin-top:8px;font-weight:700;'},`Total in play: ${Utils.fmt(result.totalMoney + totalJunkMoney)}`)
+            hasJunk ? h('div',{class:'muted',style:'margin-top:8px;'},`Junk: ${Utils.fmt(totalJunkMoney)}`) : ''
           ])
         ]);
       }
@@ -4643,6 +4641,87 @@ const UI = {
                 ]),
                 h('div',{style:'font-size:24px;font-weight:700;'},Utils.fmt(result.totalMoney + totalJunkMoney))
               ])
+            ])
+          ])
+        ]);
+      }
+
+      // 9-Point - hole-by-hole view with point distribution
+      if (g.gameType === 'ninepoint') {
+        const result = Game.computeNinePointResult(g);
+        const players = g.ninePointPlayers || [];
+        const pointValue = g.ninePointValue || 1;
+
+        const buildNinePointHoleRows = () => {
+          const rows = [];
+          for (let hole = 0; hole < 18; hole++) {
+            const detail = result.holeDetails[hole];
+            if (!detail || Object.keys(detail.scores).length !== 3) {
+              rows.push(h('div',{style:'padding:6px 0;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;'},
+                `Hole ${hole+1}: No scores`));
+              continue;
+            }
+
+            // Get scores and points for display
+            const playerInfo = players.map(pid => ({
+              pid,
+              name: UI.playerName(pid),
+              score: detail.scores[pid] ? detail.scores[pid].net : '?',
+              pts: detail.points[pid] || 0
+            })).sort((a, b) => a.score - b.score);
+
+            const scoreText = playerInfo.map(p => `${p.name.slice(0,3)}:${p.score}`).join(' ');
+            const ptsText = playerInfo.map(p => `${p.pts}`).join('/');
+
+            let specialText = '';
+            if (detail.birdieDoubleApplied) specialText = ' (Birdie 2x)';
+            else if (detail.winBy2Applied) specialText = ' (Win by 2)';
+
+            rows.push(h('div',{style:'padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;'},[
+              h('div',{style:'display:flex;justify-content:space-between;align-items:center;'},[
+                h('span',{style:'font-weight:600;'},`#${hole+1}`),
+                h('span',{style:'font-weight:600;'},`${ptsText}${specialText}`)
+              ]),
+              h('div',{style:'margin-top:4px;color:var(--muted);'},scoreText)
+            ]));
+          }
+          return rows;
+        };
+
+        const holeRows = buildNinePointHoleRows();
+
+        // Player results
+        const playerRows = players.map(pid => {
+          const pts = result.playerPoints[pid] || 0;
+          const amt = result.playerNet[pid] || 0;
+          const profitClass = amt > 0 ? 'points-positive' : amt < 0 ? 'points-negative' : '';
+          return h('div',{style:'display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);'},[
+            h('span',{},`${UI.playerName(pid)} (${pts} pts)`),
+            h('span',{class:profitClass,style:'font-weight:600;'},Utils.fmt(amt))
+          ]);
+        });
+
+        const rulesNote = [];
+        if (g.ninePointWinBy2) rulesNote.push('Win by 2');
+        if (g.ninePointBirdieDouble) rulesNote.push('Birdie 2x');
+        const rulesText = rulesNote.length ? ` | ${rulesNote.join(', ')}` : '';
+
+        return h('div',{class:theme},[
+          h('div',{class:'card'},[
+            h('div',{class:'pill'},UI.gameLabel(g)),
+            h('div',{class:'note',style:'margin-top:6px;'},`Players: ${players.map(pid => UI.playerName(pid)).join(', ')}`),
+            h('div',{class:'note'},`$${pointValue}/pt${rulesText}`),
+
+            // Hole-by-hole
+            h('div',{style:'margin-top:12px;'},[
+              h('div',{style:'font-weight:600;margin-bottom:8px;'},'Hole by Hole'),
+              ...holeRows
+            ]),
+
+            // Player results
+            h('div',{style:'margin-top:12px;'},[
+              h('div',{style:'font-weight:600;margin-bottom:8px;'},'Player Results'),
+              ...playerRows
             ])
           ])
         ]);
@@ -5479,7 +5558,11 @@ document.getElementById('hostBtn').onclick = () => { UI.closeMenu(); LiveSync.sh
 document.getElementById('joinBtn').onclick = () => { UI.closeMenu(); LiveSync.showJoinModal(); };
 
 // Wizard button
-document.getElementById('startWizardBtn').onclick = () => { UI.closeMenu(); Wizard.start(); };
+document.getElementById('startWizardBtn').onclick = () => {
+  if (!confirm('Start a new game?\n\nThis will erase all scores and settings from the current game.')) return;
+  UI.closeMenu();
+  Wizard.start();
+};
 
 // Check URL for join code on load
 let joiningViaUrl = false;
