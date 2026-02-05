@@ -154,7 +154,8 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .menu-item.primary { color:var(--acc); font-weight:600; }
 
 /* Wizard Styles */
-.wizard-overlay { position:fixed; inset:0; z-index:200; display:flex; flex-direction:column; }
+.wizard-overlay { position:fixed; inset:0; z-index:200; display:flex; flex-direction:column; overflow:hidden; }
+body:has(.wizard-overlay) { overflow:hidden; }
 .wizard-splash {
   background: linear-gradient(135deg, #16a34a 0%, #15803d 50%, #166534 100%);
   flex:1;
