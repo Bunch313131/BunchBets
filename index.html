@@ -1963,14 +1963,17 @@ const Wizard = {
         </div>
         ${(g.wolfPlayers||[]).length >= 4 ? `
         <div class="wizard-section">
-          <div class="wizard-section-title">Tee Order (drag to reorder)</div>
+          <div class="wizard-section-title">Tee Order (tap arrows to reorder)</div>
           <div id="wolfTeeOrderList" style="display:flex;flex-direction:column;gap:6px;">
-            ${(g.wolfTeeOrder.length ? g.wolfTeeOrder : g.wolfPlayers).map((pid, idx) => {
+            ${(g.wolfTeeOrder.length ? g.wolfTeeOrder : g.wolfPlayers).map((pid, idx, arr) => {
               const player = this.data.players.find(p => p.id === pid);
-              return player ? `<div class="wolf-tee-order-item" data-wolf-order-pid="${pid}" draggable="true" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;cursor:grab;">
+              const isFirst = idx === 0;
+              const isLast = idx === arr.length - 1;
+              return player ? `<div class="wolf-tee-order-item" data-wolf-order-pid="${pid}" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;">
                 <span style="color:var(--muted);font-weight:600;min-width:20px;">${idx+1}.</span>
                 <span style="flex:1;">${player.name}</span>
-                <span style="color:var(--muted);">☰</span>
+                <button type="button" class="wolf-order-btn" data-wolf-move="up" data-wolf-pid="${pid}" ${isFirst?'disabled':''} style="padding:4px 10px;font-size:16px;border:1px solid var(--border);border-radius:4px;background:${isFirst?'var(--muted)':'var(--card)'};cursor:${isFirst?'default':'pointer'};">▲</button>
+                <button type="button" class="wolf-order-btn" data-wolf-move="down" data-wolf-pid="${pid}" ${isLast?'disabled':''} style="padding:4px 10px;font-size:16px;border:1px solid var(--border);border-radius:4px;background:${isLast?'var(--muted)':'var(--card)'};cursor:${isLast?'default':'pointer'};">▼</button>
               </div>` : '';
             }).join('')}
           </div>
@@ -2307,47 +2310,45 @@ const Wizard = {
           }
           // Sync tee order with players
           g.wolfTeeOrder = g.wolfTeeOrder.filter(x => g.wolfPlayers.includes(x));
+          // Save scroll position before re-render
+          const scrollEl = document.querySelector('.wizard-content');
+          const scrollTop = scrollEl ? scrollEl.scrollTop : 0;
           this.render();
+          // Restore scroll position after re-render
+          setTimeout(() => {
+            const newScrollEl = document.querySelector('.wizard-content');
+            if (newScrollEl) newScrollEl.scrollTop = scrollTop;
+          }, 0);
         };
       });
 
-      // Wolf tee order drag/drop
-      const teeOrderList = document.getElementById('wolfTeeOrderList');
-      if (teeOrderList) {
-        let draggedItem = null;
-        teeOrderList.querySelectorAll('.wolf-tee-order-item').forEach(item => {
-          item.ondragstart = (e) => {
-            draggedItem = item;
-            item.style.opacity = '0.5';
-          };
-          item.ondragend = () => {
-            item.style.opacity = '1';
-            draggedItem = null;
-          };
-          item.ondragover = (e) => {
-            e.preventDefault();
-            if (draggedItem && draggedItem !== item) {
-              const rect = item.getBoundingClientRect();
-              const midY = rect.top + rect.height / 2;
-              if (e.clientY < midY) {
-                item.parentNode.insertBefore(draggedItem, item);
-              } else {
-                item.parentNode.insertBefore(draggedItem, item.nextSibling);
-              }
-            }
-          };
-          item.ondrop = (e) => {
-            e.preventDefault();
-            // Update tee order based on DOM order
-            const newOrder = [];
-            teeOrderList.querySelectorAll('.wolf-tee-order-item').forEach(el => {
-              newOrder.push(el.dataset.wolfOrderPid);
-            });
-            g.wolfTeeOrder = newOrder;
-            this.render();
-          };
-        });
-      }
+      // Wolf tee order up/down buttons
+      div.querySelectorAll('.wolf-order-btn').forEach(btn => {
+        btn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const pid = btn.dataset.wolfPid;
+          const dir = btn.dataset.wolfMove;
+          const order = g.wolfTeeOrder.length ? [...g.wolfTeeOrder] : [...g.wolfPlayers];
+          const idx = order.indexOf(pid);
+          if (idx === -1) return;
+          if (dir === 'up' && idx > 0) {
+            [order[idx-1], order[idx]] = [order[idx], order[idx-1]];
+          } else if (dir === 'down' && idx < order.length - 1) {
+            [order[idx], order[idx+1]] = [order[idx+1], order[idx]];
+          }
+          g.wolfTeeOrder = order;
+          // Save scroll position before re-render
+          const scrollEl = document.querySelector('.wizard-content');
+          const scrollTop = scrollEl ? scrollEl.scrollTop : 0;
+          this.render();
+          // Restore scroll position after re-render
+          setTimeout(() => {
+            const newScrollEl = document.querySelector('.wizard-content');
+            if (newScrollEl) newScrollEl.scrollTop = scrollTop;
+          }, 0);
+        };
+      });
 
       // Wolf point value input
       const wolfPointInput = document.getElementById('wizardWolfPointValue');
@@ -3000,13 +3001,22 @@ const UI = {
       const actualIdx = State.data.games.indexOf(game);
       const theme = `theme-g${(actualIdx%6)+1}`;
       const wolfPlayers = game.wolfPlayers || [];
+      // Skip if no wolf players configured
+      if (wolfPlayers.length < 4) {
+        const cells = [h('td',{class:'sticky press-label',style:'font-weight:600;'},UI.gameLabel(game))];
+        for (let hole = 0; hole < 18; hole++) {
+          cells.push(h('td',{class:'muted',style:'font-size:10px;'},'-'));
+        }
+        cells.push(h('td',{colspan:'3'}));
+        return h('tr',{class:`press-row ${theme}`},cells);
+      }
       // Compute wolf result to get actual wolf for each hole (includes catch-up logic)
       const wolfResult = Game.computeWolfResult(game);
       const cells = [h('td',{class:'sticky press-label',style:'font-weight:600;'},UI.gameLabel(game))];
       for (let hole = 0; hole < 18; hole++) {
         const detail = wolfResult.holeDetails[hole] || {};
         const wolfPid = detail.wolf || wolfPlayers[hole % wolfPlayers.length];
-        const wolfName = UI.playerName(wolfPid);
+        const wolfName = UI.playerName(wolfPid) || '?';
         const isCatchUp = hole >= 15;
         const currentSel = game.wolfSelections[hole] || '';
         // Options: player names (except wolf), Wolf, Blind Wolf
@@ -3014,7 +3024,7 @@ const UI = {
         const options = [
           h('option',{value:'',selected:currentSel===''},(isCatchUp ? '*' : '') + wolfName.slice(0,1) + '?'),
           ...otherPlayers.map(pid => {
-            const name = UI.playerName(pid);
+            const name = UI.playerName(pid) || '?';
             const abbr = name.length <= 3 ? name : name.slice(0,2);
             return h('option',{value:pid,selected:currentSel===pid},abbr);
           }),
