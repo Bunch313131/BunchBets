@@ -1303,29 +1303,22 @@ const Game = {
       // Calculate points for this hole
       const basePoints = 1;
       const holePoints = basePoints * mult * carryMultiplier;
+      const totalPoints = holePoints + carryover;
 
       if (wolfBest < otherBest) {
-        // Wolf team wins
+        // Wolf team wins - each winner gets full points, each loser loses full points
         detail.winner = 'wolf';
-        detail.points = holePoints + carryover;
-        // Distribute points to wolf team
-        const pointsPerWinner = (holePoints + carryover) / wolfTeam.length;
-        wolfTeam.forEach(p => { playerPoints[p] += pointsPerWinner; });
-        // Other team loses points
-        const pointsPerLoser = (holePoints + carryover) / otherTeam.length;
-        otherTeam.forEach(p => { playerPoints[p] -= pointsPerLoser; });
+        detail.points = totalPoints;
+        wolfTeam.forEach(p => { playerPoints[p] += totalPoints; });
+        otherTeam.forEach(p => { playerPoints[p] -= totalPoints; });
         carryover = 0;
         carryMultiplier = 1;
       } else if (otherBest < wolfBest) {
-        // Other team wins
+        // Other team wins - each winner gets full points, each loser loses full points
         detail.winner = 'others';
-        detail.points = holePoints + carryover;
-        // Distribute points to other team
-        const pointsPerWinner = (holePoints + carryover) / otherTeam.length;
-        otherTeam.forEach(p => { playerPoints[p] += pointsPerWinner; });
-        // Wolf team loses points
-        const pointsPerLoser = (holePoints + carryover) / wolfTeam.length;
-        wolfTeam.forEach(p => { playerPoints[p] -= pointsPerLoser; });
+        detail.points = totalPoints;
+        otherTeam.forEach(p => { playerPoints[p] += totalPoints; });
+        wolfTeam.forEach(p => { playerPoints[p] -= totalPoints; });
         carryover = 0;
         carryMultiplier = 1;
       } else {
@@ -1346,16 +1339,19 @@ const Game = {
     })).sort((a, b) => b.points - a.points);
 
     // Calculate transactions (pay up the ladder)
+    // Divide diff by 2 because each player's points include their side of each bet
+    // e.g., A at +1 and C at -1 means diff of 2, but actual bet was 1 point
     const transactions = [];
     for (let i = 0; i < standings.length; i++) {
       for (let j = i + 1; j < standings.length; j++) {
         const diff = standings[i].points - standings[j].points;
         if (diff > 0) {
+          const actualPoints = diff / 2;
           transactions.push({
             from: standings[j].pid,
             to: standings[i].pid,
-            points: diff,
-            amount: diff * pointValue
+            points: actualPoints,
+            amount: actualPoints * pointValue
           });
         }
       }
@@ -1976,10 +1972,11 @@ const Wizard = {
           <div class="wizard-section-title">Tee Order (tap arrows to reorder)</div>
           <div id="wolfTeeOrderList" style="display:flex;flex-direction:column;gap:6px;">
             ${(g.wolfTeeOrder.length ? g.wolfTeeOrder : g.wolfPlayers).map((pid, idx, arr) => {
-              const player = this.data.players.find(p => p.id === pid);
+              const playerIdx = parseInt(pid.slice(1)) - 1;
+              const player = this.data.players[playerIdx];
               const isFirst = idx === 0;
               const isLast = idx === arr.length - 1;
-              return player ? `<div class="wolf-tee-order-item" data-wolf-order-pid="${pid}" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;">
+              return player && player.name ? `<div class="wolf-tee-order-item" data-wolf-order-pid="${pid}" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;">
                 <span style="color:var(--muted);font-weight:600;min-width:20px;">${idx+1}.</span>
                 <span style="flex:1;">${player.name}</span>
                 <button type="button" class="wolf-order-btn" data-wolf-move="up" data-wolf-pid="${pid}" ${isFirst?'disabled':''} style="padding:4px 10px;font-size:16px;border:1px solid var(--border);border-radius:4px;background:${isFirst?'var(--muted)':'var(--card)'};cursor:${isFirst?'default':'pointer'};">▲</button>
@@ -2701,8 +2698,8 @@ const UI = {
 
       const gameTypeSelector = () => h('div',{style:'margin:12px 0;'},[
         h('div',{class:'muted'},'Game Type'),
-        h('div',{class:'row',style:'margin-top:6px;'},[
-          h('label',{class:'nowrap',style:'margin-right:12px;'},[
+        h('div',{class:'row',style:'margin-top:6px;flex-wrap:wrap;gap:8px;'},[
+          h('label',{class:'nowrap'},[
             h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='nassau',
               onchange:()=>{g.gameType='nassau';State.scheduleSave();State.scheduleRender();}}),
             ' Nassau'
@@ -2717,6 +2714,16 @@ const UI = {
                 State.scheduleRender();
               }}),
             ' Vegas'
+          ]),
+          h('label',{class:'nowrap'},[
+            h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='skins',
+              onchange:()=>{g.gameType='skins';State.scheduleSave();State.scheduleRender();}}),
+            ' Skins'
+          ]),
+          h('label',{class:'nowrap'},[
+            h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='wolf',
+              onchange:()=>{g.gameType='wolf';State.scheduleSave();State.scheduleRender();}}),
+            ' Wolf'
           ])
         ])
       ]);
@@ -2836,6 +2843,77 @@ const UI = {
               h('div',{},[h('div',{class:'muted'},'Back'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.back,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.back=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.back);State.end();}})]),
             ]),
             h('div',{class:'note',style:'margin-top:8px;'},'Flip if: opponent birdie, OR no one on your team has net par or better')
+          ]) : h('div',{}),
+
+          g.gameType === 'skins' ? h('div',{},[
+            h('div',{style:'margin:8px 0;'},[
+              h('div',{class:'muted'},'Players (tap to toggle)'),
+              h('div',{class:'row',style:'flex-wrap:wrap;gap:6px;margin-top:6px;'},
+                State.data.players.map(p => {
+                  const inGame = (g.skinsPlayers || []).includes(p.id);
+                  return h('button',{
+                    class:`btn small ${inGame?'primary':''}`,
+                    onclick:()=>{
+                      g.skinsPlayers = g.skinsPlayers || [];
+                      if (inGame) g.skinsPlayers = g.skinsPlayers.filter(x => x !== p.id);
+                      else if (g.skinsPlayers.length < 5) g.skinsPlayers.push(p.id);
+                      State.scheduleSave();
+                      State.scheduleRender();
+                    }
+                  },p.name);
+                })
+              )
+            ]),
+            h('div',{style:'margin:8px 0;'},[
+              h('div',{class:'muted'},'Mode'),
+              h('div',{class:'row',style:'gap:12px;margin-top:6px;'},[
+                h('label',{},[h('input',{type:'radio',name:`smode_${g.id}`,checked:g.skinsMode==='net',onchange:()=>{g.skinsMode='net';State.scheduleSave();State.scheduleRender();}}),' Net']),
+                h('label',{},[h('input',{type:'radio',name:`smode_${g.id}`,checked:g.skinsMode==='gross',onchange:()=>{g.skinsMode='gross';State.scheduleSave();State.scheduleRender();}}),' Gross']),
+                h('label',{},[h('input',{type:'radio',name:`smode_${g.id}`,checked:g.skinsMode==='both',onchange:()=>{g.skinsMode='both';State.scheduleSave();State.scheduleRender();}}),' Both'])
+              ])
+            ]),
+            h('div',{style:'margin:8px 0;'},[
+              h('div',{class:'muted'},'Buy-in $'),
+              h('input',{type:'number',value:g.stakes.front||20,style:'width:80px;',onfocus:()=>State.begin(),onblur:(e)=>{g.stakes.front=parseFloat(e.target.value)||20;State.end();}}),
+              h('span',{class:'muted',style:'margin-left:8px;'},`Pot: $${((g.stakes.front||20) * (g.skinsPlayers||[]).length).toFixed(0)}`)
+            ])
+          ]) : h('div',{}),
+
+          g.gameType === 'wolf' ? h('div',{},[
+            h('div',{style:'margin:8px 0;'},[
+              h('div',{class:'muted'},'Players (tap to toggle, 4-5)'),
+              h('div',{class:'row',style:'flex-wrap:wrap;gap:6px;margin-top:6px;'},
+                State.data.players.map(p => {
+                  const inGame = (g.wolfPlayers || []).includes(p.id);
+                  return h('button',{
+                    class:`btn small ${inGame?'primary':''}`,
+                    onclick:()=>{
+                      g.wolfPlayers = g.wolfPlayers || [];
+                      g.wolfTeeOrder = g.wolfTeeOrder || [];
+                      if (inGame) {
+                        g.wolfPlayers = g.wolfPlayers.filter(x => x !== p.id);
+                        g.wolfTeeOrder = g.wolfTeeOrder.filter(x => x !== p.id);
+                      } else if (g.wolfPlayers.length < 5) {
+                        g.wolfPlayers.push(p.id);
+                        if (!g.wolfTeeOrder.includes(p.id)) g.wolfTeeOrder.push(p.id);
+                      }
+                      State.scheduleSave();
+                      State.scheduleRender();
+                    }
+                  },p.name);
+                })
+              )
+            ]),
+            h('div',{style:'margin:8px 0;'},[
+              h('div',{class:'muted'},'Point Value $'),
+              h('input',{type:'number',step:'0.25',value:g.wolfPointValue||1,style:'width:80px;',onfocus:()=>State.begin(),onblur:(e)=>{g.wolfPointValue=parseFloat(e.target.value)||1;State.end();}})
+            ]),
+            h('div',{class:'row',style:'align-items:center;gap:12px;margin:8px 0;'},[
+              h('div',{class:'pill'},'Junk $/point'),
+              h('div',{},[h('div',{class:'muted'},'Front'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.front,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.front=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.front);State.end();}})]),
+              h('div',{},[h('div',{class:'muted'},'Back'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.back,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.back=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.back);State.end();}})]),
+            ]),
+            h('div',{class:'note',style:'margin-top:8px;'},'Wolf=2x, Blind Wolf=4x. Catch-up on holes 16-18.')
           ]) : h('div',{}),
 
           strokesEditor(),
@@ -3213,7 +3291,14 @@ const UI = {
       toggleBar,
       h('div',{class:'row',style:'align-items:center;justify-content:space-between;margin-bottom:8px;'},[
         h('div',{class:'pill'},'Entering GROSS for all players'),
-        h('div',{class:'note'},'Vegas: P=2x, B=4x | Wolf: pick partner or W/BW')
+        (() => {
+          const notes = [];
+          const gameTypes = State.data.games.map(g => g.gameType);
+          if (gameTypes.includes('vegas')) notes.push('Vegas: P=2x, B=4x');
+          if (gameTypes.includes('wolf')) notes.push('Wolf: pick partner or W/BW');
+          if (gameTypes.includes('skins')) notes.push('Skins: lowest wins');
+          return notes.length ? h('div',{class:'note'},notes.join(' | ')) : h('div',{});
+        })()
       ]),
       scroller,
       h('div',{id:'gameStatusBars',style:'margin-top:12px;'},gameStatusRows)
