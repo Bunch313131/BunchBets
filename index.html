@@ -2798,7 +2798,7 @@ const UI = {
       ]);
 
       const strokesEditor = () => {
-        const teamRow = (lbl, ids) => {
+        const playerRow = (ids) => {
           const grid = h('div',{style:'display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));'});
           ids.forEach(pid => {
             grid.appendChild(h('div',{style:'display:flex;flex-direction:column;gap:6px;'},[
@@ -2816,13 +2816,36 @@ const UI = {
               })
             ]));
           });
-          return h('div',{},[h('div',{class:'muted',style:'margin:6px 0 8px;'},lbl),grid]);
+          return grid;
+        };
+        const teamRow = (lbl, ids) => {
+          return h('div',{},[h('div',{class:'muted',style:'margin:6px 0 8px;'},lbl),playerRow(ids)]);
         };
         const body = [];
-        if (g.teamA.length) body.push(teamRow('Team A:',g.teamA));
-        if (g.teamB.length) body.push(teamRow('Team B:',g.teamB));
-        if (!g.teamA.length && !g.teamB.length) body.push(h('div',{class:'note'},'Pick players to edit strokes'));
-        else body.push(h('div',{class:'note'},'Strokes apply on HCP 1…n'));
+        // Wolf and Skins use player lists, not teams
+        if (g.gameType === 'wolf') {
+          const wolfPlayers = g.wolfPlayers || [];
+          if (wolfPlayers.length) {
+            body.push(playerRow(wolfPlayers));
+            body.push(h('div',{class:'note'},'Strokes apply on HCP 1…n'));
+          } else {
+            body.push(h('div',{class:'note'},'Select players above to edit strokes'));
+          }
+        } else if (g.gameType === 'skins') {
+          const skinsPlayers = g.skinsPlayers || [];
+          if (skinsPlayers.length) {
+            body.push(playerRow(skinsPlayers));
+            body.push(h('div',{class:'note'},'Strokes apply on HCP 1…n'));
+          } else {
+            body.push(h('div',{class:'note'},'Select players above to edit strokes'));
+          }
+        } else {
+          // Nassau/Vegas use teams
+          if (g.teamA.length) body.push(teamRow('Team A:',g.teamA));
+          if (g.teamB.length) body.push(teamRow('Team B:',g.teamB));
+          if (!g.teamA.length && !g.teamB.length) body.push(h('div',{class:'note'},'Pick players to edit strokes'));
+          else body.push(h('div',{class:'note'},'Strokes apply on HCP 1…n'));
+        }
         return h('div',{class:'card'},[h('div',{class:'pill'},'Strokes'),h('div',{},body)]);
       };
 
@@ -2960,19 +2983,18 @@ const UI = {
                   const inGame = (g.wolfPlayers || []).includes(p.id);
                   return h('button',{
                     class:`btn small ${inGame?'primary':''}`,
-                    onclick:(e)=>{
+                    onclick:()=>{
                       g.wolfPlayers = g.wolfPlayers || [];
                       g.wolfTeeOrder = g.wolfTeeOrder || [];
                       if (inGame) {
                         g.wolfPlayers = g.wolfPlayers.filter(x => x !== p.id);
                         g.wolfTeeOrder = g.wolfTeeOrder.filter(x => x !== p.id);
-                        e.target.classList.remove('primary');
                       } else if (g.wolfPlayers.length < 5) {
                         g.wolfPlayers.push(p.id);
                         if (!g.wolfTeeOrder.includes(p.id)) g.wolfTeeOrder.push(p.id);
-                        e.target.classList.add('primary');
                       }
                       State.scheduleSave();
+                      State.scheduleRender();
                     }
                   },p.name);
                 })
