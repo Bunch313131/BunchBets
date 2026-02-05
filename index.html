@@ -4039,37 +4039,26 @@ const UI = {
                 h('div',{style:'font-weight:600;color:#ca8a04;'},`${result.carryover} pts carrying to next hole`)
               ]) : '',
 
+            // Wolf Transactions
+            txnRows.length > 0 ? h('div',{class:'card',style:'margin-top:12px;'},[
+              h('div',{style:'font-weight:600;margin-bottom:8px;'},'Wolf'),
+              ...txnRows
+            ]) : '',
+
             // Junk (pay up the ladder)
             hasJunk ?
               h('div',{class:'card',style:'margin-top:12px;'},[
-                h('div',{style:'font-weight:600;margin-bottom:4px;'},'Junk (Pay Up the Ladder)'),
+                h('div',{style:'font-weight:600;margin-bottom:4px;'},'Junk'),
                 ...junkTxns.map(t => h('div',{style:'display:flex;justify-content:space-between;padding:4px 0;font-size:12px;'},[
                   h('span',{},`${UI.playerName(t.from)} → ${UI.playerName(t.to)}`),
                   h('span',{style:'font-weight:600;'},Utils.fmt(t.amount))
                 ]))
               ]) : '',
 
-            // Player results
-            h('div',{style:'margin-top:12px;'},[
-              h('div',{style:'font-weight:600;margin-bottom:8px;'},'Player Results (Wolf + Junk)'),
-              ...playerRows
-            ]),
-
-            // Wolf Transactions
-            txnRows.length > 0 ? h('div',{style:'margin-top:12px;'},[
-              h('div',{style:'font-weight:600;margin-bottom:8px;'},'Wolf Pay Up the Ladder'),
-              ...txnRows
-            ]) : '',
-
-            // Total
+            // Total combined
             h('div',{class:'card',style:'margin-top:12px;background:linear-gradient(135deg,rgba(59,130,246,0.1),rgba(22,163,74,0.1));'},[
-              h('div',{class:'row',style:'justify-content:space-between;align-items:center;'},[
-                h('div',{},[
-                  h('div',{class:'muted'},'TOTAL IN PLAY'),
-                  hasJunk ? h('div',{class:'muted',style:'font-size:11px;'},`Wolf: ${Utils.fmt(result.totalMoney)} + Junk: ${Utils.fmt(totalJunkMoney)}`) : ''
-                ]),
-                h('div',{style:'font-size:24px;font-weight:700;'},Utils.fmt(result.totalMoney + totalJunkMoney))
-              ])
+              h('div',{style:'font-weight:600;margin-bottom:8px;'},'Total'),
+              ...playerRows
             ])
           ])
         ]);
