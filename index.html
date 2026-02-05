@@ -1578,6 +1578,71 @@ const Wizard = {
     if (overlay) overlay.remove();
   },
 
+  updateWolfUI() {
+    const g = this.data.games[this.currentGameIndex];
+    if (!g || g.gameType !== 'wolf') return;
+
+    // Update player chip classes
+    document.querySelectorAll('[data-wolf-pid]').forEach(chip => {
+      const pid = chip.dataset.wolfPid;
+      const inGame = (g.wolfPlayers || []).includes(pid);
+      chip.classList.toggle('skins-selected', inGame);
+      chip.classList.toggle('skins-unselected', !inGame);
+    });
+
+    // Update player count text
+    const countEl = document.getElementById('wolfPlayerCount');
+    if (countEl) {
+      const count = (g.wolfPlayers || []).length;
+      countEl.textContent = `${count} player${count !== 1 ? 's' : ''} selected`;
+    }
+
+    // Show/hide tee order section
+    const teeSection = document.getElementById('wolfTeeOrderSection');
+    if (teeSection) {
+      teeSection.style.display = (g.wolfPlayers || []).length >= 4 ? '' : 'none';
+    }
+
+    // Update tee order list
+    const teeList = document.getElementById('wolfTeeOrderList');
+    if (teeList && (g.wolfPlayers || []).length >= 4) {
+      const order = g.wolfTeeOrder.length ? g.wolfTeeOrder : g.wolfPlayers;
+      teeList.innerHTML = order.map((pid, idx, arr) => {
+        const playerIdx = parseInt(pid.slice(1)) - 1;
+        const player = this.data.players[playerIdx];
+        const isFirst = idx === 0;
+        const isLast = idx === arr.length - 1;
+        return player && player.name ? `<div class="wolf-tee-order-item" data-wolf-order-pid="${pid}" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;">
+          <span style="color:var(--muted);font-weight:600;min-width:20px;">${idx+1}.</span>
+          <span style="flex:1;">${player.name}</span>
+          <button type="button" class="wolf-order-btn" data-wolf-move="up" data-wolf-pid="${pid}" ${isFirst?'disabled':''} style="padding:4px 10px;font-size:16px;border:1px solid var(--border);border-radius:4px;background:${isFirst?'var(--muted)':'var(--card)'};cursor:${isFirst?'default':'pointer'};">▲</button>
+          <button type="button" class="wolf-order-btn" data-wolf-move="down" data-wolf-pid="${pid}" ${isLast?'disabled':''} style="padding:4px 10px;font-size:16px;border:1px solid var(--border);border-radius:4px;background:${isLast?'var(--muted)':'var(--card)'};cursor:${isLast?'default':'pointer'};">▼</button>
+        </div>` : '';
+      }).join('');
+
+      // Re-attach tee order button handlers
+      teeList.querySelectorAll('.wolf-order-btn').forEach(btn => {
+        btn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const pid = btn.dataset.wolfPid;
+          const dir = btn.dataset.wolfMove;
+          const currentOrder = g.wolfTeeOrder.length ? [...g.wolfTeeOrder] : [...g.wolfPlayers];
+          const idx = currentOrder.indexOf(pid);
+          if (idx === -1) return;
+          if (dir === 'up' && idx > 0) {
+            [currentOrder[idx-1], currentOrder[idx]] = [currentOrder[idx], currentOrder[idx-1]];
+          } else if (dir === 'down' && idx < currentOrder.length - 1) {
+            [currentOrder[idx], currentOrder[idx+1]] = [currentOrder[idx+1], currentOrder[idx]];
+          }
+          g.wolfTeeOrder = currentOrder;
+          State.scheduleSave();
+          this.updateWolfUI();
+        };
+      });
+    }
+  },
+
   render() {
     this.removeOverlay();
     if (!this.active) return;
@@ -1967,16 +2032,16 @@ const Wizard = {
         ` : g.gameType === 'wolf' ? `
         <div class="wizard-section">
           <div class="wizard-section-title">Players (tap to toggle, 4-5 players)</div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
+          <div id="wolfPlayerChips" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
             ${this.data.players.filter(p=>p.name.trim()).map((p,i) => {
               const pid = 'p'+(i+1);
               const inGame = (g.wolfPlayers || []).includes(pid);
               return `<div class="wizard-player-chip ${inGame?'skins-selected':'skins-unselected'}" data-wolf-pid="${pid}" style="cursor:pointer;">${p.name}</div>`;
             }).join('')}
           </div>
-          <div class="muted" style="font-size:12px;margin-top:8px;text-align:center;">${(g.wolfPlayers||[]).length} player${(g.wolfPlayers||[]).length!==1?'s':''} selected</div>
+          <div id="wolfPlayerCount" class="muted" style="font-size:12px;margin-top:8px;text-align:center;">${(g.wolfPlayers||[]).length} player${(g.wolfPlayers||[]).length!==1?'s':''} selected</div>
         </div>
-        ${(g.wolfPlayers||[]).length >= 4 ? `
+        <div id="wolfTeeOrderSection" style="${(g.wolfPlayers||[]).length >= 4 ? '' : 'display:none;'}">
         <div class="wizard-section">
           <div class="wizard-section-title">Tee Order (tap arrows to reorder)</div>
           <div id="wolfTeeOrderList" style="display:flex;flex-direction:column;gap:6px;">
@@ -1995,7 +2060,7 @@ const Wizard = {
           </div>
           <div class="muted" style="font-size:12px;margin-top:8px;">Player 1 tees off first on hole 1, then rotates each hole.</div>
         </div>
-        ` : ''}
+        </div>
         ` : `
         <div class="wizard-section">
           <div class="wizard-section-title">Teams (tap to reassign)</div>
@@ -2333,15 +2398,7 @@ const Wizard = {
           // Sync tee order with players
           g.wolfTeeOrder = g.wolfTeeOrder.filter(x => g.wolfPlayers.includes(x));
           State.scheduleSave();
-          // Save scroll position before re-render
-          const scrollEl = document.querySelector('.wizard-content');
-          const scrollTop = scrollEl ? scrollEl.scrollTop : 0;
-          this.render();
-          // Restore scroll position after re-render
-          setTimeout(() => {
-            const newScrollEl = document.querySelector('.wizard-content');
-            if (newScrollEl) newScrollEl.scrollTop = scrollTop;
-          }, 0);
+          this.updateWolfUI();
         };
       });
 
@@ -2361,15 +2418,8 @@ const Wizard = {
             [order[idx], order[idx+1]] = [order[idx+1], order[idx]];
           }
           g.wolfTeeOrder = order;
-          // Save scroll position before re-render
-          const scrollEl = document.querySelector('.wizard-content');
-          const scrollTop = scrollEl ? scrollEl.scrollTop : 0;
-          this.render();
-          // Restore scroll position after re-render
-          setTimeout(() => {
-            const newScrollEl = document.querySelector('.wizard-content');
-            if (newScrollEl) newScrollEl.scrollTop = scrollTop;
-          }, 0);
+          State.scheduleSave();
+          this.updateWolfUI();
         };
       });
 
