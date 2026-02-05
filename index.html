@@ -1193,9 +1193,12 @@ const Game = {
     const pointValue = g.wolfPointValue || 1;
     const selections = g.wolfSelections || [];
 
-    // Initialize player points
-    const playerPoints = {};
-    players.forEach(pid => { playerPoints[pid] = 0; });
+    // Initialize player dollars (not points - dollars account for multipliers)
+    const playerDollars = {};
+    players.forEach(pid => { playerDollars[pid] = 0; });
+
+    // Catch-up start: 4 players = hole 17 (index 16), 5 players = hole 16 (index 15)
+    const catchUpStart = players.length === 4 ? 16 : 15;
 
     let carryover = 0;
     let carryMultiplier = 1;
@@ -1217,15 +1220,15 @@ const Game = {
       };
 
       // Determine who is wolf this hole
-      // Catch-up rule: on holes 16-18, player with lowest points becomes Wolf
+      // Catch-up rule: player with lowest dollars becomes Wolf
       let wolfPid;
-      if (h >= 15) {
-        // Find player with lowest points
-        let lowestPts = Infinity;
+      if (h >= catchUpStart) {
+        // Find player with lowest dollars
+        let lowestDollars = Infinity;
         let lowestPid = teeOrder[h % teeOrder.length]; // fallback to rotation
         players.forEach(pid => {
-          if (playerPoints[pid] < lowestPts) {
-            lowestPts = playerPoints[pid];
+          if (playerDollars[pid] < lowestDollars) {
+            lowestDollars = playerDollars[pid];
             lowestPid = pid;
           }
         });
@@ -1304,21 +1307,22 @@ const Game = {
       const basePoints = 1;
       const holePoints = basePoints * mult * carryMultiplier;
       const totalPoints = holePoints + carryover;
+      const holeDollars = totalPoints * pointValue;
 
       if (wolfBest < otherBest) {
         // Wolf team wins - each winner gets full points, each loser loses full points
         detail.winner = 'wolf';
         detail.points = totalPoints;
-        wolfTeam.forEach(p => { playerPoints[p] += totalPoints; });
-        otherTeam.forEach(p => { playerPoints[p] -= totalPoints; });
+        wolfTeam.forEach(p => { playerDollars[p] += holeDollars; });
+        otherTeam.forEach(p => { playerDollars[p] -= holeDollars; });
         carryover = 0;
         carryMultiplier = 1;
       } else if (otherBest < wolfBest) {
         // Other team wins - each winner gets full points, each loser loses full points
         detail.winner = 'others';
         detail.points = totalPoints;
-        otherTeam.forEach(p => { playerPoints[p] += totalPoints; });
-        wolfTeam.forEach(p => { playerPoints[p] -= totalPoints; });
+        otherTeam.forEach(p => { playerDollars[p] += holeDollars; });
+        wolfTeam.forEach(p => { playerDollars[p] -= holeDollars; });
         carryover = 0;
         carryMultiplier = 1;
       } else {
@@ -1332,26 +1336,25 @@ const Game = {
       holeDetails.push(detail);
     }
 
-    // Calculate final standings (pay up the ladder)
+    // Calculate final standings (pay up the ladder) - using dollars
     const standings = players.map(pid => ({
       pid,
-      points: playerPoints[pid]
-    })).sort((a, b) => b.points - a.points);
+      dollars: playerDollars[pid]
+    })).sort((a, b) => b.dollars - a.dollars);
 
     // Calculate transactions (pay up the ladder)
-    // Divide diff by 2 because each player's points include their side of each bet
-    // e.g., A at +1 and C at -1 means diff of 2, but actual bet was 1 point
+    // Divide diff by 2 because each player's dollars include their side of each bet
+    // e.g., A at +$1 and C at -$1 means diff of $2, but actual bet was $1
     const transactions = [];
     for (let i = 0; i < standings.length; i++) {
       for (let j = i + 1; j < standings.length; j++) {
-        const diff = standings[i].points - standings[j].points;
+        const diff = standings[i].dollars - standings[j].dollars;
         if (diff > 0) {
-          const actualPoints = diff / 2;
+          const amount = diff / 2;
           transactions.push({
             from: standings[j].pid,
             to: standings[i].pid,
-            points: actualPoints,
-            amount: actualPoints * pointValue
+            amount: amount
           });
         }
       }
@@ -1367,7 +1370,7 @@ const Game = {
 
     return {
       holeDetails,
-      playerPoints,
+      playerDollars,
       playerNet,
       standings,
       transactions,
@@ -2294,7 +2297,7 @@ const Wizard = {
               '</ul>' +
               '<p><strong>Scoring:</strong> Lowest net score wins the hole (best ball). Winners earn points, losers pay up the ladder at the end.</p>' +
               '<p><strong>Carryovers:</strong> If a hole ties, points carry over with multipliers stacking.</p>' +
-              '<p><strong>Catch-up (Holes 16-18):</strong> Player with the lowest points becomes Wolf, giving them a chance to catch up.</p>' +
+              '<p><strong>Catch-up:</strong> On the final holes (17-18 for 4 players, 16-18 for 5 players), the player with the lowest dollars becomes Wolf.</p>' +
               '<p><strong>Junk:</strong> Individual bets (birdies, sandies, etc.) are paid separately.</p>';
           }
           // Show modal
@@ -2984,7 +2987,7 @@ const UI = {
               h('div',{},[h('div',{class:'muted'},'Front'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.front,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.front=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.front);State.end();}})]),
               h('div',{},[h('div',{class:'muted'},'Back'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.back,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.back=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.back);State.end();}})]),
             ]),
-            h('div',{class:'note',style:'margin-top:8px;'},'Wolf=2x, Blind Wolf=4x. Catch-up on holes 16-18.')
+            h('div',{class:'note',style:'margin-top:8px;'},'Wolf=2x, Blind Wolf=4x. Catch-up: 17-18 (4P) or 16-18 (5P).')
           ]) : h('div',{}),
 
           strokesEditor(),
@@ -4495,8 +4498,8 @@ const UI = {
         h('p',{},'Best ball (lowest net score) wins the hole. Winners earn points, losers pay. Everyone settles up at the end.'),
         h('h3',{style:'margin:16px 0 8px 0;'},'Carryovers'),
         h('p',{},'If the hole ties, points carry over to the next hole. Multipliers stack on tied holes.'),
-        h('h3',{style:'margin:16px 0 8px 0;'},'Catch-up (Holes 16-18)'),
-        h('p',{},'On the final three holes, the player with the fewest points becomes Wolf - giving them a chance to catch up.')
+        h('h3',{style:'margin:16px 0 8px 0;'},'Catch-up'),
+        h('p',{},'On the final holes (17-18 for 4 players, 16-18 for 5 players), the player with the lowest dollars becomes Wolf - giving them a chance to catch up.')
       ]),
 
       h('div',{class:'card'},[
