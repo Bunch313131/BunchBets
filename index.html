@@ -718,6 +718,12 @@ const Game = {
       wolfTeeOrder: [],
       wolfPointValue: 1,
       wolfSelections: Utils.make18(''),
+      // 9-Point specific
+      ninePointPlayers: [],
+      ninePointValue: 1,
+      ninePointMode: 'net',
+      ninePointWinBy2: true,
+      ninePointBirdieDouble: false,
       gross: {},
       junkCounts: {},
       strokesCount: {}
@@ -733,7 +739,7 @@ const Game = {
   sanitize(g) {
     if (!g) return this.create();
     g.id = g.id || Utils.uid();
-    g.gameType = ['nassau','vegas','skins','wolf'].includes(g.gameType) ? g.gameType : 'nassau';
+    g.gameType = ['nassau','vegas','skins','wolf','ninepoint'].includes(g.gameType) ? g.gameType : 'nassau';
 
     const maxTeamSize = g.gameType === 'vegas' ? 2 : (g.teamSize || 2);
     g.teamSize = [1,2].includes(g.teamSize) ? g.teamSize : 2;
@@ -756,6 +762,12 @@ const Game = {
     g.wolfPointValue = g.wolfPointValue || 1;
     g.wolfSelections = Array.isArray(g.wolfSelections) ? g.wolfSelections.slice(0,18) : Utils.make18('');
     while ((g.wolfSelections || []).length < 18) g.wolfSelections.push('');
+    // 9-Point specific
+    g.ninePointPlayers = Array.isArray(g.ninePointPlayers) ? g.ninePointPlayers : [];
+    g.ninePointValue = g.ninePointValue || 1;
+    g.ninePointMode = ['net','gross'].includes(g.ninePointMode) ? g.ninePointMode : 'net';
+    g.ninePointWinBy2 = g.ninePointWinBy2 !== false;
+    g.ninePointBirdieDouble = g.ninePointBirdieDouble === true;
     
     let pa = Array.isArray(g.presses) ? g.presses.slice(0,18) : Utils.make18('');
     while (pa.length < 18) pa.push('');
@@ -1397,6 +1409,154 @@ const Game = {
     };
   },
 
+  computeNinePointResult(g) {
+    const players = (g.ninePointPlayers || []);
+    const pointValue = g.ninePointValue || 1;
+    const mode = g.ninePointMode || 'net';
+    const winBy2 = g.ninePointWinBy2 !== false;
+    const birdieDouble = g.ninePointBirdieDouble === true;
+
+    // Initialize player points
+    const playerPoints = {};
+    players.forEach(pid => { playerPoints[pid] = 0; });
+
+    const holeDetails = [];
+
+    for (let h = 0; h < 18; h++) {
+      const detail = {
+        hole: h + 1,
+        scores: {},
+        points: {},
+        winner: null,
+        winBy2Applied: false,
+        birdieDoubleApplied: false
+      };
+
+      // Get scores for this hole
+      let allScored = true;
+      const scores = [];
+      players.forEach(pid => {
+        const gross = g.gross[pid] && g.gross[pid][h];
+        if (gross == null || gross === '') {
+          allScored = false;
+        } else {
+          let score = gross;
+          if (mode === 'net') {
+            const strokes = g.strokesCount[pid] || 0;
+            const hdcpHoles = State.data.course.hdcp || [];
+            const getsStroke = hdcpHoles[h] <= strokes;
+            score = gross - (getsStroke ? 1 : 0);
+          }
+          scores.push({ pid, gross, net: score, score });
+          detail.scores[pid] = { gross, net: score };
+        }
+      });
+
+      if (!allScored || scores.length !== 3) {
+        players.forEach(pid => { detail.points[pid] = 0; });
+        holeDetails.push(detail);
+        continue;
+      }
+
+      // Sort by score (lowest first)
+      scores.sort((a, b) => a.score - b.score);
+      const par = State.data.course.par[h] || 4;
+
+      // Determine points based on ties
+      const s1 = scores[0].score, s2 = scores[1].score, s3 = scores[2].score;
+      let pts = {};
+
+      if (s1 === s2 && s2 === s3) {
+        // Three-way tie: 3/3/3
+        pts[scores[0].pid] = 3;
+        pts[scores[1].pid] = 3;
+        pts[scores[2].pid] = 3;
+      } else if (s1 === s2) {
+        // Two tied for best: 4/4/1
+        pts[scores[0].pid] = 4;
+        pts[scores[1].pid] = 4;
+        pts[scores[2].pid] = 1;
+      } else if (s2 === s3) {
+        // Two tied for worst: 5/2/2
+        pts[scores[0].pid] = 5;
+        pts[scores[1].pid] = 2;
+        pts[scores[2].pid] = 2;
+        detail.winner = scores[0].pid;
+      } else {
+        // All different: 5/3/1
+        pts[scores[0].pid] = 5;
+        pts[scores[1].pid] = 3;
+        pts[scores[2].pid] = 1;
+        detail.winner = scores[0].pid;
+      }
+
+      // Win by 2 rule: if winner won by 2+ strokes, they get all 9 points
+      if (winBy2 && detail.winner && (s2 - s1) >= 2) {
+        detail.winBy2Applied = true;
+        const winnerGross = scores[0].gross;
+        const isBirdie = winnerGross <= par - 1;
+
+        if (birdieDouble && isBirdie) {
+          // Birdie doubles: 18/0/0
+          detail.birdieDoubleApplied = true;
+          pts[scores[0].pid] = 18;
+          pts[scores[1].pid] = 0;
+          pts[scores[2].pid] = 0;
+        } else {
+          // Win by 2: 9/0/0
+          pts[scores[0].pid] = 9;
+          pts[scores[1].pid] = 0;
+          pts[scores[2].pid] = 0;
+        }
+      }
+
+      detail.points = pts;
+      players.forEach(pid => { playerPoints[pid] += pts[pid] || 0; });
+      holeDetails.push(detail);
+    }
+
+    // Calculate final standings
+    const standings = players.map(pid => ({
+      pid,
+      points: playerPoints[pid],
+      dollars: playerPoints[pid] * pointValue
+    })).sort((a, b) => b.points - a.points);
+
+    // Calculate transactions (compare each pair)
+    const transactions = [];
+    for (let i = 0; i < standings.length; i++) {
+      for (let j = i + 1; j < standings.length; j++) {
+        const diff = standings[i].points - standings[j].points;
+        if (diff > 0) {
+          transactions.push({
+            from: standings[j].pid,
+            to: standings[i].pid,
+            points: diff,
+            amount: diff * pointValue
+          });
+        }
+      }
+    }
+
+    // Calculate per-player net
+    const playerNet = {};
+    players.forEach(pid => { playerNet[pid] = 0; });
+    transactions.forEach(t => {
+      playerNet[t.to] += t.amount;
+      playerNet[t.from] -= t.amount;
+    });
+
+    return {
+      holeDetails,
+      playerPoints,
+      playerNet,
+      standings,
+      transactions,
+      pointValue,
+      totalMoney: transactions.reduce((sum, t) => sum + t.amount, 0)
+    };
+  },
+
   getLastScored() {
     const g = State.data.games[0];
     if (!g || !g.gross) return -1;
@@ -2020,6 +2180,11 @@ const Wizard = {
             <div style="flex:1;"><strong>Wolf</strong><br><span class="muted">4-5 players - pick your partner each hole</span></div>
             <button type="button" class="help-btn" data-help="wolf">?</button>
           </div>
+          <div class="wizard-option ${g.gameType==='ninepoint'?'selected':''}" data-type="ninepoint">
+            <input type="radio" name="gameType" ${g.gameType==='ninepoint'?'checked':''}>
+            <div style="flex:1;"><strong>9-Point</strong><br><span class="muted">3 players - 5/3/1 points per hole</span></div>
+            <button type="button" class="help-btn" data-help="ninepoint">?</button>
+          </div>
         </div>
 
         ${g.gameType === 'skins' ? `
@@ -2080,6 +2245,40 @@ const Wizard = {
           </div>
           <div class="muted" style="font-size:12px;margin-top:8px;">Player 1 tees off first on hole 1, then rotates each hole.</div>
         </div>
+        </div>
+        ` : g.gameType === 'ninepoint' ? `
+        <div class="wizard-section">
+          <div class="wizard-section-title">Players (exactly 3 players)</div>
+          <div id="ninePointPlayerChips" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
+            ${this.data.players.filter(p=>p.name.trim()).map((p,i) => {
+              const pid = 'p'+(i+1);
+              const inGame = (g.ninePointPlayers || []).includes(pid);
+              return `<div class="wizard-player-chip ${inGame?'skins-selected':'skins-unselected'}" data-ninepoint-pid="${pid}" style="cursor:pointer;">${p.name}</div>`;
+            }).join('')}
+          </div>
+          <div id="ninePointPlayerCount" class="muted" style="font-size:12px;margin-top:8px;text-align:center;">${(g.ninePointPlayers||[]).length} player${(g.ninePointPlayers||[]).length!==1?'s':''} selected</div>
+        </div>
+        <div class="wizard-section">
+          <div class="wizard-section-title">Scoring Mode</div>
+          <div class="wizard-option ${g.ninePointMode==='net'?'selected':''}" data-ninepoint-mode="net">
+            <input type="radio" name="ninePointMode" ${g.ninePointMode==='net'?'checked':''}>
+            <div><strong>Net</strong><br><span class="muted">Handicap strokes apply</span></div>
+          </div>
+          <div class="wizard-option ${g.ninePointMode==='gross'?'selected':''}" data-ninepoint-mode="gross">
+            <input type="radio" name="ninePointMode" ${g.ninePointMode==='gross'?'checked':''}>
+            <div><strong>Gross</strong><br><span class="muted">Raw scores only</span></div>
+          </div>
+        </div>
+        <div class="wizard-section">
+          <div class="wizard-section-title">Optional Rules</div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 0;">
+            <input type="checkbox" id="wizardNinePointWinBy2" ${g.ninePointWinBy2?'checked':''} style="width:20px;height:20px;">
+            <div><strong>Win by 2</strong><br><span class="muted">Win by 2+ strokes = all 9 points</span></div>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 0;">
+            <input type="checkbox" id="wizardNinePointBirdieDouble" ${g.ninePointBirdieDouble?'checked':''} style="width:20px;height:20px;">
+            <div><strong>Birdie Doubles</strong><br><span class="muted">Win by 2+ with birdie = 18 points</span></div>
+          </label>
         </div>
         ` : `
         <div class="wizard-section">
@@ -2146,6 +2345,16 @@ const Wizard = {
             </div>
           </div>
           <div class="muted" style="font-size:12px;margin-top:8px;">Wolf = 2x points, Blind Wolf = 4x points</div>
+        </div>
+        ` : g.gameType === 'ninepoint' ? `
+        <div class="wizard-section">
+          <div class="wizard-section-title">Point Value ($/point)</div>
+          <div style="max-width:120px;">
+            <div class="currency-input-wrap">
+              <input type="number" class="currency-input" id="wizardNinePointValue" value="${(g.ninePointValue||1).toFixed(2)}" min="0" step="0.01">
+            </div>
+          </div>
+          <div class="muted" style="font-size:12px;margin-top:8px;">9 points per hole × 18 holes = 162 total points</div>
         </div>
         ` : `
         <div class="wizard-section">
@@ -2246,6 +2455,14 @@ const Wizard = {
               g.withJunk = true;
               g.wolfPlayers = g.wolfPlayers || [];
               g.wolfTeeOrder = g.wolfTeeOrder || [];
+            } else if (newType === 'ninepoint') {
+              g.ninePointValue = g.ninePointValue || 1;
+              g.junkValue = {front:1, back:2};
+              g.withJunk = true;
+              g.ninePointPlayers = g.ninePointPlayers || [];
+              g.ninePointMode = g.ninePointMode || 'net';
+              g.ninePointWinBy2 = g.ninePointWinBy2 !== false;
+              g.ninePointBirdieDouble = g.ninePointBirdieDouble === true;
             }
           }
           this.render();
@@ -2316,6 +2533,19 @@ const Wizard = {
               '<p><strong>Carryovers:</strong> If a hole ties, points carry over with multipliers stacking.</p>' +
               '<p><strong>Catch-up:</strong> On the final holes (17-18 for 4 players, 16-18 for 5 players), the player with the lowest dollars becomes Wolf.</p>' +
               '<p><strong>Junk:</strong> Individual bets (birdies, sandies, etc.) are paid separately.</p>';
+          } else if (type === 'ninepoint') {
+            title = '9-Point';
+            content = '<p><strong>9-Point</strong> (also called 5-3-1) is a game for exactly 3 players where each hole is worth 9 points.</p>' +
+              '<p><strong>Point Distribution:</strong></p>' +
+              '<ul>' +
+              '<li><strong>All different scores:</strong> 5 / 3 / 1 (best to worst)</li>' +
+              '<li><strong>Two tied for best:</strong> 4 / 4 / 1</li>' +
+              '<li><strong>Two tied for worst:</strong> 5 / 2 / 2</li>' +
+              '<li><strong>Three-way tie:</strong> 3 / 3 / 3</li>' +
+              '</ul>' +
+              '<p><strong>Win by 2 (optional):</strong> If you win by 2+ strokes, you get all 9 points (9/0/0).</p>' +
+              '<p><strong>Birdie Doubles (optional):</strong> Win by 2+ with a birdie or better = 18 points.</p>' +
+              '<p><strong>Settlement:</strong> At the end, compare point totals and pay based on the difference × $/point.</p>';
           }
           // Show modal
           const modal = document.createElement('div');
@@ -2451,6 +2681,54 @@ const Wizard = {
         };
       }
 
+      // 9-Point player toggle
+      div.querySelectorAll('[data-ninepoint-pid]').forEach(chip => {
+        chip.onclick = () => {
+          const pid = chip.dataset.ninepointPid;
+          g.ninePointPlayers = g.ninePointPlayers || [];
+          const wasSelected = g.ninePointPlayers.includes(pid);
+          if (wasSelected) {
+            g.ninePointPlayers = g.ninePointPlayers.filter(x => x !== pid);
+          } else if (g.ninePointPlayers.length < 3) {
+            g.ninePointPlayers.push(pid);
+          }
+          State.scheduleSave();
+          this.render();
+        };
+      });
+
+      // 9-Point mode selection
+      div.querySelectorAll('[data-ninepoint-mode]').forEach(opt => {
+        opt.onclick = () => {
+          g.ninePointMode = opt.dataset.ninepointMode;
+          this.render();
+        };
+      });
+
+      // 9-Point optional rules
+      const ninePointWinBy2 = document.getElementById('wizardNinePointWinBy2');
+      if (ninePointWinBy2) {
+        ninePointWinBy2.onchange = (e) => {
+          g.ninePointWinBy2 = e.target.checked;
+          State.scheduleSave();
+        };
+      }
+      const ninePointBirdieDouble = document.getElementById('wizardNinePointBirdieDouble');
+      if (ninePointBirdieDouble) {
+        ninePointBirdieDouble.onchange = (e) => {
+          g.ninePointBirdieDouble = e.target.checked;
+          State.scheduleSave();
+        };
+      }
+
+      // 9-Point value input
+      const ninePointValueInput = document.getElementById('wizardNinePointValue');
+      if (ninePointValueInput) {
+        ninePointValueInput.onchange = (e) => {
+          g.ninePointValue = parseFloat(e.target.value) || 1;
+        };
+      }
+
       // Stakes inputs (only for non-skins games)
       const stakesFront = document.getElementById('wizardStakesFront');
       if (stakesFront) {
@@ -2499,6 +2777,11 @@ const Wizard = {
             Err.toast('Select at least 4 players for Wolf');
             return;
           }
+        } else if (g.gameType === 'ninepoint') {
+          if ((g.ninePointPlayers || []).length !== 3) {
+            Err.toast('Select exactly 3 players for 9-Point');
+            return;
+          }
         } else if (g.teamA.length === 0 || g.teamB.length === 0) {
           Err.toast('Assign players to both teams');
           return;
@@ -2519,6 +2802,12 @@ const Wizard = {
           } else if (game.gameType === 'wolf') {
             if ((game.wolfPlayers || []).length < 4) {
               Err.toast(`Game ${i+1} needs at least 4 players`);
+              this.switchToGame(i);
+              return;
+            }
+          } else if (game.gameType === 'ninepoint') {
+            if ((game.ninePointPlayers || []).length !== 3) {
+              Err.toast(`Game ${i+1} needs exactly 3 players`);
               this.switchToGame(i);
               return;
             }
@@ -2581,6 +2870,9 @@ const UI = {
     } else if (g.gameType === 'wolf') {
       const count = (g.wolfPlayers || []).length;
       return `Wolf (${count}p)`;
+    } else if (g.gameType === 'ninepoint') {
+      const modeLabel = g.ninePointMode === 'gross' ? 'Gross' : 'Net';
+      return `9-Point ${modeLabel}`;
     } else if (g.gameType === 'vegas') {
       return `Vegas: ${left} vs ${right}`;
     } else {
@@ -2823,6 +3115,11 @@ const UI = {
             h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='wolf',
               onchange:()=>{g.gameType='wolf';State.scheduleSave();State.scheduleRender();}}),
             ' Wolf'
+          ]),
+          h('label',{class:'nowrap'},[
+            h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='ninepoint',
+              onchange:()=>{g.gameType='ninepoint';State.scheduleSave();State.scheduleRender();}}),
+            ' 9-Point'
           ])
         ])
       ]);
@@ -2852,7 +3149,7 @@ const UI = {
           return h('div',{},[h('div',{class:'muted',style:'margin:6px 0 8px;'},lbl),playerRow(ids)]);
         };
         const body = [];
-        // Wolf and Skins use player lists, not teams
+        // Wolf, Skins, and 9-Point use player lists, not teams
         if (g.gameType === 'wolf') {
           const wolfPlayers = g.wolfPlayers || [];
           if (wolfPlayers.length) {
@@ -2865,6 +3162,14 @@ const UI = {
           const skinsPlayers = g.skinsPlayers || [];
           if (skinsPlayers.length) {
             body.push(playerRow(skinsPlayers));
+            body.push(h('div',{class:'note'},'Strokes apply on HCP 1…n'));
+          } else {
+            body.push(h('div',{class:'note'},'Select players above to edit strokes'));
+          }
+        } else if (g.gameType === 'ninepoint') {
+          const ninePointPlayers = g.ninePointPlayers || [];
+          if (ninePointPlayers.length) {
+            body.push(playerRow(ninePointPlayers));
             body.push(h('div',{class:'note'},'Strokes apply on HCP 1…n'));
           } else {
             body.push(h('div',{class:'note'},'Select players above to edit strokes'));
@@ -3040,6 +3345,54 @@ const UI = {
               h('div',{},[h('div',{class:'muted'},'Back'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.back,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.back=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.back);State.end();}})]),
             ]),
             h('div',{class:'note',style:'margin-top:8px;'},'Wolf=2x, Blind Wolf=4x. Catch-up: 17-18 (4P) or 16-18 (5P).')
+          ]) : h('div',{}),
+
+          g.gameType === 'ninepoint' ? h('div',{},[
+            h('div',{style:'margin:8px 0;'},[
+              h('div',{class:'muted'},'Players (exactly 3)'),
+              h('div',{class:'row',style:'flex-wrap:wrap;gap:6px;margin-top:6px;'},
+                State.data.players.map(p => {
+                  const inGame = (g.ninePointPlayers || []).includes(p.id);
+                  return h('button',{
+                    class:`btn small ${inGame?'primary':''}`,
+                    onclick:()=>{
+                      g.ninePointPlayers = g.ninePointPlayers || [];
+                      if (inGame) {
+                        g.ninePointPlayers = g.ninePointPlayers.filter(x => x !== p.id);
+                      } else if (g.ninePointPlayers.length < 3) {
+                        g.ninePointPlayers.push(p.id);
+                      }
+                      State.scheduleSave();
+                      State.scheduleRender();
+                    }
+                  },p.name);
+                })
+              )
+            ]),
+            h('div',{style:'margin:8px 0;'},[
+              h('div',{class:'muted'},'Mode'),
+              h('div',{class:'row',style:'gap:12px;margin-top:6px;'},[
+                h('label',{},[h('input',{type:'radio',name:`npmode_${g.id}`,checked:g.ninePointMode==='net',onchange:()=>{g.ninePointMode='net';State.scheduleSave();State.scheduleRender();}}),' Net']),
+                h('label',{},[h('input',{type:'radio',name:`npmode_${g.id}`,checked:g.ninePointMode==='gross',onchange:()=>{g.ninePointMode='gross';State.scheduleSave();State.scheduleRender();}}),' Gross'])
+              ])
+            ]),
+            h('div',{style:'margin:8px 0;'},[
+              h('div',{class:'muted'},'Optional Rules'),
+              h('div',{style:'margin-top:6px;'},[
+                h('label',{style:'display:block;margin-bottom:4px;'},[h('input',{type:'checkbox',checked:g.ninePointWinBy2!==false,onclick:(e)=>{g.ninePointWinBy2=e.target.checked;State.scheduleSave();}}),' Win by 2 (9/0/0)']),
+                h('label',{style:'display:block;'},[h('input',{type:'checkbox',checked:g.ninePointBirdieDouble===true,onclick:(e)=>{g.ninePointBirdieDouble=e.target.checked;State.scheduleSave();}}),' Birdie Doubles'])
+              ])
+            ]),
+            h('div',{style:'margin:8px 0;'},[
+              h('div',{class:'muted'},'Point Value $'),
+              h('input',{type:'number',step:'0.25',value:g.ninePointValue||1,style:'width:80px;',onfocus:()=>State.begin(),onblur:(e)=>{g.ninePointValue=parseFloat(e.target.value)||1;State.end();}})
+            ]),
+            h('div',{class:'row',style:'align-items:center;gap:12px;margin:8px 0;'},[
+              h('div',{class:'pill'},'Junk $/point'),
+              h('div',{},[h('div',{class:'muted'},'Front'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.front,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.front=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.front);State.end();}})]),
+              h('div',{},[h('div',{class:'muted'},'Back'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.back,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.back=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.back);State.end();}})]),
+            ]),
+            h('div',{class:'note',style:'margin-top:8px;'},'5/3/1 distribution. Win by 2=9/0/0, with birdie=18/0/0.')
           ]) : h('div',{}),
 
           strokesEditor(),
@@ -3413,6 +3766,48 @@ const UI = {
         frontLine = playerAmts + (result.carryover > 0 ? ` | Carry:${result.carryover}` : '');
         const junkPart = totalJunkMoney > 0 ? ` | Junk: ${Utils.fmt(totalJunkMoney)}` : '';
         backLine = `$${game.wolfPointValue}/pt | Total: ${Utils.fmt(result.totalMoney + totalJunkMoney)}${junkPart}`;
+      } else if (game.gameType === 'ninepoint') {
+        const result = Game.computeNinePointResult(game);
+        const players = game.ninePointPlayers || [];
+
+        // Calculate junk for 9-Point
+        const sumNinePointJunkPid = (pid, start, end) => {
+          let tot = 0;
+          const arr = game.junkCounts[pid] || [];
+          for (let h = start; h <= end; h++) tot += (arr[h]||0);
+          return tot;
+        };
+        const junkStandings = players.map(pid => {
+          const frontJunk = sumNinePointJunkPid(pid, 0, 8);
+          const backJunk = sumNinePointJunkPid(pid, 9, 17);
+          const junkVal = frontJunk * (game.junkValue.front||0) + backJunk * (game.junkValue.back||0);
+          return { pid, junkVal };
+        }).sort((a, b) => b.junkVal - a.junkVal);
+        const junkNet = {};
+        players.forEach(pid => { junkNet[pid] = 0; });
+        let totalJunkMoney9 = 0;
+        for (let i = 0; i < junkStandings.length; i++) {
+          for (let j = i + 1; j < junkStandings.length; j++) {
+            const diff = junkStandings[i].junkVal - junkStandings[j].junkVal;
+            if (diff > 0) {
+              junkNet[junkStandings[i].pid] += diff;
+              junkNet[junkStandings[j].pid] -= diff;
+              totalJunkMoney9 += diff;
+            }
+          }
+        }
+
+        const playerAmts = players.map(pid => {
+          const name = UI.playerName(pid);
+          const abbr = name.length <= 3 ? name : name.slice(0,2);
+          const nineAmt = result.playerNet[pid] || 0;
+          const junkAmt = junkNet[pid] || 0;
+          return `${abbr}:${Utils.fmt(nineAmt + junkAmt)}`;
+        }).join(' ');
+
+        frontLine = playerAmts;
+        const junkPart9 = totalJunkMoney9 > 0 ? ` | Junk: ${Utils.fmt(totalJunkMoney9)}` : '';
+        backLine = `$${game.ninePointValue}/pt | Total: ${Utils.fmt(result.totalMoney + totalJunkMoney9)}${junkPart9}`;
       } else if (game.gameType === 'vegas') {
         const result = Game.computeVegasResult(game);
         // Per-player value = points × $/point (no team multiplier)
@@ -3500,6 +3895,8 @@ const UI = {
         pids = g.skinsPlayers || [];
       } else if (g.gameType === 'wolf') {
         pids = g.wolfPlayers || [];
+      } else if (g.gameType === 'ninepoint') {
+        pids = g.ninePointPlayers || [];
       } else {
         pids = [...(g.teamA||[]),...(g.teamB||[])];
       }
@@ -3696,6 +4093,67 @@ const UI = {
           h('div',{class:'card'},[
             h('div',{class:'pill'},UI.gameLabel(g)),
             h('div',{class:'note',style:'margin-top:6px;'},`$${pointValue}/pt | Carryover: ${result.carryover}`),
+            h('div',{style:'margin-top:12px;'},playerRows),
+            hasJunk ? h('div',{class:'muted',style:'margin-top:8px;'},`Junk in play: ${Utils.fmt(totalJunkMoney)}`) : '',
+            h('div',{style:'margin-top:8px;font-weight:700;'},`Total in play: ${Utils.fmt(result.totalMoney + totalJunkMoney)}`)
+          ])
+        ]);
+      }
+
+      if (g.gameType === 'ninepoint') {
+        const result = Game.computeNinePointResult(g);
+        const players = g.ninePointPlayers || [];
+        const pointValue = g.ninePointValue || 1;
+
+        // Calculate junk pay-up-the-ladder for 9-Point
+        const sumJunkPid = (pid, start, end) => {
+          let tot = 0;
+          const arr = g.junkCounts[pid] || [];
+          for (let h = start; h <= end; h++) tot += (arr[h]||0);
+          return tot;
+        };
+        const junkStandings = players.map(pid => {
+          const frontJunk = sumJunkPid(pid, 0, 8);
+          const backJunk = sumJunkPid(pid, 9, 17);
+          const junkVal = frontJunk * (g.junkValue.front||0) + backJunk * (g.junkValue.back||0);
+          return { pid, junkVal };
+        }).sort((a, b) => b.junkVal - a.junkVal);
+        const junkNet = {};
+        players.forEach(pid => { junkNet[pid] = 0; });
+        let totalJunkMoney = 0;
+        for (let i = 0; i < junkStandings.length; i++) {
+          for (let j = i + 1; j < junkStandings.length; j++) {
+            const diff = junkStandings[i].junkVal - junkStandings[j].junkVal;
+            if (diff > 0) {
+              junkNet[junkStandings[i].pid] += diff;
+              junkNet[junkStandings[j].pid] -= diff;
+              totalJunkMoney += diff;
+            }
+          }
+        }
+        const hasJunk = totalJunkMoney > 0;
+
+        // Player standings
+        const playerRows = players.map(pid => {
+          const name = UI.playerName(pid);
+          const nineAmt = result.playerNet[pid] || 0;
+          const junkAmt = junkNet[pid] || 0;
+          const totalAmt = nineAmt + junkAmt;
+          const pts = result.playerPoints[pid] || 0;
+          return h('div',{style:'display:flex;justify-content:space-between;padding:4px 0;'},
+            [h('span',{},`${name} (${pts} pts)`), h('span',{},Utils.fmt(totalAmt))]
+          );
+        });
+
+        const rulesNote = [];
+        if (g.ninePointWinBy2) rulesNote.push('Win by 2');
+        if (g.ninePointBirdieDouble) rulesNote.push('Birdie 2x');
+        const rulesText = rulesNote.length ? ` | ${rulesNote.join(', ')}` : '';
+
+        return h('div',{class:theme},[
+          h('div',{class:'card'},[
+            h('div',{class:'pill'},UI.gameLabel(g)),
+            h('div',{class:'note',style:'margin-top:6px;'},`$${pointValue}/pt${rulesText}`),
             h('div',{style:'margin-top:12px;'},playerRows),
             hasJunk ? h('div',{class:'muted',style:'margin-top:8px;'},`Junk in play: ${Utils.fmt(totalJunkMoney)}`) : '',
             h('div',{style:'margin-top:8px;font-weight:700;'},`Total in play: ${Utils.fmt(result.totalMoney + totalJunkMoney)}`)
@@ -4421,6 +4879,45 @@ const UI = {
         return h('li',{},`${this.gameLabel(g)}: ${best && bestAmt > 0 ? UI.playerName(best) + ' +' + Utils.fmt(bestAmt) : 'No winner yet'}`);
       }
 
+      if (g.gameType === 'ninepoint') {
+        const res = Game.computeNinePointResult(g);
+        const players = g.ninePointPlayers || [];
+        // Add 9-Point net $ to player totals (pay-up-the-ladder)
+        players.forEach(pid => {
+          net[pid] += res.playerNet[pid] || 0;
+        });
+        // Calculate junk for 9-Point - pay up the ladder
+        const sumJunk = (pid, start, end) => {
+          let tot = 0;
+          const arr = g.junkCounts[pid] || [];
+          for (let h = start; h <= end; h++) tot += (arr[h]||0);
+          return tot;
+        };
+        // Get each player's junk value
+        const junkStandings = players.map(pid => {
+          const frontJunk = sumJunk(pid, 0, 8);
+          const backJunk = sumJunk(pid, 9, 17);
+          const junkVal = frontJunk * (g.junkValue.front||0) + backJunk * (g.junkValue.back||0);
+          return { pid, junkVal };
+        }).sort((a, b) => b.junkVal - a.junkVal);
+        // Pay up the ladder for junk
+        for (let i = 0; i < junkStandings.length; i++) {
+          for (let j = i + 1; j < junkStandings.length; j++) {
+            const diff = junkStandings[i].junkVal - junkStandings[j].junkVal;
+            if (diff > 0) {
+              net[junkStandings[i].pid] += diff;
+              net[junkStandings[j].pid] -= diff;
+            }
+          }
+        }
+        // Find biggest winner for display (including junk)
+        let best = null, bestAmt = -Infinity;
+        players.forEach(pid => {
+          if (net[pid] > bestAmt) { best = pid; bestAmt = net[pid]; }
+        });
+        return h('li',{},`${this.gameLabel(g)}: ${best && bestAmt > 0 ? UI.playerName(best) + ' +' + Utils.fmt(bestAmt) : 'No winner yet'}`);
+      }
+
       let tot;
       if (g.gameType === 'vegas') {
         const res = Game.computeVegasResult(g);
@@ -4552,6 +5049,30 @@ const UI = {
         h('p',{},'If the hole ties, points carry over to the next hole. Multipliers stack on tied holes.'),
         h('h3',{style:'margin:16px 0 8px 0;'},'Catch-up'),
         h('p',{},'On the final holes (17-18 for 4 players, 16-18 for 5 players), the player with the lowest dollars becomes Wolf - giving them a chance to catch up.')
+      ]),
+
+      h('div',{class:'card',style:'margin-bottom:16px;'},[
+        h('h2',{style:'margin:0 0 12px 0;'},'9-Point'),
+        h('p',{},'Classic 3-player game where 9 points are distributed each hole based on finishing order.'),
+        h('h3',{style:'margin:16px 0 8px 0;'},'Point Distribution'),
+        h('ul',{style:'margin:8px 0;padding-left:20px;'},[
+          h('li',{},h('strong',{},'All Different:'),' Best = 5 pts, Middle = 3 pts, Worst = 1 pt'),
+          h('li',{},h('strong',{},'Two Tied for Best:'),' Both get 4 pts, Worst = 1 pt'),
+          h('li',{},h('strong',{},'Two Tied for Worst:'),' Best = 5 pts, Both tied = 2 pts each'),
+          h('li',{},h('strong',{},'Three-Way Tie:'),' All get 3 pts each')
+        ]),
+        h('h3',{style:'margin:16px 0 8px 0;'},'Modes'),
+        h('ul',{style:'margin:8px 0;padding-left:20px;'},[
+          h('li',{},h('strong',{},'Net:'),' Handicap strokes apply'),
+          h('li',{},h('strong',{},'Gross:'),' Raw scores only')
+        ]),
+        h('h3',{style:'margin:16px 0 8px 0;'},'Optional Rules'),
+        h('ul',{style:'margin:8px 0;padding-left:20px;'},[
+          h('li',{},h('strong',{},'Win by 2:'),' Outright winner by 2+ strokes gets all 9 points (9/0/0)'),
+          h('li',{},h('strong',{},'Birdie Doubles:'),' If winner makes birdie, points double (18/0/0 for win by 2, 10/6/2 normally)')
+        ]),
+        h('h3',{style:'margin:16px 0 8px 0;'},'Payout'),
+        h('p',{},'Set a point value (e.g., $1/pt). Settlement is pay-up-the-ladder: highest earner collects from each other player.')
       ]),
 
       h('div',{class:'card'},[
