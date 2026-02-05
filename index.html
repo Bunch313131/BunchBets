@@ -3156,7 +3156,7 @@ const UI = {
     });
 
     // Build Wolf selection rows
-    const wolfRows = State.data.games.filter(g => g.gameType === 'wolf').map((game,gi) => {
+    const wolfRows = State.data.games.filter(g => g.gameType === 'wolf').flatMap((game,gi) => {
       const actualIdx = State.data.games.indexOf(game);
       const theme = `theme-g${(actualIdx%6)+1}`;
       const wolfPlayers = game.wolfPlayers || [];
@@ -3167,21 +3167,51 @@ const UI = {
           cells.push(h('td',{class:'muted',style:'font-size:10px;'},'-'));
         }
         cells.push(h('td',{colspan:'3'}));
-        return h('tr',{class:`press-row ${theme}`},cells);
+        return [h('tr',{class:`press-row ${theme}`},cells)];
       }
       // Compute wolf result to get actual wolf for each hole (includes catch-up logic)
       const wolfResult = Game.computeWolfResult(game);
-      const cells = [h('td',{class:'sticky press-label',style:'font-weight:600;'},UI.gameLabel(game))];
+
+      // Determine catch-up start hole: 4 players = hole 17 (index 16), 5 players = hole 16 (index 15)
+      const catchUpStart = wolfPlayers.length === 4 ? 16 : 15;
+
+      // Row 1: Wolf name for each hole
+      const wolfNameCells = [h('td',{class:'sticky press-label',style:'font-weight:600;font-size:11px;'},'Wolf')];
       for (let hole = 0; hole < 18; hole++) {
         const detail = wolfResult.holeDetails[hole] || {};
+        const isCatchUp = hole >= catchUpStart;
+        // For catch-up holes, show TBD unless we can determine from current standings
+        let displayName;
+        if (isCatchUp) {
+          // Check if all prior holes have selections made - if so, wolf is determined
+          const allPriorSelected = Array.from({length: hole}, (_, h) => game.wolfSelections[h]).every(s => s);
+          if (allPriorSelected && detail.wolf) {
+            const name = UI.playerName(detail.wolf) || '?';
+            displayName = name.length <= 3 ? name : name.slice(0,2);
+          } else {
+            displayName = 'TBD';
+          }
+        } else {
+          const wolfPid = detail.wolf || wolfPlayers[hole % wolfPlayers.length];
+          const name = UI.playerName(wolfPid) || '?';
+          displayName = name.length <= 3 ? name : name.slice(0,2);
+        }
+        wolfNameCells.push(h('td',{style:'font-size:11px;text-align:center;' + (isCatchUp ? 'color:#ca8a04;' : '')},displayName));
+      }
+      wolfNameCells.push(h('td',{colspan:'3'}));
+      const wolfNameRow = h('tr',{class:`press-row ${theme}`},wolfNameCells);
+
+      // Row 2: Partner selection dropdown
+      const pickCells = [h('td',{class:'sticky press-label',style:'font-weight:600;font-size:11px;'},'Pick')];
+      for (let hole = 0; hole < 18; hole++) {
+        const detail = wolfResult.holeDetails[hole] || {};
+        const isCatchUp = hole >= catchUpStart;
         const wolfPid = detail.wolf || wolfPlayers[hole % wolfPlayers.length];
-        const wolfName = UI.playerName(wolfPid) || '?';
-        const isCatchUp = hole >= 15;
         const currentSel = game.wolfSelections[hole] || '';
         // Options: player names (except wolf), Wolf, Blind Wolf
         const otherPlayers = wolfPlayers.filter(p => p !== wolfPid);
         const options = [
-          h('option',{value:'',selected:currentSel===''},(isCatchUp ? '*' : '') + wolfName.slice(0,1) + '?'),
+          h('option',{value:'',selected:currentSel===''},'?'),
           ...otherPlayers.map(pid => {
             const name = UI.playerName(pid) || '?';
             const abbr = name.length <= 3 ? name : name.slice(0,2);
@@ -3192,17 +3222,19 @@ const UI = {
         ];
         const sel = h('select',{
           class:'press-select',
-          style:'font-size:12px;' + (isCatchUp ? 'background:#ffe0b2;' : ''),
+          style:'font-size:12px;',
           onchange:(e)=>{
             game.wolfSelections[hole] = e.target.value;
             State.scheduleSave();
             State.scheduleRender();
           }
         },options);
-        cells.push(h('td',{},[sel]));
+        pickCells.push(h('td',{},[sel]));
       }
-      cells.push(h('td',{colspan:'3'}));
-      return h('tr',{class:`press-row ${theme}`},cells);
+      pickCells.push(h('td',{colspan:'3'}));
+      const pickRow = h('tr',{class:`press-row ${theme}`},pickCells);
+
+      return [wolfNameRow, pickRow];
     });
 
     const tbl = h('table',{},[
