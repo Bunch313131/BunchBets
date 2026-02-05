@@ -1357,14 +1357,23 @@ const Game = {
       }
     }
 
+    // Calculate per-player net from transactions (pay-up-the-ladder)
+    const playerNet = {};
+    players.forEach(pid => { playerNet[pid] = 0; });
+    transactions.forEach(t => {
+      playerNet[t.to] += t.amount;
+      playerNet[t.from] -= t.amount;
+    });
+
     return {
       holeDetails,
       playerPoints,
+      playerNet,
       standings,
       transactions,
       pointValue,
       carryover,
-      totalPoints: Object.values(playerPoints).reduce((a, b) => a + Math.abs(b), 0) / 2
+      totalMoney: transactions.reduce((sum, t) => sum + t.amount, 0)
     };
   },
 
@@ -3216,17 +3225,16 @@ const UI = {
         const result = Game.computeWolfResult(game);
         const players = game.wolfPlayers || [];
 
-        // Build player point standings
-        const playerPts = players.map(pid => {
+        // Build player net $ standings (pay-up-the-ladder)
+        const playerAmts = players.map(pid => {
           const name = UI.playerName(pid);
           const abbr = name.length <= 3 ? name : name.slice(0,2);
-          const pts = result.playerPoints[pid] || 0;
-          const sign = pts > 0 ? '+' : '';
-          return `${abbr}:${sign}${pts.toFixed(1)}`;
+          const amt = result.playerNet[pid] || 0;
+          return `${abbr}:${Utils.fmt(amt)}`;
         }).join(' ');
 
-        frontLine = playerPts + (result.carryover > 0 ? ` | Carry:${result.carryover}` : '');
-        backLine = `$${game.wolfPointValue}/pt | Tot: ${Utils.fmt(result.totalPoints * game.wolfPointValue)}`;
+        frontLine = playerAmts + (result.carryover > 0 ? ` | Carry:${result.carryover}` : '');
+        backLine = `$${game.wolfPointValue}/pt | Total: ${Utils.fmt(result.totalMoney)}`;
       } else if (game.gameType === 'vegas') {
         const result = Game.computeVegasResult(game);
         // Per-player value = points × $/point (no team multiplier)
@@ -3427,7 +3435,80 @@ const UI = {
           ])
         ]);
       }
-      
+
+      if (g.gameType === 'skins') {
+        const result = Game.computeSkinsResult(g);
+        const players = g.skinsPlayers || [];
+        const mode = g.skinsMode || 'net';
+        const buyIn = g.stakes.front || 20;
+
+        // Player standings
+        const playerRows = players.map(pid => {
+          const name = UI.playerName(pid);
+          const skins = mode === 'gross' ? result.grossSkins[pid] :
+                        mode === 'net' ? result.netSkins[pid] :
+                        (result.grossSkins[pid] + result.netSkins[pid]);
+          const value = (skins || 0) * (mode === 'gross' ? result.grossSkinValue : result.netSkinValue);
+          return h('div',{style:'display:flex;justify-content:space-between;padding:4px 0;'},
+            [h('span',{},name), h('span',{},`${skins || 0} skins = ${Utils.fmt(value)}`)]
+          );
+        });
+
+        const carry = mode === 'gross' ? result.grossCarry :
+                      mode === 'net' ? result.netCarry :
+                      (result.grossCarry + result.netCarry);
+
+        return h('div',{class:theme},[
+          h('div',{class:'card'},[
+            h('div',{class:'pill'},UI.gameLabel(g)),
+            h('div',{class:'note',style:'margin-top:6px;'},`Mode: ${mode} | Buy-in: ${Utils.fmt(buyIn)} | Pot: ${Utils.fmt(result.totalPot)}`),
+            h('div',{style:'margin-top:12px;'},playerRows),
+            carry > 0 ? h('div',{class:'muted',style:'margin-top:8px;'},`Carryover: ${carry} skin${carry>1?'s':''}`) : '',
+            h('div',{style:'margin-top:8px;font-weight:700;'},`$/Skin: ${Utils.fmt(mode === 'gross' ? result.grossSkinValue : result.netSkinValue)}`)
+          ])
+        ]);
+      }
+
+      if (g.gameType === 'wolf') {
+        const result = Game.computeWolfResult(g);
+        const players = g.wolfPlayers || [];
+        const pointValue = g.wolfPointValue || 1;
+
+        // Player standings with net amounts
+        const playerRows = players.map(pid => {
+          const name = UI.playerName(pid);
+          const pts = result.playerPoints[pid] || 0;
+          const amt = result.playerNet[pid] || 0;
+          const ptsStr = pts > 0 ? `+${pts}` : String(pts);
+          return h('div',{style:'display:flex;justify-content:space-between;padding:4px 0;'},
+            [h('span',{},name), h('span',{},`${ptsStr} pts = ${Utils.fmt(amt)}`)]
+          );
+        });
+
+        // Calculate junk totals for Wolf
+        const sumJunk = (pids, start, end) => {
+          let tot = 0;
+          pids.forEach(pid => {
+            const arr = g.junkCounts[pid] || [];
+            for (let h = start; h <= end; h++) tot += (arr[h]||0);
+          });
+          return tot;
+        };
+        const frontJunk = sumJunk(players, 0, 8);
+        const backJunk = sumJunk(players, 9, 17);
+        const junkVal = frontJunk * (g.junkValue.front||0) + backJunk * (g.junkValue.back||0);
+
+        return h('div',{class:theme},[
+          h('div',{class:'card'},[
+            h('div',{class:'pill'},UI.gameLabel(g)),
+            h('div',{class:'note',style:'margin-top:6px;'},`$${pointValue}/pt | Carryover: ${result.carryover}`),
+            h('div',{style:'margin-top:12px;'},playerRows),
+            junkVal > 0 ? h('div',{class:'muted',style:'margin-top:8px;'},`Junk: ${Utils.fmt(junkVal)}`) : '',
+            h('div',{style:'margin-top:8px;font-weight:700;'},`Total in play: ${Utils.fmt(result.totalMoney)}`)
+          ])
+        ]);
+      }
+
       const renderSeg = (lbl, start, end, autoKey) => {
         const stake = g.stakes[autoKey] || 0;
         const seg = Game.buildSegment(g, start, end, stake, g.autoPress[autoKey]);
@@ -3722,6 +3803,152 @@ const UI = {
         ]);
       }
 
+      // Wolf - hole-by-hole view with partner selections and results
+      if (g.gameType === 'wolf') {
+        const result = Game.computeWolfResult(g);
+        const players = g.wolfPlayers || [];
+        const pointValue = g.wolfPointValue || 1;
+
+        const buildWolfHoleRows = () => {
+          const rows = [];
+          for (let hole = 0; hole < 18; hole++) {
+            const detail = result.holeDetails[hole];
+            if (!detail || !detail.selection) {
+              const wolfPid = detail ? detail.wolf : null;
+              const wolfName = wolfPid ? UI.playerName(wolfPid) : '?';
+              rows.push(h('div',{style:'padding:6px 0;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;'},
+                `Hole ${hole+1}: Wolf=${wolfName} - No selection`));
+              continue;
+            }
+
+            const wolfName = UI.playerName(detail.wolf);
+            let selText = '';
+            if (detail.selection === 'blind') selText = 'Blind Wolf (4x)';
+            else if (detail.selection === 'wolf') selText = 'Wolf alone (2x)';
+            else selText = `Partner: ${UI.playerName(detail.selection)}`;
+
+            const wolfTeamNames = detail.wolfTeam.map(pid => UI.playerName(pid)).join(' & ');
+            const otherTeamNames = detail.otherTeam.map(pid => UI.playerName(pid)).join(' & ');
+
+            let resultText = '';
+            let resultClass = '';
+            if (detail.winner === 'wolf') {
+              resultText = `Wolf team wins +${detail.points} pts`;
+              resultClass = 'points-positive';
+            } else if (detail.winner === 'others') {
+              resultText = `Others win +${detail.points} pts`;
+              resultClass = 'points-negative';
+            } else if (detail.winner === 'tie') {
+              resultText = `Tie - carry ${detail.carryover}`;
+              resultClass = '';
+            } else {
+              resultText = 'In progress';
+            }
+
+            const catchUpText = detail.catchUp ? ' (catch-up)' : '';
+
+            rows.push(h('div',{style:'padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;'},[
+              h('div',{style:'display:flex;justify-content:space-between;align-items:center;'},[
+                h('span',{style:'font-weight:600;'},`#${hole+1}${catchUpText}`),
+                h('span',{class:resultClass,style:'font-weight:600;'},resultText)
+              ]),
+              h('div',{style:'margin-top:4px;color:var(--muted);'},[
+                h('div',{},`Wolf: ${wolfName} | ${selText}`),
+                h('div',{style:'margin-top:2px;'},`${wolfTeamNames} (${detail.wolfBest || '?'}) vs ${otherTeamNames} (${detail.otherBest || '?'})`)
+              ])
+            ]));
+          }
+          return rows;
+        };
+
+        const holeRows = buildWolfHoleRows();
+
+        // Player results table
+        const playerRows = players.map(pid => {
+          const pts = result.playerPoints[pid] || 0;
+          const amt = result.playerNet[pid] || 0;
+          const ptsStr = pts > 0 ? `+${pts}` : String(pts);
+          const profitClass = amt > 0 ? 'points-positive' : amt < 0 ? 'points-negative' : '';
+          return h('div',{style:'display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);'},[
+            h('span',{},UI.playerName(pid)),
+            h('div',{style:'text-align:right;'},[
+              h('span',{class:'muted'},`${ptsStr} pts `),
+              h('span',{class:profitClass,style:'font-weight:600;'},Utils.fmt(amt))
+            ])
+          ]);
+        });
+
+        // Calculate junk totals
+        const sumJunk = (pids, start, end) => {
+          let tot = 0;
+          pids.forEach(pid => {
+            const arr = g.junkCounts[pid] || [];
+            for (let h = start; h <= end; h++) tot += (arr[h]||0);
+          });
+          return tot;
+        };
+        const frontJunk = sumJunk(players, 0, 8);
+        const backJunk = sumJunk(players, 9, 17);
+        const junkVal = frontJunk * (g.junkValue.front||0) + backJunk * (g.junkValue.back||0);
+
+        // Transactions display
+        const txnRows = result.transactions.map(t =>
+          h('div',{style:'display:flex;justify-content:space-between;padding:4px 0;font-size:12px;'},[
+            h('span',{},`${UI.playerName(t.from)} → ${UI.playerName(t.to)}`),
+            h('span',{style:'font-weight:600;'},Utils.fmt(t.amount))
+          ])
+        );
+
+        return h('div',{class:theme},[
+          h('div',{class:'card'},[
+            h('div',{class:'pill'},UI.gameLabel(g)),
+            h('div',{class:'note',style:'margin-top:6px;'},`Players: ${players.map(pid => UI.playerName(pid)).join(', ')}`),
+            h('div',{class:'note'},`$${pointValue}/pt | Carryover: ${result.carryover}`),
+
+            // Hole-by-hole
+            h('div',{style:'margin-top:12px;'},[
+              h('div',{style:'font-weight:600;margin-bottom:8px;'},'Hole by Hole'),
+              ...holeRows
+            ]),
+
+            // Carryover warning
+            result.carryover > 0 ?
+              h('div',{class:'card',style:'margin-top:12px;background:rgba(234,179,8,0.1);'},[
+                h('div',{style:'font-weight:600;color:#ca8a04;'},`${result.carryover} pts carrying to next hole`)
+              ]) : '',
+
+            // Junk
+            junkVal > 0 ?
+              h('div',{class:'card',style:'margin-top:12px;'},[
+                h('div',{style:'font-weight:600;margin-bottom:4px;'},'Junk'),
+                h('div',{class:'muted'},`Front: ${frontJunk} pts | Back: ${backJunk} pts | Total: ${Utils.fmt(junkVal)}`)
+              ]) : '',
+
+            // Player results
+            h('div',{style:'margin-top:12px;'},[
+              h('div',{style:'font-weight:600;margin-bottom:8px;'},'Player Results'),
+              ...playerRows
+            ]),
+
+            // Transactions
+            txnRows.length > 0 ? h('div',{style:'margin-top:12px;'},[
+              h('div',{style:'font-weight:600;margin-bottom:8px;'},'Pay Up the Ladder'),
+              ...txnRows
+            ]) : '',
+
+            // Total
+            h('div',{class:'card',style:'margin-top:12px;background:linear-gradient(135deg,rgba(59,130,246,0.1),rgba(22,163,74,0.1));'},[
+              h('div',{class:'row',style:'justify-content:space-between;align-items:center;'},[
+                h('div',{},[
+                  h('div',{class:'muted'},'TOTAL IN PLAY'),
+                ]),
+                h('div',{style:'font-size:24px;font-weight:700;'},Utils.fmt(result.totalMoney))
+              ])
+            ])
+          ])
+        ]);
+      }
+
       // Nassau - detailed hole-by-hole view
       let res;
       try {
@@ -3936,20 +4163,34 @@ const UI = {
       if (g.gameType === 'wolf') {
         const res = Game.computeWolfResult(g);
         const players = g.wolfPlayers || [];
-        const pointValue = g.wolfPointValue || 1;
-        // Add wolf points to player net values
+        // Add wolf net $ to player totals (pay-up-the-ladder)
         players.forEach(pid => {
-          const pts = res.playerPoints[pid] || 0;
-          net[pid] += pts * pointValue;
+          net[pid] += res.playerNet[pid] || 0;
         });
-        // Find biggest winner for display
-        let best = null, bestPts = -Infinity;
+        // Add junk for Wolf
+        const sumJunk = (pid, start, end) => {
+          let tot = 0;
+          const arr = g.junkCounts[pid] || [];
+          for (let h = start; h <= end; h++) tot += (arr[h]||0);
+          return tot;
+        };
         players.forEach(pid => {
-          const pts = res.playerPoints[pid] || 0;
-          if (pts > bestPts) { best = pid; bestPts = pts; }
+          const frontJunk = sumJunk(pid, 0, 8);
+          const backJunk = sumJunk(pid, 9, 17);
+          const playerJunkVal = frontJunk * (g.junkValue.front||0) + backJunk * (g.junkValue.back||0);
+          net[pid] += playerJunkVal;
         });
-        const bestAmt = bestPts * pointValue;
-        return h('li',{},`${this.gameLabel(g)}: ${best && bestPts > 0 ? UI.playerName(best) + ' +' + Utils.fmt(bestAmt) : 'No winner yet'}`);
+        // Find biggest winner for display (including junk)
+        let best = null, bestAmt = -Infinity;
+        players.forEach(pid => {
+          const wolfAmt = res.playerNet[pid] || 0;
+          const frontJunk = sumJunk(pid, 0, 8);
+          const backJunk = sumJunk(pid, 9, 17);
+          const junkAmt = frontJunk * (g.junkValue.front||0) + backJunk * (g.junkValue.back||0);
+          const amt = wolfAmt + junkAmt;
+          if (amt > bestAmt) { best = pid; bestAmt = amt; }
+        });
+        return h('li',{},`${this.gameLabel(g)}: ${best && bestAmt > 0 ? UI.playerName(best) + ' +' + Utils.fmt(bestAmt) : 'No winner yet'}`);
       }
 
       let tot;
