@@ -695,6 +695,12 @@ const Game = {
       junkValue: {front:1, back:2},
       pointValue: {front:1, back:1},
       presses: Utils.make18(''),
+      skinsPlayers: [],
+      skinsMode: 'net',
+      wolfPlayers: [],
+      wolfTeeOrder: [],
+      wolfPointValue: 1,
+      wolfSelections: Utils.make18(''),
       gross: {},
       junkCounts: {},
       strokesCount: {}
@@ -1505,6 +1511,10 @@ const Wizard = {
       // Skins-specific
       g.skinsMode = wg.skinsMode || 'net';
       g.skinsPlayers = wg.skinsPlayers || [];
+      // Wolf-specific
+      g.wolfPlayers = wg.wolfPlayers || [];
+      g.wolfTeeOrder = (wg.wolfTeeOrder || []).length ? [...wg.wolfTeeOrder] : [...(wg.wolfPlayers || [])];
+      g.wolfPointValue = wg.wolfPointValue || 1;
 
       // Apply handicap strokes based on mode
       const playerHandicaps = {};
