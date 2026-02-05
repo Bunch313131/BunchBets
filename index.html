@@ -2256,7 +2256,7 @@ const Wizard = {
               return `<div class="wizard-player-chip ${inGame?'skins-selected':'skins-unselected'}" data-ninepoint-pid="${pid}" style="cursor:pointer;">${p.name}</div>`;
             }).join('')}
           </div>
-          <div id="ninePointPlayerCount" class="muted" style="font-size:12px;margin-top:8px;text-align:center;">${(g.ninePointPlayers||[]).length} player${(g.ninePointPlayers||[]).length!==1?'s':''} selected</div>
+          <div id="ninePointPlayerCount" class="muted" style="font-size:12px;margin-top:8px;text-align:center;">${(g.ninePointPlayers||[]).length}/3 players</div>
         </div>
         <div class="wizard-section">
           <div class="wizard-section-title">Scoring Mode</div>
@@ -2308,7 +2308,7 @@ const Wizard = {
             <input type="radio" name="hcpMode" ${g.handicapMode==='off_low'?'checked':''}>
             <div><strong>Off the Low</strong><br><span class="muted">Reduce all by lowest handicap</span></div>
           </div>
-          ${g.gameType !== 'skins' && g.gameType !== 'wolf' ? `
+          ${g.gameType !== 'skins' && g.gameType !== 'wolf' && g.gameType !== 'ninepoint' ? `
           <div class="wizard-option ${g.handicapMode==='team_delta'?'selected':''}" data-hcp="team_delta">
             <input type="radio" name="hcpMode" ${g.handicapMode==='team_delta'?'checked':''}>
             <div><strong>Team Delta</strong><br><span class="muted">High player on high team gets difference</span></div>
@@ -2464,6 +2464,13 @@ const Wizard = {
               g.ninePointWinBy2 = g.ninePointWinBy2 !== false;
               g.ninePointBirdieDouble = g.ninePointBirdieDouble === true;
             }
+            // Update visual state immediately before re-render
+            div.querySelectorAll('[data-type]').forEach(o => {
+              const isSelected = o.dataset.type === newType;
+              o.classList.toggle('selected', isSelected);
+              const radio = o.querySelector('input[type="radio"]');
+              if (radio) radio.checked = isSelected;
+            });
           }
           this.render();
         };
@@ -2689,11 +2696,17 @@ const Wizard = {
           const wasSelected = g.ninePointPlayers.includes(pid);
           if (wasSelected) {
             g.ninePointPlayers = g.ninePointPlayers.filter(x => x !== pid);
+            chip.classList.remove('skins-selected');
+            chip.classList.add('skins-unselected');
           } else if (g.ninePointPlayers.length < 3) {
             g.ninePointPlayers.push(pid);
+            chip.classList.remove('skins-unselected');
+            chip.classList.add('skins-selected');
           }
+          // Update player count display
+          const countEl = document.getElementById('ninePointPlayerCount');
+          if (countEl) countEl.textContent = `${g.ninePointPlayers.length}/3 players`;
           State.scheduleSave();
-          this.render();
         };
       });
 
