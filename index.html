@@ -2191,9 +2191,10 @@ const Wizard = {
         <div class="wizard-section">
           <div class="wizard-section-title">Players (tap to toggle, 2-5 players)</div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
-            ${this.data.players.filter(p=>p.name.trim()).map(p => {
-              const inGame = (g.skinsPlayers || []).includes(p.id);
-              return `<div class="wizard-player-chip ${inGame?'skins-selected':'skins-unselected'}" data-skins-pid="${p.id}" style="cursor:pointer;">${p.name}</div>`;
+            ${this.data.players.filter(p=>p.name.trim()).map((p,i) => {
+              const pid = 'p'+(i+1);
+              const inGame = (g.skinsPlayers || []).includes(pid);
+              return `<div class="wizard-player-chip ${inGame?'skins-selected':'skins-unselected'}" data-skins-pid="${pid}" style="cursor:pointer;">${p.name}</div>`;
             }).join('')}
           </div>
           <div class="muted" style="font-size:12px;margin-top:8px;text-align:center;">${(g.skinsPlayers||[]).length} player${(g.skinsPlayers||[]).length!==1?'s':''} selected</div>
@@ -2217,9 +2218,10 @@ const Wizard = {
         <div class="wizard-section">
           <div class="wizard-section-title">Players (tap to toggle, 4-5 players)</div>
           <div id="wolfPlayerChips" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
-            ${this.data.players.filter(p=>p.name.trim()).map(p => {
-              const inGame = (g.wolfPlayers || []).includes(p.id);
-              return `<div class="wizard-player-chip ${inGame?'skins-selected':'skins-unselected'}" data-wolf-pid="${p.id}" style="cursor:pointer;">${p.name}</div>`;
+            ${this.data.players.filter(p=>p.name.trim()).map((p,i) => {
+              const pid = 'p'+(i+1);
+              const inGame = (g.wolfPlayers || []).includes(pid);
+              return `<div class="wizard-player-chip ${inGame?'skins-selected':'skins-unselected'}" data-wolf-pid="${pid}" style="cursor:pointer;">${p.name}</div>`;
             }).join('')}
           </div>
           <div id="wolfPlayerCount" class="muted" style="font-size:12px;margin-top:8px;text-align:center;">${(g.wolfPlayers||[]).length} player${(g.wolfPlayers||[]).length!==1?'s':''} selected</div>
@@ -2248,12 +2250,13 @@ const Wizard = {
         <div class="wizard-section">
           <div class="wizard-section-title">Players (exactly 3 players)</div>
           <div id="ninePointPlayerChips" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
-            ${this.data.players.filter(p=>p.name.trim()).map(p => {
-              const inGame = (g.ninePointPlayers || []).includes(p.id);
-              return `<div class="wizard-player-chip ${inGame?'skins-selected':'skins-unselected'}" data-ninepoint-pid="${p.id}" style="cursor:pointer;">${p.name}</div>`;
+            ${this.data.players.filter(p=>p.name.trim()).map((p,i) => {
+              const pid = 'p'+(i+1);
+              const inGame = (g.ninePointPlayers || []).includes(pid);
+              return `<div class="wizard-player-chip ${inGame?'skins-selected':'skins-unselected'}" data-ninepoint-pid="${pid}" style="cursor:pointer;">${p.name}</div>`;
             }).join('')}
           </div>
-          <div class="muted" style="font-size:12px;margin-top:8px;text-align:center;">${(g.ninePointPlayers||[]).length}/3 players selected</div>
+          <div id="ninePointPlayerCount" class="muted" style="font-size:12px;margin-top:8px;text-align:center;">${(g.ninePointPlayers||[]).length}/3 players</div>
         </div>
         <div class="wizard-section">
           <div class="wizard-section-title">Scoring Mode</div>
@@ -2693,11 +2696,17 @@ const Wizard = {
           const wasSelected = g.ninePointPlayers.includes(pid);
           if (wasSelected) {
             g.ninePointPlayers = g.ninePointPlayers.filter(x => x !== pid);
+            chip.classList.remove('skins-selected');
+            chip.classList.add('skins-unselected');
           } else if (g.ninePointPlayers.length < 3) {
             g.ninePointPlayers.push(pid);
+            chip.classList.remove('skins-unselected');
+            chip.classList.add('skins-selected');
           }
+          // Update player count display
+          const countEl = document.getElementById('ninePointPlayerCount');
+          if (countEl) countEl.textContent = `${g.ninePointPlayers.length}/3 players`;
           State.scheduleSave();
-          this.render();
         };
       });
 
