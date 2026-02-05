@@ -19,6 +19,13 @@
 :root.light-mode { --bg:#f5f5f7; --card:#ffffff; --txt:#1d1d1f; --muted:#6e6e73; --border:#d2d2d7; --acc:#3b82f6; --success:#16a34a; --danger:#dc2626; --warning:#d97706; color-scheme: light; }
 :root.light-mode input[type="text"], :root.light-mode input[type="tel"], :root.light-mode input[type="number"], :root.light-mode select { background:rgba(0,0,0,0.04); }
 :root.light-mode .menu-item:hover { background:rgba(0,0,0,0.05); }
+.theme-switch { position:relative; width:50px; height:26px; display:inline-block; }
+.theme-switch input { opacity:0; width:0; height:0; }
+.theme-slider { position:absolute; cursor:pointer; inset:0; background:var(--border); border-radius:26px; transition:0.3s; }
+.theme-slider:before { position:absolute; content:""; height:20px; width:20px; left:3px; bottom:3px; background:var(--card); border-radius:50%; transition:0.3s; }
+.theme-switch input:checked + .theme-slider { background:var(--acc); }
+.theme-switch input:checked + .theme-slider:before { transform:translateX(24px); }
+.theme-icons { position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 5px; font-size:12px; pointer-events:none; }
 * { box-sizing:border-box; }
 body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; color:var(--txt); background:var(--bg); }
 header { background:var(--card); border-bottom:1px solid var(--border); padding:10px 12px; position:sticky; top:0; z-index:10; }
@@ -243,7 +250,14 @@ body:has(.wizard-overlay) { overflow:hidden; }
 <div class="slide-menu" id="slideMenu">
   <div class="menu-header">
     <h2>Menu</h2>
-    <button class="menu-close" id="menuClose">&times;</button>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <label class="theme-switch">
+        <input type="checkbox" id="themeToggle">
+        <span class="theme-slider"></span>
+        <span class="theme-icons"><span>☀️</span><span>🌙</span></span>
+      </label>
+      <button class="menu-close" id="menuClose">&times;</button>
+    </div>
   </div>
   <div class="menu-section">
     <button class="menu-item primary" id="startWizardBtn" style="background:var(--success);color:#fff;font-weight:600;text-align:center;border-radius:8px;margin:0 12px;">Start New Game</button>
@@ -262,10 +276,6 @@ body:has(.wizard-overlay) { overflow:hidden; }
     <button class="menu-item" id="resetBtn">New Round</button>
     <button class="menu-item" id="clearBtn">Clear Scores</button>
     <button class="menu-item danger" id="factoryBtn">Factory Reset</button>
-  </div>
-  <div class="menu-section">
-    <div class="menu-section-title">Appearance</div>
-    <button class="menu-item" id="themeToggle">☀️ Light Mode</button>
   </div>
 </div>
 <div id="liveBanner" class="live-banner" style="display:none;"></div>
@@ -2647,22 +2657,17 @@ const UI = {
     document.getElementById('menuClose').onclick = () => this.closeMenu();
     document.getElementById('menuOverlay').onclick = () => this.closeMenu();
 
-    // Theme toggle
-    const themeBtn = document.getElementById('themeToggle');
-    const updateThemeBtn = () => {
-      const isLight = document.documentElement.classList.contains('light-mode');
-      themeBtn.textContent = isLight ? '🌙 Dark Mode' : '☀️ Light Mode';
-    };
+    // Theme toggle (checkbox)
+    const themeToggle = document.getElementById('themeToggle');
     // Load saved theme
-    if (localStorage.getItem('bunchbets-theme') === 'light') {
+    const savedTheme = localStorage.getItem('bunchbets-theme');
+    if (savedTheme === 'light') {
       document.documentElement.classList.add('light-mode');
+      themeToggle.checked = true;
     }
-    updateThemeBtn();
-    themeBtn.onclick = () => {
-      document.documentElement.classList.toggle('light-mode');
-      const isLight = document.documentElement.classList.contains('light-mode');
-      localStorage.setItem('bunchbets-theme', isLight ? 'light' : 'dark');
-      updateThemeBtn();
+    themeToggle.onchange = () => {
+      document.documentElement.classList.toggle('light-mode', themeToggle.checked);
+      localStorage.setItem('bunchbets-theme', themeToggle.checked ? 'light' : 'dark');
     };
   },
 
