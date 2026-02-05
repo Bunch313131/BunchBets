@@ -1700,6 +1700,12 @@ const Wizard = {
       g.wolfPlayers = wg.wolfPlayers || [];
       g.wolfTeeOrder = (wg.wolfTeeOrder || []).length ? [...wg.wolfTeeOrder] : [...(wg.wolfPlayers || [])];
       g.wolfPointValue = wg.wolfPointValue || 1;
+      // 9-Point-specific
+      g.ninePointPlayers = wg.ninePointPlayers || [];
+      g.ninePointMode = wg.ninePointMode || 'net';
+      g.ninePointValue = wg.ninePointValue || 1;
+      g.ninePointWinBy2 = wg.ninePointWinBy2 !== false;
+      g.ninePointBirdieDouble = wg.ninePointBirdieDouble === true;
 
       // Apply handicap strokes based on mode
       const playerHandicaps = {};
