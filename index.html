@@ -3230,31 +3230,45 @@ const UI = {
         const result = Game.computeWolfResult(game);
         const players = game.wolfPlayers || [];
 
-        // Calculate junk for Wolf
-        const sumWolfJunk = (pids, start, end) => {
+        // Calculate junk pay-up-the-ladder for Wolf
+        const sumWolfJunkPid = (pid, start, end) => {
           let tot = 0;
-          pids.forEach(pid => {
-            const arr = game.junkCounts[pid] || [];
-            for (let h = start; h <= end; h++) tot += (arr[h]||0);
-          });
+          const arr = game.junkCounts[pid] || [];
+          for (let h = start; h <= end; h++) tot += (arr[h]||0);
           return tot;
         };
-        const wolfFrontJunk = sumWolfJunk(players, 0, 8);
-        const wolfBackJunk = sumWolfJunk(players, 9, 17);
-        const wolfJunkVal = wolfFrontJunk * (game.junkValue.front||0) + wolfBackJunk * (game.junkValue.back||0);
+        const junkStandings = players.map(pid => {
+          const frontJunk = sumWolfJunkPid(pid, 0, 8);
+          const backJunk = sumWolfJunkPid(pid, 9, 17);
+          const junkVal = frontJunk * (game.junkValue.front||0) + backJunk * (game.junkValue.back||0);
+          return { pid, junkVal };
+        }).sort((a, b) => b.junkVal - a.junkVal);
+        const junkNet = {};
+        players.forEach(pid => { junkNet[pid] = 0; });
+        let totalJunkMoney = 0;
+        for (let i = 0; i < junkStandings.length; i++) {
+          for (let j = i + 1; j < junkStandings.length; j++) {
+            const diff = junkStandings[i].junkVal - junkStandings[j].junkVal;
+            if (diff > 0) {
+              junkNet[junkStandings[i].pid] += diff;
+              junkNet[junkStandings[j].pid] -= diff;
+              totalJunkMoney += diff;
+            }
+          }
+        }
 
-        // Build player net $ standings (pay-up-the-ladder)
+        // Build player net $ standings (Wolf + junk pay-up-the-ladder)
         const playerAmts = players.map(pid => {
           const name = UI.playerName(pid);
           const abbr = name.length <= 3 ? name : name.slice(0,2);
-          const amt = result.playerNet[pid] || 0;
-          return `${abbr}:${Utils.fmt(amt)}`;
+          const wolfAmt = result.playerNet[pid] || 0;
+          const junkAmt = junkNet[pid] || 0;
+          return `${abbr}:${Utils.fmt(wolfAmt + junkAmt)}`;
         }).join(' ');
 
         frontLine = playerAmts + (result.carryover > 0 ? ` | Carry:${result.carryover}` : '');
-        const totalWithJunk = result.totalMoney + wolfJunkVal;
-        const junkPart = wolfJunkVal > 0 ? ` | Junk: ${Utils.fmt(wolfJunkVal)}` : '';
-        backLine = `$${game.wolfPointValue}/pt | Total: ${Utils.fmt(totalWithJunk)}${junkPart}`;
+        const junkPart = totalJunkMoney > 0 ? ` | Junk: ${Utils.fmt(totalJunkMoney)}` : '';
+        backLine = `$${game.wolfPointValue}/pt | Total: ${Utils.fmt(result.totalMoney + totalJunkMoney)}${junkPart}`;
       } else if (game.gameType === 'vegas') {
         const result = Game.computeVegasResult(game);
         // Per-player value = points × $/point (no team multiplier)
@@ -3494,35 +3508,53 @@ const UI = {
         const players = g.wolfPlayers || [];
         const pointValue = g.wolfPointValue || 1;
 
-        // Player standings with net amounts
-        const playerRows = players.map(pid => {
-          const name = UI.playerName(pid);
-          const amt = result.playerNet[pid] || 0;
-          return h('div',{style:'display:flex;justify-content:space-between;padding:4px 0;'},
-            [h('span',{},name), h('span',{},Utils.fmt(amt))]
-          );
-        });
-
-        // Calculate junk totals for Wolf
-        const sumJunk = (pids, start, end) => {
+        // Calculate junk pay-up-the-ladder for Wolf
+        const sumJunkPid = (pid, start, end) => {
           let tot = 0;
-          pids.forEach(pid => {
-            const arr = g.junkCounts[pid] || [];
-            for (let h = start; h <= end; h++) tot += (arr[h]||0);
-          });
+          const arr = g.junkCounts[pid] || [];
+          for (let h = start; h <= end; h++) tot += (arr[h]||0);
           return tot;
         };
-        const frontJunk = sumJunk(players, 0, 8);
-        const backJunk = sumJunk(players, 9, 17);
-        const junkVal = frontJunk * (g.junkValue.front||0) + backJunk * (g.junkValue.back||0);
+        const junkStandings = players.map(pid => {
+          const frontJunk = sumJunkPid(pid, 0, 8);
+          const backJunk = sumJunkPid(pid, 9, 17);
+          const junkVal = frontJunk * (g.junkValue.front||0) + backJunk * (g.junkValue.back||0);
+          return { pid, junkVal };
+        }).sort((a, b) => b.junkVal - a.junkVal);
+        // Calculate junk net per player (pay up the ladder)
+        const junkNet = {};
+        players.forEach(pid => { junkNet[pid] = 0; });
+        let totalJunkMoney = 0;
+        for (let i = 0; i < junkStandings.length; i++) {
+          for (let j = i + 1; j < junkStandings.length; j++) {
+            const diff = junkStandings[i].junkVal - junkStandings[j].junkVal;
+            if (diff > 0) {
+              junkNet[junkStandings[i].pid] += diff;
+              junkNet[junkStandings[j].pid] -= diff;
+              totalJunkMoney += diff;
+            }
+          }
+        }
+        const hasJunk = totalJunkMoney > 0;
+
+        // Player standings with Wolf + junk net amounts
+        const playerRows = players.map(pid => {
+          const name = UI.playerName(pid);
+          const wolfAmt = result.playerNet[pid] || 0;
+          const junkAmt = junkNet[pid] || 0;
+          const totalAmt = wolfAmt + junkAmt;
+          return h('div',{style:'display:flex;justify-content:space-between;padding:4px 0;'},
+            [h('span',{},name), h('span',{},Utils.fmt(totalAmt))]
+          );
+        });
 
         return h('div',{class:theme},[
           h('div',{class:'card'},[
             h('div',{class:'pill'},UI.gameLabel(g)),
             h('div',{class:'note',style:'margin-top:6px;'},`$${pointValue}/pt | Carryover: ${result.carryover}`),
             h('div',{style:'margin-top:12px;'},playerRows),
-            junkVal > 0 ? h('div',{class:'muted',style:'margin-top:8px;'},`Junk: ${Utils.fmt(junkVal)}`) : '',
-            h('div',{style:'margin-top:8px;font-weight:700;'},`Total in play: ${Utils.fmt(result.totalMoney + junkVal)}`)
+            hasJunk ? h('div',{class:'muted',style:'margin-top:8px;'},`Junk in play: ${Utils.fmt(totalJunkMoney)}`) : '',
+            h('div',{style:'margin-top:8px;font-weight:700;'},`Total in play: ${Utils.fmt(result.totalMoney + totalJunkMoney)}`)
           ])
         ]);
       }
@@ -3881,28 +3913,48 @@ const UI = {
 
         const holeRows = buildWolfHoleRows();
 
-        // Player results table
-        const playerRows = players.map(pid => {
-          const amt = result.playerNet[pid] || 0;
-          const profitClass = amt > 0 ? 'points-positive' : amt < 0 ? 'points-negative' : '';
-          return h('div',{style:'display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);'},[
-            h('span',{},UI.playerName(pid)),
-            h('span',{class:profitClass,style:'font-weight:600;'},Utils.fmt(amt))
-          ]);
-        });
-
-        // Calculate junk totals
-        const sumJunk = (pids, start, end) => {
+        // Calculate junk pay-up-the-ladder
+        const sumJunkPid = (pid, start, end) => {
           let tot = 0;
-          pids.forEach(pid => {
-            const arr = g.junkCounts[pid] || [];
-            for (let h = start; h <= end; h++) tot += (arr[h]||0);
-          });
+          const arr = g.junkCounts[pid] || [];
+          for (let h = start; h <= end; h++) tot += (arr[h]||0);
           return tot;
         };
-        const frontJunk = sumJunk(players, 0, 8);
-        const backJunk = sumJunk(players, 9, 17);
-        const junkVal = frontJunk * (g.junkValue.front||0) + backJunk * (g.junkValue.back||0);
+        const junkStandings = players.map(pid => {
+          const frontJunk = sumJunkPid(pid, 0, 8);
+          const backJunk = sumJunkPid(pid, 9, 17);
+          const junkVal = frontJunk * (g.junkValue.front||0) + backJunk * (g.junkValue.back||0);
+          return { pid, junkVal, frontJunk, backJunk };
+        }).sort((a, b) => b.junkVal - a.junkVal);
+        // Calculate junk net per player (pay up the ladder)
+        const junkNet = {};
+        players.forEach(pid => { junkNet[pid] = 0; });
+        let totalJunkMoney = 0;
+        const junkTxns = [];
+        for (let i = 0; i < junkStandings.length; i++) {
+          for (let j = i + 1; j < junkStandings.length; j++) {
+            const diff = junkStandings[i].junkVal - junkStandings[j].junkVal;
+            if (diff > 0) {
+              junkNet[junkStandings[i].pid] += diff;
+              junkNet[junkStandings[j].pid] -= diff;
+              totalJunkMoney += diff;
+              junkTxns.push({ from: junkStandings[j].pid, to: junkStandings[i].pid, amount: diff });
+            }
+          }
+        }
+        const hasJunk = totalJunkMoney > 0;
+
+        // Player results table (Wolf + junk combined)
+        const playerRows = players.map(pid => {
+          const wolfAmt = result.playerNet[pid] || 0;
+          const junkAmt = junkNet[pid] || 0;
+          const totalAmt = wolfAmt + junkAmt;
+          const profitClass = totalAmt > 0 ? 'points-positive' : totalAmt < 0 ? 'points-negative' : '';
+          return h('div',{style:'display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);'},[
+            h('span',{},UI.playerName(pid)),
+            h('span',{class:profitClass,style:'font-weight:600;'},Utils.fmt(totalAmt))
+          ]);
+        });
 
         // Transactions display
         const txnRows = result.transactions.map(t =>
@@ -3930,22 +3982,25 @@ const UI = {
                 h('div',{style:'font-weight:600;color:#ca8a04;'},`${result.carryover} pts carrying to next hole`)
               ]) : '',
 
-            // Junk
-            junkVal > 0 ?
+            // Junk (pay up the ladder)
+            hasJunk ?
               h('div',{class:'card',style:'margin-top:12px;'},[
-                h('div',{style:'font-weight:600;margin-bottom:4px;'},'Junk'),
-                h('div',{class:'muted'},`Front: ${frontJunk} pts | Back: ${backJunk} pts | Total: ${Utils.fmt(junkVal)}`)
+                h('div',{style:'font-weight:600;margin-bottom:4px;'},'Junk (Pay Up the Ladder)'),
+                ...junkTxns.map(t => h('div',{style:'display:flex;justify-content:space-between;padding:4px 0;font-size:12px;'},[
+                  h('span',{},`${UI.playerName(t.from)} → ${UI.playerName(t.to)}`),
+                  h('span',{style:'font-weight:600;'},Utils.fmt(t.amount))
+                ]))
               ]) : '',
 
             // Player results
             h('div',{style:'margin-top:12px;'},[
-              h('div',{style:'font-weight:600;margin-bottom:8px;'},'Player Results'),
+              h('div',{style:'font-weight:600;margin-bottom:8px;'},'Player Results (Wolf + Junk)'),
               ...playerRows
             ]),
 
-            // Transactions
+            // Wolf Transactions
             txnRows.length > 0 ? h('div',{style:'margin-top:12px;'},[
-              h('div',{style:'font-weight:600;margin-bottom:8px;'},'Pay Up the Ladder'),
+              h('div',{style:'font-weight:600;margin-bottom:8px;'},'Wolf Pay Up the Ladder'),
               ...txnRows
             ]) : '',
 
@@ -3954,9 +4009,9 @@ const UI = {
               h('div',{class:'row',style:'justify-content:space-between;align-items:center;'},[
                 h('div',{},[
                   h('div',{class:'muted'},'TOTAL IN PLAY'),
-                  junkVal > 0 ? h('div',{class:'muted',style:'font-size:11px;'},`Wolf: ${Utils.fmt(result.totalMoney)} + Junk: ${Utils.fmt(junkVal)}`) : ''
+                  hasJunk ? h('div',{class:'muted',style:'font-size:11px;'},`Wolf: ${Utils.fmt(result.totalMoney)} + Junk: ${Utils.fmt(totalJunkMoney)}`) : ''
                 ]),
-                h('div',{style:'font-size:24px;font-weight:700;'},Utils.fmt(result.totalMoney + junkVal))
+                h('div',{style:'font-size:24px;font-weight:700;'},Utils.fmt(result.totalMoney + totalJunkMoney))
               ])
             ])
           ])
@@ -4181,28 +4236,34 @@ const UI = {
         players.forEach(pid => {
           net[pid] += res.playerNet[pid] || 0;
         });
-        // Add junk for Wolf
+        // Calculate junk for Wolf - pay up the ladder
         const sumJunk = (pid, start, end) => {
           let tot = 0;
           const arr = g.junkCounts[pid] || [];
           for (let h = start; h <= end; h++) tot += (arr[h]||0);
           return tot;
         };
-        players.forEach(pid => {
+        // Get each player's junk value
+        const junkStandings = players.map(pid => {
           const frontJunk = sumJunk(pid, 0, 8);
           const backJunk = sumJunk(pid, 9, 17);
-          const playerJunkVal = frontJunk * (g.junkValue.front||0) + backJunk * (g.junkValue.back||0);
-          net[pid] += playerJunkVal;
-        });
+          const junkVal = frontJunk * (g.junkValue.front||0) + backJunk * (g.junkValue.back||0);
+          return { pid, junkVal };
+        }).sort((a, b) => b.junkVal - a.junkVal);
+        // Pay up the ladder for junk
+        for (let i = 0; i < junkStandings.length; i++) {
+          for (let j = i + 1; j < junkStandings.length; j++) {
+            const diff = junkStandings[i].junkVal - junkStandings[j].junkVal;
+            if (diff > 0) {
+              net[junkStandings[i].pid] += diff;
+              net[junkStandings[j].pid] -= diff;
+            }
+          }
+        }
         // Find biggest winner for display (including junk)
         let best = null, bestAmt = -Infinity;
         players.forEach(pid => {
-          const wolfAmt = res.playerNet[pid] || 0;
-          const frontJunk = sumJunk(pid, 0, 8);
-          const backJunk = sumJunk(pid, 9, 17);
-          const junkAmt = frontJunk * (g.junkValue.front||0) + backJunk * (g.junkValue.back||0);
-          const amt = wolfAmt + junkAmt;
-          if (amt > bestAmt) { best = pid; bestAmt = amt; }
+          if (net[pid] > bestAmt) { best = pid; bestAmt = net[pid]; }
         });
         return h('li',{},`${this.gameLabel(g)}: ${best && bestAmt > 0 ? UI.playerName(best) + ' +' + Utils.fmt(bestAmt) : 'No winner yet'}`);
       }
