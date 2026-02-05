@@ -1303,29 +1303,22 @@ const Game = {
       // Calculate points for this hole
       const basePoints = 1;
       const holePoints = basePoints * mult * carryMultiplier;
+      const totalPoints = holePoints + carryover;
 
       if (wolfBest < otherBest) {
-        // Wolf team wins
+        // Wolf team wins - each winner gets full points, each loser loses full points
         detail.winner = 'wolf';
-        detail.points = holePoints + carryover;
-        // Distribute points to wolf team
-        const pointsPerWinner = (holePoints + carryover) / wolfTeam.length;
-        wolfTeam.forEach(p => { playerPoints[p] += pointsPerWinner; });
-        // Other team loses points
-        const pointsPerLoser = (holePoints + carryover) / otherTeam.length;
-        otherTeam.forEach(p => { playerPoints[p] -= pointsPerLoser; });
+        detail.points = totalPoints;
+        wolfTeam.forEach(p => { playerPoints[p] += totalPoints; });
+        otherTeam.forEach(p => { playerPoints[p] -= totalPoints; });
         carryover = 0;
         carryMultiplier = 1;
       } else if (otherBest < wolfBest) {
-        // Other team wins
+        // Other team wins - each winner gets full points, each loser loses full points
         detail.winner = 'others';
-        detail.points = holePoints + carryover;
-        // Distribute points to other team
-        const pointsPerWinner = (holePoints + carryover) / otherTeam.length;
-        otherTeam.forEach(p => { playerPoints[p] += pointsPerWinner; });
-        // Wolf team loses points
-        const pointsPerLoser = (holePoints + carryover) / wolfTeam.length;
-        wolfTeam.forEach(p => { playerPoints[p] -= pointsPerLoser; });
+        detail.points = totalPoints;
+        otherTeam.forEach(p => { playerPoints[p] += totalPoints; });
+        wolfTeam.forEach(p => { playerPoints[p] -= totalPoints; });
         carryover = 0;
         carryMultiplier = 1;
       } else {
@@ -1346,16 +1339,19 @@ const Game = {
     })).sort((a, b) => b.points - a.points);
 
     // Calculate transactions (pay up the ladder)
+    // Divide diff by 2 because each player's points include their side of each bet
+    // e.g., A at +1 and C at -1 means diff of 2, but actual bet was 1 point
     const transactions = [];
     for (let i = 0; i < standings.length; i++) {
       for (let j = i + 1; j < standings.length; j++) {
         const diff = standings[i].points - standings[j].points;
         if (diff > 0) {
+          const actualPoints = diff / 2;
           transactions.push({
             from: standings[j].pid,
             to: standings[i].pid,
-            points: diff,
-            amount: diff * pointValue
+            points: actualPoints,
+            amount: actualPoints * pointValue
           });
         }
       }
@@ -1976,10 +1972,11 @@ const Wizard = {
           <div class="wizard-section-title">Tee Order (tap arrows to reorder)</div>
           <div id="wolfTeeOrderList" style="display:flex;flex-direction:column;gap:6px;">
             ${(g.wolfTeeOrder.length ? g.wolfTeeOrder : g.wolfPlayers).map((pid, idx, arr) => {
-              const player = this.data.players.find(p => p.id === pid);
+              const playerIdx = parseInt(pid.slice(1)) - 1;
+              const player = this.data.players[playerIdx];
               const isFirst = idx === 0;
               const isLast = idx === arr.length - 1;
-              return player ? `<div class="wolf-tee-order-item" data-wolf-order-pid="${pid}" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;">
+              return player && player.name ? `<div class="wolf-tee-order-item" data-wolf-order-pid="${pid}" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;">
                 <span style="color:var(--muted);font-weight:600;min-width:20px;">${idx+1}.</span>
                 <span style="flex:1;">${player.name}</span>
                 <button type="button" class="wolf-order-btn" data-wolf-move="up" data-wolf-pid="${pid}" ${isFirst?'disabled':''} style="padding:4px 10px;font-size:16px;border:1px solid var(--border);border-radius:4px;background:${isFirst?'var(--muted)':'var(--card)'};cursor:${isFirst?'default':'pointer'};">▲</button>
