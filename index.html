@@ -5558,7 +5558,11 @@ document.getElementById('hostBtn').onclick = () => { UI.closeMenu(); LiveSync.sh
 document.getElementById('joinBtn').onclick = () => { UI.closeMenu(); LiveSync.showJoinModal(); };
 
 // Wizard button
-document.getElementById('startWizardBtn').onclick = () => { UI.closeMenu(); Wizard.start(); };
+document.getElementById('startWizardBtn').onclick = () => {
+  if (!confirm('Start a new game?\n\nThis will erase all scores and settings from the current game.')) return;
+  UI.closeMenu();
+  Wizard.start();
+};
 
 // Check URL for join code on load
 let joiningViaUrl = false;
