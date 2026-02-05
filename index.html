@@ -710,7 +710,7 @@ const Game = {
   sanitize(g) {
     if (!g) return this.create();
     g.id = g.id || Utils.uid();
-    g.gameType = ['nassau','vegas','skins'].includes(g.gameType) ? g.gameType : 'nassau';
+    g.gameType = ['nassau','vegas','skins','wolf'].includes(g.gameType) ? g.gameType : 'nassau';
 
     const maxTeamSize = g.gameType === 'vegas' ? 2 : (g.teamSize || 2);
     g.teamSize = [1,2].includes(g.teamSize) ? g.teamSize : 2;
@@ -727,6 +727,12 @@ const Game = {
     // Skins-specific
     g.skinsMode = ['net','gross','both'].includes(g.skinsMode) ? g.skinsMode : 'net';
     g.skinsPlayers = Array.isArray(g.skinsPlayers) ? g.skinsPlayers : [];
+    // Wolf-specific
+    g.wolfPlayers = Array.isArray(g.wolfPlayers) ? g.wolfPlayers : [];
+    g.wolfTeeOrder = Array.isArray(g.wolfTeeOrder) ? g.wolfTeeOrder : [];
+    g.wolfPointValue = g.wolfPointValue || 1;
+    g.wolfSelections = Array.isArray(g.wolfSelections) ? g.wolfSelections.slice(0,18) : Utils.make18('');
+    while ((g.wolfSelections || []).length < 18) g.wolfSelections.push('');
     
     let pa = Array.isArray(g.presses) ? g.presses.slice(0,18) : Utils.make18('');
     while (pa.length < 18) pa.push('');
@@ -1172,6 +1178,191 @@ const Game = {
       totalPot,
       buyIn,
       playerResults
+    };
+  },
+
+  computeWolfResult(g) {
+    const players = (g.wolfPlayers || []);
+    const teeOrder = g.wolfTeeOrder.length ? g.wolfTeeOrder : players;
+    const pointValue = g.wolfPointValue || 1;
+    const selections = g.wolfSelections || [];
+
+    // Initialize player points
+    const playerPoints = {};
+    players.forEach(pid => { playerPoints[pid] = 0; });
+
+    let carryover = 0;
+    let carryMultiplier = 1;
+    const holeDetails = [];
+
+    for (let h = 0; h < 18; h++) {
+      const detail = {
+        hole: h + 1,
+        wolf: null,
+        selection: null,
+        multiplier: 1,
+        wolfTeam: [],
+        otherTeam: [],
+        wolfBest: null,
+        otherBest: null,
+        winner: null,
+        points: 0,
+        carryover: 0
+      };
+
+      // Determine who is wolf this hole
+      // Catch-up rule: on holes 16-18, player with lowest points becomes Wolf
+      let wolfPid;
+      if (h >= 15) {
+        // Find player with lowest points
+        let lowestPts = Infinity;
+        let lowestPid = teeOrder[h % teeOrder.length]; // fallback to rotation
+        players.forEach(pid => {
+          if (playerPoints[pid] < lowestPts) {
+            lowestPts = playerPoints[pid];
+            lowestPid = pid;
+          }
+        });
+        wolfPid = lowestPid;
+        detail.catchUp = true;
+      } else {
+        // Normal rotation through tee order
+        const wolfIdx = h % teeOrder.length;
+        wolfPid = teeOrder[wolfIdx];
+      }
+      detail.wolf = wolfPid;
+
+      // Get wolf's selection for this hole
+      const sel = selections[h] || '';
+      detail.selection = sel;
+
+      // Determine multiplier and teams based on selection
+      let wolfTeam = [wolfPid];
+      let otherTeam = players.filter(p => p !== wolfPid);
+      let mult = 1;
+
+      if (sel === 'blind') {
+        mult = 4;
+        // Wolf goes alone
+      } else if (sel === 'wolf') {
+        mult = 2;
+        // Wolf goes alone
+      } else if (sel && players.includes(sel)) {
+        // Wolf picked a partner
+        mult = 1;
+        wolfTeam = [wolfPid, sel];
+        otherTeam = players.filter(p => p !== wolfPid && p !== sel);
+      }
+
+      detail.multiplier = mult;
+      detail.wolfTeam = wolfTeam;
+      detail.otherTeam = otherTeam;
+
+      // Get scores for this hole
+      let allScored = true;
+      const scores = {};
+      players.forEach(pid => {
+        const gross = g.gross[pid] && g.gross[pid][h];
+        if (gross == null || gross === '') {
+          allScored = false;
+        } else {
+          const strokes = g.strokesCount[pid] || 0;
+          const hdcpHoles = State.data.course.hdcp || [];
+          const getsStroke = hdcpHoles[h] <= strokes;
+          scores[pid] = { gross, net: gross - (getsStroke ? 1 : 0) };
+        }
+      });
+
+      if (!allScored || !sel) {
+        detail.carryover = carryover;
+        holeDetails.push(detail);
+        continue;
+      }
+
+      // Calculate best ball for each team
+      const wolfScores = wolfTeam.map(p => scores[p] ? scores[p].net : 99).filter(s => s !== 99);
+      const otherScores = otherTeam.map(p => scores[p] ? scores[p].net : 99).filter(s => s !== 99);
+
+      if (wolfScores.length === 0 || otherScores.length === 0) {
+        detail.carryover = carryover;
+        holeDetails.push(detail);
+        continue;
+      }
+
+      const wolfBest = Math.min(...wolfScores);
+      const otherBest = Math.min(...otherScores);
+      detail.wolfBest = wolfBest;
+      detail.otherBest = otherBest;
+
+      // Calculate points for this hole
+      const basePoints = 1;
+      const holePoints = basePoints * mult * carryMultiplier;
+
+      if (wolfBest < otherBest) {
+        // Wolf team wins
+        detail.winner = 'wolf';
+        detail.points = holePoints + carryover;
+        // Distribute points to wolf team
+        const pointsPerWinner = (holePoints + carryover) / wolfTeam.length;
+        wolfTeam.forEach(p => { playerPoints[p] += pointsPerWinner; });
+        // Other team loses points
+        const pointsPerLoser = (holePoints + carryover) / otherTeam.length;
+        otherTeam.forEach(p => { playerPoints[p] -= pointsPerLoser; });
+        carryover = 0;
+        carryMultiplier = 1;
+      } else if (otherBest < wolfBest) {
+        // Other team wins
+        detail.winner = 'others';
+        detail.points = holePoints + carryover;
+        // Distribute points to other team
+        const pointsPerWinner = (holePoints + carryover) / otherTeam.length;
+        otherTeam.forEach(p => { playerPoints[p] += pointsPerWinner; });
+        // Wolf team loses points
+        const pointsPerLoser = (holePoints + carryover) / wolfTeam.length;
+        wolfTeam.forEach(p => { playerPoints[p] -= pointsPerLoser; });
+        carryover = 0;
+        carryMultiplier = 1;
+      } else {
+        // Tie - carry over
+        detail.winner = 'tie';
+        carryover += holePoints;
+        carryMultiplier *= mult > 1 ? mult : 1; // Stack multipliers on ties
+      }
+
+      detail.carryover = carryover;
+      holeDetails.push(detail);
+    }
+
+    // Calculate final standings (pay up the ladder)
+    const standings = players.map(pid => ({
+      pid,
+      points: playerPoints[pid]
+    })).sort((a, b) => b.points - a.points);
+
+    // Calculate transactions (pay up the ladder)
+    const transactions = [];
+    for (let i = 0; i < standings.length; i++) {
+      for (let j = i + 1; j < standings.length; j++) {
+        const diff = standings[i].points - standings[j].points;
+        if (diff > 0) {
+          transactions.push({
+            from: standings[j].pid,
+            to: standings[i].pid,
+            points: diff,
+            amount: diff * pointValue
+          });
+        }
+      }
+    }
+
+    return {
+      holeDetails,
+      playerPoints,
+      standings,
+      transactions,
+      pointValue,
+      carryover,
+      totalPoints: Object.values(playerPoints).reduce((a, b) => a + Math.abs(b), 0) / 2
     };
   },
 
@@ -1724,6 +1915,11 @@ const Wizard = {
             <div style="flex:1;"><strong>Skins</strong><br><span class="muted">2-5 players - win hole outright to take the skin</span></div>
             <button type="button" class="help-btn" data-help="skins">?</button>
           </div>
+          <div class="wizard-option ${g.gameType==='wolf'?'selected':''}" data-type="wolf">
+            <input type="radio" name="gameType" ${g.gameType==='wolf'?'checked':''}>
+            <div style="flex:1;"><strong>Wolf</strong><br><span class="muted">4-5 players - pick your partner each hole</span></div>
+            <button type="button" class="help-btn" data-help="wolf">?</button>
+          </div>
         </div>
 
         ${g.gameType === 'skins' ? `
@@ -1753,6 +1949,34 @@ const Wizard = {
             <div><strong>Net + Gross</strong><br><span class="muted">Two separate pots</span></div>
           </div>
         </div>
+        ` : g.gameType === 'wolf' ? `
+        <div class="wizard-section">
+          <div class="wizard-section-title">Players (tap to toggle, 4-5 players)</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
+            ${this.data.players.filter(p=>p.name.trim()).map((p,i) => {
+              const pid = 'p'+(i+1);
+              const inGame = (g.wolfPlayers || []).includes(pid);
+              return `<div class="wizard-player-chip ${inGame?'skins-selected':'skins-unselected'}" data-wolf-pid="${pid}" style="cursor:pointer;">${p.name}</div>`;
+            }).join('')}
+          </div>
+          <div class="muted" style="font-size:12px;margin-top:8px;text-align:center;">${(g.wolfPlayers||[]).length} player${(g.wolfPlayers||[]).length!==1?'s':''} selected</div>
+        </div>
+        ${(g.wolfPlayers||[]).length >= 4 ? `
+        <div class="wizard-section">
+          <div class="wizard-section-title">Tee Order (drag to reorder)</div>
+          <div id="wolfTeeOrderList" style="display:flex;flex-direction:column;gap:6px;">
+            ${(g.wolfTeeOrder.length ? g.wolfTeeOrder : g.wolfPlayers).map((pid, idx) => {
+              const player = this.data.players.find(p => p.id === pid);
+              return player ? `<div class="wolf-tee-order-item" data-wolf-order-pid="${pid}" draggable="true" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;cursor:grab;">
+                <span style="color:var(--muted);font-weight:600;min-width:20px;">${idx+1}.</span>
+                <span style="flex:1;">${player.name}</span>
+                <span style="color:var(--muted);">☰</span>
+              </div>` : '';
+            }).join('')}
+          </div>
+          <div class="muted" style="font-size:12px;margin-top:8px;">Player 1 tees off first on hole 1, then rotates each hole.</div>
+        </div>
+        ` : ''}
         ` : `
         <div class="wizard-section">
           <div class="wizard-section-title">Teams (tap to reassign)</div>
@@ -1781,7 +2005,7 @@ const Wizard = {
             <input type="radio" name="hcpMode" ${g.handicapMode==='off_low'?'checked':''}>
             <div><strong>Off the Low</strong><br><span class="muted">Reduce all by lowest handicap</span></div>
           </div>
-          ${g.gameType !== 'skins' ? `
+          ${g.gameType !== 'skins' && g.gameType !== 'wolf' ? `
           <div class="wizard-option ${g.handicapMode==='team_delta'?'selected':''}" data-hcp="team_delta">
             <input type="radio" name="hcpMode" ${g.handicapMode==='team_delta'?'checked':''}>
             <div><strong>Team Delta</strong><br><span class="muted">High player on high team gets difference</span></div>
@@ -1808,6 +2032,16 @@ const Wizard = {
             </div>
           </div>
           <div class="muted" style="font-size:12px;margin-top:8px;">Total pot: $${((g.stakes.front||20) * (g.skinsPlayers||[]).length).toFixed(2)}</div>
+        </div>
+        ` : g.gameType === 'wolf' ? `
+        <div class="wizard-section">
+          <div class="wizard-section-title">Point Value</div>
+          <div style="max-width:120px;">
+            <div class="currency-input-wrap">
+              <input type="number" class="currency-input" id="wizardWolfPointValue" value="${(g.wolfPointValue||1).toFixed(2)}" min="0" step="0.01">
+            </div>
+          </div>
+          <div class="muted" style="font-size:12px;margin-top:8px;">Wolf = 2x points, Blind Wolf = 4x points</div>
         </div>
         ` : `
         <div class="wizard-section">
@@ -1902,6 +2136,12 @@ const Wizard = {
               g.junkValue = {front:0, back:0};
               g.withJunk = false;
               g.skinsMode = g.skinsMode || 'net';
+            } else if (newType === 'wolf') {
+              g.wolfPointValue = g.wolfPointValue || 1;
+              g.junkValue = {front:1, back:2};
+              g.withJunk = true;
+              g.wolfPlayers = g.wolfPlayers || [];
+              g.wolfTeeOrder = g.wolfTeeOrder || [];
             }
           }
           this.render();
@@ -1958,6 +2198,20 @@ const Wizard = {
               '</ul>' +
               '<p><strong>Payout:</strong> Total pot divided by number of skins won. If Net+Gross, each pot is calculated separately.</p>' +
               '<p><strong>Final hole ties:</strong> If the last hole ties with carryovers, the pot splits evenly among tied players.</p>';
+          } else if (type === 'wolf') {
+            title = 'Wolf';
+            content = '<p><strong>Wolf</strong> is a 4-5 player game where one player (the Wolf) chooses their partner each hole.</p>' +
+              '<p><strong>Tee Order:</strong> Players rotate who tees off first. The first player is the Wolf for that hole.</p>' +
+              '<p><strong>Wolf\'s Choices:</strong></p>' +
+              '<ul>' +
+              '<li><strong>Pick a Partner:</strong> After seeing a player\'s tee shot, call them as your partner (2v2 or 2v3)</li>' +
+              '<li><strong>Wolf:</strong> Go alone after all tee shots (1v3 or 1v4) - worth <strong>2x points</strong></li>' +
+              '<li><strong>Blind Wolf:</strong> Declare before teeing off (1v3 or 1v4) - worth <strong>4x points</strong></li>' +
+              '</ul>' +
+              '<p><strong>Scoring:</strong> Lowest net score wins the hole (best ball). Winners earn points, losers pay up the ladder at the end.</p>' +
+              '<p><strong>Carryovers:</strong> If a hole ties, points carry over with multipliers stacking.</p>' +
+              '<p><strong>Catch-up (Holes 16-18):</strong> Player with the lowest points becomes Wolf, giving them a chance to catch up.</p>' +
+              '<p><strong>Junk:</strong> Individual bets (birdies, sandies, etc.) are paid separately.</p>';
           }
           // Show modal
           const modal = document.createElement('div');
@@ -2036,6 +2290,73 @@ const Wizard = {
         };
       }
 
+      // Wolf player toggle
+      div.querySelectorAll('[data-wolf-pid]').forEach(chip => {
+        chip.onclick = () => {
+          const pid = chip.dataset.wolfPid;
+          g.wolfPlayers = g.wolfPlayers || [];
+          if (g.wolfPlayers.includes(pid)) {
+            g.wolfPlayers = g.wolfPlayers.filter(x => x !== pid);
+            g.wolfTeeOrder = g.wolfTeeOrder.filter(x => x !== pid);
+          } else if (g.wolfPlayers.length < 5) {
+            g.wolfPlayers.push(pid);
+            // Add to tee order if not there
+            if (!g.wolfTeeOrder.includes(pid)) {
+              g.wolfTeeOrder.push(pid);
+            }
+          }
+          // Sync tee order with players
+          g.wolfTeeOrder = g.wolfTeeOrder.filter(x => g.wolfPlayers.includes(x));
+          this.render();
+        };
+      });
+
+      // Wolf tee order drag/drop
+      const teeOrderList = document.getElementById('wolfTeeOrderList');
+      if (teeOrderList) {
+        let draggedItem = null;
+        teeOrderList.querySelectorAll('.wolf-tee-order-item').forEach(item => {
+          item.ondragstart = (e) => {
+            draggedItem = item;
+            item.style.opacity = '0.5';
+          };
+          item.ondragend = () => {
+            item.style.opacity = '1';
+            draggedItem = null;
+          };
+          item.ondragover = (e) => {
+            e.preventDefault();
+            if (draggedItem && draggedItem !== item) {
+              const rect = item.getBoundingClientRect();
+              const midY = rect.top + rect.height / 2;
+              if (e.clientY < midY) {
+                item.parentNode.insertBefore(draggedItem, item);
+              } else {
+                item.parentNode.insertBefore(draggedItem, item.nextSibling);
+              }
+            }
+          };
+          item.ondrop = (e) => {
+            e.preventDefault();
+            // Update tee order based on DOM order
+            const newOrder = [];
+            teeOrderList.querySelectorAll('.wolf-tee-order-item').forEach(el => {
+              newOrder.push(el.dataset.wolfOrderPid);
+            });
+            g.wolfTeeOrder = newOrder;
+            this.render();
+          };
+        });
+      }
+
+      // Wolf point value input
+      const wolfPointInput = document.getElementById('wizardWolfPointValue');
+      if (wolfPointInput) {
+        wolfPointInput.onchange = (e) => {
+          g.wolfPointValue = parseFloat(e.target.value) || 1;
+        };
+      }
+
       // Stakes inputs (only for non-skins games)
       const stakesFront = document.getElementById('wizardStakesFront');
       if (stakesFront) {
@@ -2079,6 +2400,11 @@ const Wizard = {
             Err.toast('Select at least 2 players for Skins');
             return;
           }
+        } else if (g.gameType === 'wolf') {
+          if ((g.wolfPlayers || []).length < 4) {
+            Err.toast('Select at least 4 players for Wolf');
+            return;
+          }
         } else if (g.teamA.length === 0 || g.teamB.length === 0) {
           Err.toast('Assign players to both teams');
           return;
@@ -2093,6 +2419,12 @@ const Wizard = {
           if (game.gameType === 'skins') {
             if ((game.skinsPlayers || []).length < 2) {
               Err.toast(`Game ${i+1} needs at least 2 players`);
+              this.switchToGame(i);
+              return;
+            }
+          } else if (game.gameType === 'wolf') {
+            if ((game.wolfPlayers || []).length < 4) {
+              Err.toast(`Game ${i+1} needs at least 4 players`);
               this.switchToGame(i);
               return;
             }
@@ -2152,6 +2484,9 @@ const UI = {
       const count = (g.skinsPlayers || []).length;
       const modeLabel = g.skinsMode === 'both' ? 'Net+Gross' : (g.skinsMode === 'gross' ? 'Gross' : 'Net');
       return `Skins ${modeLabel} (${count}p)`;
+    } else if (g.gameType === 'wolf') {
+      const count = (g.wolfPlayers || []).length;
+      return `Wolf (${count}p)`;
     } else if (g.gameType === 'vegas') {
       return `Vegas: ${left} vs ${right}`;
     } else {
@@ -2635,31 +2970,75 @@ const UI = {
     });
 
 
+    // Build Vegas press rows
+    const vegasRows = State.data.games.filter(g => g.gameType === 'vegas').map((game,gi) => {
+      const actualIdx = State.data.games.indexOf(game);
+      const theme = `theme-g${(actualIdx%6)+1}`;
+      const cells = [h('td',{class:'sticky press-label',style:'font-weight:600;'},UI.gameLabel(game))];
+      for (let hole = 0; hole < 18; hole++) {
+        const currentPress = game.presses[hole] || '';
+        const sel = h('select',{
+          class:'press-select',
+          onchange:(e)=>{
+            game.presses[hole] = e.target.value;
+            State.scheduleSave();
+            State.scheduleRender();
+          }
+        },[
+          h('option',{value:'',selected:currentPress===''},'—'),
+          h('option',{value:'press',selected:currentPress==='press'},'P'),
+          h('option',{value:'blind',selected:currentPress==='blind'},'B')
+        ]);
+        cells.push(h('td',{},[sel]));
+      }
+      cells.push(h('td',{colspan:'3'}));
+      return h('tr',{class:`press-row ${theme}`},cells);
+    });
+
+    // Build Wolf selection rows
+    const wolfRows = State.data.games.filter(g => g.gameType === 'wolf').map((game,gi) => {
+      const actualIdx = State.data.games.indexOf(game);
+      const theme = `theme-g${(actualIdx%6)+1}`;
+      const wolfPlayers = game.wolfPlayers || [];
+      // Compute wolf result to get actual wolf for each hole (includes catch-up logic)
+      const wolfResult = Game.computeWolfResult(game);
+      const cells = [h('td',{class:'sticky press-label',style:'font-weight:600;'},UI.gameLabel(game))];
+      for (let hole = 0; hole < 18; hole++) {
+        const detail = wolfResult.holeDetails[hole] || {};
+        const wolfPid = detail.wolf || wolfPlayers[hole % wolfPlayers.length];
+        const wolfName = UI.playerName(wolfPid);
+        const isCatchUp = hole >= 15;
+        const currentSel = game.wolfSelections[hole] || '';
+        // Options: player names (except wolf), Wolf, Blind Wolf
+        const otherPlayers = wolfPlayers.filter(p => p !== wolfPid);
+        const options = [
+          h('option',{value:'',selected:currentSel===''},(isCatchUp ? '*' : '') + wolfName.slice(0,1) + '?'),
+          ...otherPlayers.map(pid => {
+            const name = UI.playerName(pid);
+            const abbr = name.length <= 3 ? name : name.slice(0,2);
+            return h('option',{value:pid,selected:currentSel===pid},abbr);
+          }),
+          h('option',{value:'wolf',selected:currentSel==='wolf'},'W'),
+          h('option',{value:'blind',selected:currentSel==='blind'},'BW')
+        ];
+        const sel = h('select',{
+          class:'press-select',
+          style:'font-size:12px;' + (isCatchUp ? 'background:#ffe0b2;' : ''),
+          onchange:(e)=>{
+            game.wolfSelections[hole] = e.target.value;
+            State.scheduleSave();
+            State.scheduleRender();
+          }
+        },options);
+        cells.push(h('td',{},[sel]));
+      }
+      cells.push(h('td',{colspan:'3'}));
+      return h('tr',{class:`press-row ${theme}`},cells);
+    });
+
     const tbl = h('table',{},[
       h('thead',{},[h('tr',{},head),h('tr',{},parRow)]),
-      h('tbody',{},[...rows,...(State.data.games.filter(g => g.gameType === 'vegas').map((game,gi) => {
-        const actualIdx = State.data.games.indexOf(game);
-        const theme = `theme-g${(actualIdx%6)+1}`;
-        const cells = [h('td',{class:'sticky press-label',style:'font-weight:600;'},UI.gameLabel(game))];
-        for (let hole = 0; hole < 18; hole++) {
-          const currentPress = game.presses[hole] || '';
-          const sel = h('select',{
-            class:'press-select',
-            onchange:(e)=>{
-              game.presses[hole] = e.target.value;
-              State.scheduleSave();
-              State.scheduleRender();
-            }
-          },[
-            h('option',{value:'',selected:currentPress===''},'—'),
-            h('option',{value:'press',selected:currentPress==='press'},'P'),
-            h('option',{value:'blind',selected:currentPress==='blind'},'B')
-          ]);
-          cells.push(h('td',{},[sel]));
-        }
-        cells.push(h('td',{colspan:'3'}));
-        return h('tr',{class:`press-row ${theme}`},cells);
-      }))])
+      h('tbody',{},[...rows,...vegasRows,...wolfRows])
     ]);
 
     const scroller = h('div',{class:'card scroll',id:'scoresScroll'},tbl);
@@ -2735,6 +3114,21 @@ const UI = {
 
         frontLine = playerCounts + (carry > 0 ? ` | Carry:${carry}` : '');
         backLine = `Pot: ${Utils.fmt(result.totalPot)} | $/Skin: ${Utils.fmt(mode === 'gross' ? result.grossSkinValue : result.netSkinValue)}`;
+      } else if (game.gameType === 'wolf') {
+        const result = Game.computeWolfResult(game);
+        const players = game.wolfPlayers || [];
+
+        // Build player point standings
+        const playerPts = players.map(pid => {
+          const name = UI.playerName(pid);
+          const abbr = name.length <= 3 ? name : name.slice(0,2);
+          const pts = result.playerPoints[pid] || 0;
+          const sign = pts > 0 ? '+' : '';
+          return `${abbr}:${sign}${pts.toFixed(1)}`;
+        }).join(' ');
+
+        frontLine = playerPts + (result.carryover > 0 ? ` | Carry:${result.carryover}` : '');
+        backLine = `$${game.wolfPointValue}/pt | Tot: ${Utils.fmt(result.totalPoints * game.wolfPointValue)}`;
       } else if (game.gameType === 'vegas') {
         const result = Game.computeVegasResult(game);
         // Per-player value = points × $/point (no team multiplier)
@@ -2799,7 +3193,7 @@ const UI = {
       toggleBar,
       h('div',{class:'row',style:'align-items:center;justify-content:space-between;margin-bottom:8px;'},[
         h('div',{class:'pill'},'Entering GROSS for all players'),
-        h('div',{class:'note'},'Press rows show below for Vegas games (Press=2x, Blind=4x)')
+        h('div',{class:'note'},'Vegas: P=2x, B=4x | Wolf: pick partner or W/BW')
       ]),
       scroller,
       h('div',{id:'gameStatusBars',style:'margin-top:12px;'},gameStatusRows)
@@ -2809,7 +3203,15 @@ const UI = {
   junk() {
     const last = Game.getLastScored();
     const blocks = State.data.games.map((g, gi) => {
-      const pids = [...(g.teamA||[]),...(g.teamB||[])];
+      // Get players for this game type
+      let pids;
+      if (g.gameType === 'skins') {
+        pids = g.skinsPlayers || [];
+      } else if (g.gameType === 'wolf') {
+        pids = g.wolfPlayers || [];
+      } else {
+        pids = [...(g.teamA||[]),...(g.teamB||[])];
+      }
       const theme = `theme-g${(gi%6)+1}`;
       const baseTab = gi * 10000;
 
@@ -3426,6 +3828,25 @@ const UI = {
         return h('li',{},`${this.gameLabel(g)}: ${best ? UI.playerName(best) + ' +' + Utils.fmt(bestProfit) : 'No winner yet'}`);
       }
 
+      if (g.gameType === 'wolf') {
+        const res = Game.computeWolfResult(g);
+        const players = g.wolfPlayers || [];
+        const pointValue = g.wolfPointValue || 1;
+        // Add wolf points to player net values
+        players.forEach(pid => {
+          const pts = res.playerPoints[pid] || 0;
+          net[pid] += pts * pointValue;
+        });
+        // Find biggest winner for display
+        let best = null, bestPts = -Infinity;
+        players.forEach(pid => {
+          const pts = res.playerPoints[pid] || 0;
+          if (pts > bestPts) { best = pid; bestPts = pts; }
+        });
+        const bestAmt = bestPts * pointValue;
+        return h('li',{},`${this.gameLabel(g)}: ${best && bestPts > 0 ? UI.playerName(best) + ' +' + Utils.fmt(bestAmt) : 'No winner yet'}`);
+      }
+
       let tot;
       if (g.gameType === 'vegas') {
         const res = Game.computeVegasResult(g);
@@ -3538,6 +3959,25 @@ const UI = {
         h('p',{},'Total pot (buy-in × players) divided by number of skins won. For Net+Gross, each pot is calculated separately.'),
         h('h3',{style:'margin:16px 0 8px 0;'},'Final Hole Ties'),
         h('p',{},'If the last hole ties with carryovers pending, the pot splits evenly among all tied players.')
+      ]),
+
+      h('div',{class:'card',style:'margin-bottom:16px;'},[
+        h('h2',{style:'margin:0 0 12px 0;'},'Wolf'),
+        h('p',{},'Game for 4-5 players where one player (the Wolf) chooses their partner each hole.'),
+        h('h3',{style:'margin:16px 0 8px 0;'},'Tee Order'),
+        h('p',{},'Players rotate who tees off first (the Wolf). Set the tee order in game setup, then it rotates each hole.'),
+        h('h3',{style:'margin:16px 0 8px 0;'},'Wolf\'s Choices'),
+        h('ul',{style:'margin:8px 0;padding-left:20px;'},[
+          h('li',{},h('strong',{},'Pick a Partner:'),' Select someone to team up with (2v2 or 2v3). Normal 1x points.'),
+          h('li',{},h('strong',{},'Wolf (W):'),' Go alone after seeing all tee shots (1v3 or 1v4). Worth 2x points.'),
+          h('li',{},h('strong',{},'Blind Wolf (BW):'),' Declare before teeing off. Worth 4x points.')
+        ]),
+        h('h3',{style:'margin:16px 0 8px 0;'},'Scoring'),
+        h('p',{},'Best ball (lowest net score) wins the hole. Winners earn points, losers pay. Everyone settles up at the end.'),
+        h('h3',{style:'margin:16px 0 8px 0;'},'Carryovers'),
+        h('p',{},'If the hole ties, points carry over to the next hole. Multipliers stack on tied holes.'),
+        h('h3',{style:'margin:16px 0 8px 0;'},'Catch-up (Holes 16-18)'),
+        h('p',{},'On the final three holes, the player with the fewest points becomes Wolf - giving them a chance to catch up.')
       ]),
 
       h('div',{class:'card'},[
