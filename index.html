@@ -138,7 +138,7 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .hamburger:hover { color:var(--acc); }
 .menu-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100; opacity:0; visibility:hidden; transition:opacity 0.3s, visibility 0.3s; }
 .menu-overlay.open { opacity:1; visibility:visible; }
-.slide-menu { position:fixed; top:0; right:-280px; width:280px; height:100%; background:var(--card); border-left:1px solid var(--border); z-index:101; transition:right 0.3s ease; overflow-y:auto; display:flex; flex-direction:column; }
+.slide-menu { position:fixed; top:0; right:-280px; width:280px; height:100%; background:var(--card); border-left:1px solid var(--border); z-index:101; transition:right 0.3s ease; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; display:flex; flex-direction:column; }
 .slide-menu.open { right:0; }
 .menu-header { padding:16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
 .menu-header h2 { margin:0; font-size:16px; }
