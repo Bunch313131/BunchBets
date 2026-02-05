@@ -2283,12 +2283,17 @@ const Wizard = {
         chip.onclick = () => {
           const pid = chip.dataset.skinsPid;
           g.skinsPlayers = g.skinsPlayers || [];
-          if (g.skinsPlayers.includes(pid)) {
+          const wasSelected = g.skinsPlayers.includes(pid);
+          if (wasSelected) {
             g.skinsPlayers = g.skinsPlayers.filter(x => x !== pid);
+            chip.classList.remove('skins-selected');
+            chip.classList.add('skins-unselected');
           } else if (g.skinsPlayers.length < 5) {
             g.skinsPlayers.push(pid);
+            chip.classList.remove('skins-unselected');
+            chip.classList.add('skins-selected');
           }
-          this.render();
+          State.scheduleSave();
         };
       });
 
@@ -2314,27 +2319,22 @@ const Wizard = {
         chip.onclick = () => {
           const pid = chip.dataset.wolfPid;
           g.wolfPlayers = g.wolfPlayers || [];
-          if (g.wolfPlayers.includes(pid)) {
+          g.wolfTeeOrder = g.wolfTeeOrder || [];
+          const wasSelected = g.wolfPlayers.includes(pid);
+          if (wasSelected) {
             g.wolfPlayers = g.wolfPlayers.filter(x => x !== pid);
             g.wolfTeeOrder = g.wolfTeeOrder.filter(x => x !== pid);
+            chip.classList.remove('selected');
           } else if (g.wolfPlayers.length < 5) {
             g.wolfPlayers.push(pid);
-            // Add to tee order if not there
             if (!g.wolfTeeOrder.includes(pid)) {
               g.wolfTeeOrder.push(pid);
             }
+            chip.classList.add('selected');
           }
           // Sync tee order with players
           g.wolfTeeOrder = g.wolfTeeOrder.filter(x => g.wolfPlayers.includes(x));
-          // Save scroll position before re-render
-          const scrollEl = document.querySelector('.wizard-content');
-          const scrollTop = scrollEl ? scrollEl.scrollTop : 0;
-          this.render();
-          // Restore scroll position after re-render
-          setTimeout(() => {
-            const newScrollEl = document.querySelector('.wizard-content');
-            if (newScrollEl) newScrollEl.scrollTop = scrollTop;
-          }, 0);
+          State.scheduleSave();
         };
       });
 
