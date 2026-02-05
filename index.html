@@ -4001,6 +4001,26 @@ const UI = {
         }
         const hasJunk = totalJunkMoney > 0;
 
+        // Wolf per-player summary
+        const wolfPlayerRows = players.map(pid => {
+          const wolfAmt = result.playerNet[pid] || 0;
+          const profitClass = wolfAmt > 0 ? 'points-positive' : wolfAmt < 0 ? 'points-negative' : '';
+          return h('div',{style:'display:flex;justify-content:space-between;padding:4px 0;font-size:12px;'},[
+            h('span',{},UI.playerName(pid)),
+            h('span',{class:profitClass,style:'font-weight:600;'},Utils.fmt(wolfAmt))
+          ]);
+        });
+
+        // Junk per-player summary
+        const junkPlayerRows = players.map(pid => {
+          const junkAmt = junkNet[pid] || 0;
+          const profitClass = junkAmt > 0 ? 'points-positive' : junkAmt < 0 ? 'points-negative' : '';
+          return h('div',{style:'display:flex;justify-content:space-between;padding:4px 0;font-size:12px;'},[
+            h('span',{},UI.playerName(pid)),
+            h('span',{class:profitClass,style:'font-weight:600;'},Utils.fmt(junkAmt))
+          ]);
+        });
+
         // Player results table (Wolf + junk combined)
         const playerRows = players.map(pid => {
           const wolfAmt = result.playerNet[pid] || 0;
@@ -4012,14 +4032,6 @@ const UI = {
             h('span',{class:profitClass,style:'font-weight:600;'},Utils.fmt(totalAmt))
           ]);
         });
-
-        // Transactions display
-        const txnRows = result.transactions.map(t =>
-          h('div',{style:'display:flex;justify-content:space-between;padding:4px 0;font-size:12px;'},[
-            h('span',{},`${UI.playerName(t.from)} → ${UI.playerName(t.to)}`),
-            h('span',{style:'font-weight:600;'},Utils.fmt(t.amount))
-          ])
-        );
 
         return h('div',{class:theme},[
           h('div',{class:'card'},[
@@ -4039,20 +4051,17 @@ const UI = {
                 h('div',{style:'font-weight:600;color:#ca8a04;'},`${result.carryover} pts carrying to next hole`)
               ]) : '',
 
-            // Wolf Transactions
-            txnRows.length > 0 ? h('div',{style:'margin-top:12px;'},[
-              h('div',{style:'font-weight:600;margin-bottom:8px;'},'Wolf Pay Up the Ladder'),
-              ...txnRows
-            ]) : '',
+            // Wolf per-player results
+            h('div',{style:'margin-top:12px;'},[
+              h('div',{style:'font-weight:600;margin-bottom:8px;'},'Wolf'),
+              ...wolfPlayerRows
+            ]),
 
-            // Junk (pay up the ladder)
+            // Junk per-player results
             hasJunk ?
-              h('div',{class:'card',style:'margin-top:12px;'},[
-                h('div',{style:'font-weight:600;margin-bottom:4px;'},'Junk (Pay Up the Ladder)'),
-                ...junkTxns.map(t => h('div',{style:'display:flex;justify-content:space-between;padding:4px 0;font-size:12px;'},[
-                  h('span',{},`${UI.playerName(t.from)} → ${UI.playerName(t.to)}`),
-                  h('span',{style:'font-weight:600;'},Utils.fmt(t.amount))
-                ]))
+              h('div',{style:'margin-top:12px;'},[
+                h('div',{style:'font-weight:600;margin-bottom:8px;'},'Junk'),
+                ...junkPlayerRows
               ]) : '',
 
             // Player results
