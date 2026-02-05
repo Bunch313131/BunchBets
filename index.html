@@ -2862,12 +2862,16 @@ const UI = {
                   const inGame = (g.skinsPlayers || []).includes(p.id);
                   return h('button',{
                     class:`btn small ${inGame?'primary':''}`,
-                    onclick:()=>{
+                    onclick:(e)=>{
                       g.skinsPlayers = g.skinsPlayers || [];
-                      if (inGame) g.skinsPlayers = g.skinsPlayers.filter(x => x !== p.id);
-                      else if (g.skinsPlayers.length < 5) g.skinsPlayers.push(p.id);
+                      if (inGame) {
+                        g.skinsPlayers = g.skinsPlayers.filter(x => x !== p.id);
+                        e.target.classList.remove('primary');
+                      } else if (g.skinsPlayers.length < 5) {
+                        g.skinsPlayers.push(p.id);
+                        e.target.classList.add('primary');
+                      }
                       State.scheduleSave();
-                      State.scheduleRender();
                     }
                   },p.name);
                 })
@@ -2896,18 +2900,19 @@ const UI = {
                   const inGame = (g.wolfPlayers || []).includes(p.id);
                   return h('button',{
                     class:`btn small ${inGame?'primary':''}`,
-                    onclick:()=>{
+                    onclick:(e)=>{
                       g.wolfPlayers = g.wolfPlayers || [];
                       g.wolfTeeOrder = g.wolfTeeOrder || [];
                       if (inGame) {
                         g.wolfPlayers = g.wolfPlayers.filter(x => x !== p.id);
                         g.wolfTeeOrder = g.wolfTeeOrder.filter(x => x !== p.id);
+                        e.target.classList.remove('primary');
                       } else if (g.wolfPlayers.length < 5) {
                         g.wolfPlayers.push(p.id);
                         if (!g.wolfTeeOrder.includes(p.id)) g.wolfTeeOrder.push(p.id);
+                        e.target.classList.add('primary');
                       }
                       State.scheduleSave();
-                      State.scheduleRender();
                     }
                   },p.name);
                 })
@@ -3225,6 +3230,19 @@ const UI = {
         const result = Game.computeWolfResult(game);
         const players = game.wolfPlayers || [];
 
+        // Calculate junk for Wolf
+        const sumWolfJunk = (pids, start, end) => {
+          let tot = 0;
+          pids.forEach(pid => {
+            const arr = game.junkCounts[pid] || [];
+            for (let h = start; h <= end; h++) tot += (arr[h]||0);
+          });
+          return tot;
+        };
+        const wolfFrontJunk = sumWolfJunk(players, 0, 8);
+        const wolfBackJunk = sumWolfJunk(players, 9, 17);
+        const wolfJunkVal = wolfFrontJunk * (game.junkValue.front||0) + wolfBackJunk * (game.junkValue.back||0);
+
         // Build player net $ standings (pay-up-the-ladder)
         const playerAmts = players.map(pid => {
           const name = UI.playerName(pid);
@@ -3234,7 +3252,9 @@ const UI = {
         }).join(' ');
 
         frontLine = playerAmts + (result.carryover > 0 ? ` | Carry:${result.carryover}` : '');
-        backLine = `$${game.wolfPointValue}/pt | Total: ${Utils.fmt(result.totalMoney)}`;
+        const totalWithJunk = result.totalMoney + wolfJunkVal;
+        const junkPart = wolfJunkVal > 0 ? ` | Junk: ${Utils.fmt(wolfJunkVal)}` : '';
+        backLine = `$${game.wolfPointValue}/pt | Total: ${Utils.fmt(totalWithJunk)}${junkPart}`;
       } else if (game.gameType === 'vegas') {
         const result = Game.computeVegasResult(game);
         // Per-player value = points × $/point (no team multiplier)
@@ -3477,11 +3497,9 @@ const UI = {
         // Player standings with net amounts
         const playerRows = players.map(pid => {
           const name = UI.playerName(pid);
-          const pts = result.playerPoints[pid] || 0;
           const amt = result.playerNet[pid] || 0;
-          const ptsStr = pts > 0 ? `+${pts}` : String(pts);
           return h('div',{style:'display:flex;justify-content:space-between;padding:4px 0;'},
-            [h('span',{},name), h('span',{},`${ptsStr} pts = ${Utils.fmt(amt)}`)]
+            [h('span',{},name), h('span',{},Utils.fmt(amt))]
           );
         });
 
@@ -3504,7 +3522,7 @@ const UI = {
             h('div',{class:'note',style:'margin-top:6px;'},`$${pointValue}/pt | Carryover: ${result.carryover}`),
             h('div',{style:'margin-top:12px;'},playerRows),
             junkVal > 0 ? h('div',{class:'muted',style:'margin-top:8px;'},`Junk: ${Utils.fmt(junkVal)}`) : '',
-            h('div',{style:'margin-top:8px;font-weight:700;'},`Total in play: ${Utils.fmt(result.totalMoney)}`)
+            h('div',{style:'margin-top:8px;font-weight:700;'},`Total in play: ${Utils.fmt(result.totalMoney + junkVal)}`)
           ])
         ]);
       }
@@ -3865,16 +3883,11 @@ const UI = {
 
         // Player results table
         const playerRows = players.map(pid => {
-          const pts = result.playerPoints[pid] || 0;
           const amt = result.playerNet[pid] || 0;
-          const ptsStr = pts > 0 ? `+${pts}` : String(pts);
           const profitClass = amt > 0 ? 'points-positive' : amt < 0 ? 'points-negative' : '';
           return h('div',{style:'display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);'},[
             h('span',{},UI.playerName(pid)),
-            h('div',{style:'text-align:right;'},[
-              h('span',{class:'muted'},`${ptsStr} pts `),
-              h('span',{class:profitClass,style:'font-weight:600;'},Utils.fmt(amt))
-            ])
+            h('span',{class:profitClass,style:'font-weight:600;'},Utils.fmt(amt))
           ]);
         });
 
@@ -3941,8 +3954,9 @@ const UI = {
               h('div',{class:'row',style:'justify-content:space-between;align-items:center;'},[
                 h('div',{},[
                   h('div',{class:'muted'},'TOTAL IN PLAY'),
+                  junkVal > 0 ? h('div',{class:'muted',style:'font-size:11px;'},`Wolf: ${Utils.fmt(result.totalMoney)} + Junk: ${Utils.fmt(junkVal)}`) : ''
                 ]),
-                h('div',{style:'font-size:24px;font-weight:700;'},Utils.fmt(result.totalMoney))
+                h('div',{style:'font-size:24px;font-weight:700;'},Utils.fmt(result.totalMoney + junkVal))
               ])
             ])
           ])
