@@ -15,7 +15,10 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 <style>
-:root { --bg:#0b0e13; --card:#0f1420; --txt:#ecf0f6; --muted:#a3a9b6; --border:#1e2633; --acc:#3b82f6; --success:#16a34a; --danger:#dc2626; --warning:#d97706; color-scheme: light dark; }
+:root { --bg:#0b0e13; --card:#0f1420; --txt:#ecf0f6; --muted:#a3a9b6; --border:#1e2633; --acc:#3b82f6; --success:#16a34a; --danger:#dc2626; --warning:#d97706; color-scheme: dark; }
+:root.light-mode { --bg:#f5f5f7; --card:#ffffff; --txt:#1d1d1f; --muted:#6e6e73; --border:#d2d2d7; --acc:#3b82f6; --success:#16a34a; --danger:#dc2626; --warning:#d97706; color-scheme: light; }
+:root.light-mode input[type="text"], :root.light-mode input[type="tel"], :root.light-mode input[type="number"], :root.light-mode select { background:rgba(0,0,0,0.04); }
+:root.light-mode .menu-item:hover { background:rgba(0,0,0,0.05); }
 * { box-sizing:border-box; }
 body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; color:var(--txt); background:var(--bg); }
 header { background:var(--card); border-bottom:1px solid var(--border); padding:10px 12px; position:sticky; top:0; z-index:10; }
@@ -259,6 +262,10 @@ body:has(.wizard-overlay) { overflow:hidden; }
     <button class="menu-item" id="resetBtn">New Round</button>
     <button class="menu-item" id="clearBtn">Clear Scores</button>
     <button class="menu-item danger" id="factoryBtn">Factory Reset</button>
+  </div>
+  <div class="menu-section">
+    <div class="menu-section-title">Appearance</div>
+    <button class="menu-item" id="themeToggle">☀️ Light Mode</button>
   </div>
 </div>
 <div id="liveBanner" class="live-banner" style="display:none;"></div>
@@ -2639,6 +2646,24 @@ const UI = {
     document.getElementById('menuToggle').onclick = () => this.openMenu();
     document.getElementById('menuClose').onclick = () => this.closeMenu();
     document.getElementById('menuOverlay').onclick = () => this.closeMenu();
+
+    // Theme toggle
+    const themeBtn = document.getElementById('themeToggle');
+    const updateThemeBtn = () => {
+      const isLight = document.documentElement.classList.contains('light-mode');
+      themeBtn.textContent = isLight ? '🌙 Dark Mode' : '☀️ Light Mode';
+    };
+    // Load saved theme
+    if (localStorage.getItem('bunchbets-theme') === 'light') {
+      document.documentElement.classList.add('light-mode');
+    }
+    updateThemeBtn();
+    themeBtn.onclick = () => {
+      document.documentElement.classList.toggle('light-mode');
+      const isLight = document.documentElement.classList.contains('light-mode');
+      localStorage.setItem('bunchbets-theme', isLight ? 'light' : 'dark');
+      updateThemeBtn();
+    };
   },
 
   setup() {
@@ -2798,7 +2823,7 @@ const UI = {
       ]);
 
       const strokesEditor = () => {
-        const teamRow = (lbl, ids) => {
+        const playerRow = (ids) => {
           const grid = h('div',{style:'display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));'});
           ids.forEach(pid => {
             grid.appendChild(h('div',{style:'display:flex;flex-direction:column;gap:6px;'},[
@@ -2816,13 +2841,36 @@ const UI = {
               })
             ]));
           });
-          return h('div',{},[h('div',{class:'muted',style:'margin:6px 0 8px;'},lbl),grid]);
+          return grid;
+        };
+        const teamRow = (lbl, ids) => {
+          return h('div',{},[h('div',{class:'muted',style:'margin:6px 0 8px;'},lbl),playerRow(ids)]);
         };
         const body = [];
-        if (g.teamA.length) body.push(teamRow('Team A:',g.teamA));
-        if (g.teamB.length) body.push(teamRow('Team B:',g.teamB));
-        if (!g.teamA.length && !g.teamB.length) body.push(h('div',{class:'note'},'Pick players to edit strokes'));
-        else body.push(h('div',{class:'note'},'Strokes apply on HCP 1…n'));
+        // Wolf and Skins use player lists, not teams
+        if (g.gameType === 'wolf') {
+          const wolfPlayers = g.wolfPlayers || [];
+          if (wolfPlayers.length) {
+            body.push(playerRow(wolfPlayers));
+            body.push(h('div',{class:'note'},'Strokes apply on HCP 1…n'));
+          } else {
+            body.push(h('div',{class:'note'},'Select players above to edit strokes'));
+          }
+        } else if (g.gameType === 'skins') {
+          const skinsPlayers = g.skinsPlayers || [];
+          if (skinsPlayers.length) {
+            body.push(playerRow(skinsPlayers));
+            body.push(h('div',{class:'note'},'Strokes apply on HCP 1…n'));
+          } else {
+            body.push(h('div',{class:'note'},'Select players above to edit strokes'));
+          }
+        } else {
+          // Nassau/Vegas use teams
+          if (g.teamA.length) body.push(teamRow('Team A:',g.teamA));
+          if (g.teamB.length) body.push(teamRow('Team B:',g.teamB));
+          if (!g.teamA.length && !g.teamB.length) body.push(h('div',{class:'note'},'Pick players to edit strokes'));
+          else body.push(h('div',{class:'note'},'Strokes apply on HCP 1…n'));
+        }
         return h('div',{class:'card'},[h('div',{class:'pill'},'Strokes'),h('div',{},body)]);
       };
 
@@ -2960,19 +3008,18 @@ const UI = {
                   const inGame = (g.wolfPlayers || []).includes(p.id);
                   return h('button',{
                     class:`btn small ${inGame?'primary':''}`,
-                    onclick:(e)=>{
+                    onclick:()=>{
                       g.wolfPlayers = g.wolfPlayers || [];
                       g.wolfTeeOrder = g.wolfTeeOrder || [];
                       if (inGame) {
                         g.wolfPlayers = g.wolfPlayers.filter(x => x !== p.id);
                         g.wolfTeeOrder = g.wolfTeeOrder.filter(x => x !== p.id);
-                        e.target.classList.remove('primary');
                       } else if (g.wolfPlayers.length < 5) {
                         g.wolfPlayers.push(p.id);
                         if (!g.wolfTeeOrder.includes(p.id)) g.wolfTeeOrder.push(p.id);
-                        e.target.classList.add('primary');
                       }
                       State.scheduleSave();
+                      State.scheduleRender();
                     }
                   },p.name);
                 })
