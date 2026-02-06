@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Pheasant Invitational | El Macero Country Club</title>
+    <meta name="description" content="The Pheasant Invitational - El Macero Country Club's Premier Member-Guest Golf Tournament. September 17-19, 2026.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Raleway:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav id="navbar" class="navbar">
+        <div class="nav-container">
+            <a href="#hero" class="nav-logo">The Pheasant</a>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            <ul class="nav-menu" id="navMenu">
+                <li><a href="#about" class="nav-link">About</a></li>
+                <li><a href="#schedule" class="nav-link">Schedule</a></li>
+                <li><a href="#format" class="nav-link">Format</a></li>
+                <li><a href="#registration" class="nav-link">Registration</a></li>
+                <li><a href="#champions" class="nav-link">Champions</a></li>
+                <li><a href="#rules" class="nav-link">Rules</a></li>
+                <li><a href="#registration" class="nav-link nav-cta">Register Now</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="hero" class="hero">
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+            <p class="hero-subtitle">El Macero Country Club Presents</p>
+            <h1 class="hero-title">The Pheasant<br>Invitational</h1>
+            <div class="hero-divider"></div>
+            <p class="hero-date">September 17 &ndash; 19, 2026</p>
+            <p class="hero-tagline">A Premier Member-Guest Tournament &middot; Est. 1966</p>
+            <div class="hero-actions">
+                <a href="#registration" class="btn btn-primary">Register Your Team</a>
+                <a href="#format" class="btn btn-outline">Tournament Details</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="section about">
+        <div class="container">
+            <div class="section-header">
+                <h2>Welcome to The Pheasant</h2>
+                <div class="section-divider"></div>
+            </div>
+            <div class="about-grid">
+                <div class="about-card">
+                    <div class="about-icon">&#9971;</div>
+                    <h3>60 Years of Tradition</h3>
+                    <p>Since 1966, The Pheasant Invitational has been El Macero Country Club's premier member-guest event. Three days of championship competition, camaraderie, and celebration.</p>
+                </div>
+                <div class="about-card">
+                    <div class="about-icon">&#127942;</div>
+                    <h3>Championship Competition</h3>
+                    <p>72 two-man teams compete across five 9-hole matches in Four Ball Match Play. Flight winners and runners-up advance to the Championship Horse Race for the ultimate title.</p>
+                </div>
+                <div class="about-card">
+                    <div class="about-icon">&#127860;</div>
+                    <h3>First-Class Experience</h3>
+                    <p>Entry includes all golf, breakfast, lunch, dinner, hosted bar, and access to special events including the Par 3 Contest, Putting Contest, Long Drive, and Horse Races.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Schedule Section -->
+    <section id="schedule" class="section schedule">
+        <div class="container">
+            <div class="section-header">
+                <h2>Schedule of Events</h2>
+                <div class="section-divider"></div>
+                <p class="section-subtitle">Three days of world-class competition and entertainment</p>
+            </div>
+
+            <div class="schedule-tabs">
+                <button class="tab-btn active" data-day="day1">Thursday<span class="tab-date">Sept 17</span></button>
+                <button class="tab-btn" data-day="day2">Friday<span class="tab-date">Sept 18</span></button>
+                <button class="tab-btn" data-day="day3">Saturday<span class="tab-date">Sept 19</span></button>
+            </div>
+
+            <div class="schedule-content">
+                <!-- Day 1 -->
+                <div class="schedule-day active" id="day1">
+                    <h3 class="day-title">Day 1 &mdash; Thursday, September 17th</h3>
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-time">7:00 AM</div>
+                            <div class="timeline-event">
+                                <h4>Registration Opens</h4>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-time">7:00 AM</div>
+                            <div class="timeline-event">
+                                <h4>Breakfast &amp; Bloody Mary Bar</h4>
+                            </div>
+                        </div>
+                        <div class="timeline-item highlight">
+                            <div class="timeline-time">8:30 AM</div>
+                            <div class="timeline-event">
+                                <h4>9-Hole Par 3 Contest</h4>
+                                <p>Optional event &middot; $50 per team</p>
+                            </div>
+                        </div>
+                        <div class="timeline-item match">
+                            <div class="timeline-time">11:45 AM</div>
+                            <div class="timeline-event">
+                                <h4>9-Hole Match 1</h4>
+                                <p>Four Ball Match Play &middot; 85% Handicap</p>
+                            </div>
+                        </div>
+                        <div class="timeline-item highlight">
+                            <div class="timeline-time">3:15 PM</div>
+                            <div class="timeline-event">
+                                <h4>Open Horse Race</h4>
+                                <p>Optional event &middot; $50 per team</p>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-time">3:45 PM</div>
+                            <div class="timeline-event">
+                                <h4>Putting Contest Qualifying &amp; Long Drive Competition</h4>
+                            </div>
+                        </div>
+                        <div class="timeline-item social">
+                            <div class="timeline-time">6:00 PM</div>
+                            <div class="timeline-event">
+                                <h4>Dinner Served</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 2 -->
+                <div class="schedule-day" id="day2">
+                    <h3 class="day-title">Day 2 &mdash; Friday, September 18th</h3>
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-time">7:30 AM</div>
+                            <div class="timeline-event">
+                                <h4>Registration / Breakfast / Bloody Mary Bar</h4>
+                            </div>
+                        </div>
+                        <div class="timeline-item match">
+                            <div class="timeline-time">9:00 AM</div>
+                            <div class="timeline-event">
+                                <h4>9-Hole Match 2</h4>
+                                <p>Four Ball Match Play &middot; 85% Handicap</p>
+                            </div>
+                        </div>
+                        <div class="timeline-item social">
+                            <div class="timeline-time">12:00 PM</div>
+                            <div class="timeline-event">
+                                <h4>Lunch Served</h4>
+                            </div>
+                        </div>
+                        <div class="timeline-item match">
+                            <div class="timeline-time">1:00 PM</div>
+                            <div class="timeline-event">
+                                <h4>9-Hole Match 3</h4>
+                                <p>Four Ball Match Play &middot; 85% Handicap</p>
+                            </div>
+                        </div>
+                        <div class="timeline-item highlight">
+                            <div class="timeline-time">4:30 PM</div>
+                            <div class="timeline-event">
+                                <h4>Putting Contest / Long Drive / Friday Night Party</h4>
+                            </div>
+                        </div>
+                        <div class="timeline-item social">
+                            <div class="timeline-time">6:00 PM</div>
+                            <div class="timeline-event">
+                                <h4>Dinner Served</h4>
+                            </div>
+                        </div>
+                        <div class="timeline-item social">
+                            <div class="timeline-time">9:15 PM</div>
+                            <div class="timeline-event">
+                                <h4>Late-Night Snack</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 3 -->
+                <div class="schedule-day" id="day3">
+                    <h3 class="day-title">Day 3 &mdash; Saturday, September 19th</h3>
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-time">7:00 AM</div>
+                            <div class="timeline-event">
+                                <h4>Breakfast / Bloody Mary Bar</h4>
+                            </div>
+                        </div>
+                        <div class="timeline-item highlight">
+                            <div class="timeline-time">7:30 AM</div>
+                            <div class="timeline-event">
+                                <h4>Putting Contest Semifinals</h4>
+                            </div>
+                        </div>
+                        <div class="timeline-item match">
+                            <div class="timeline-time">8:30 AM</div>
+                            <div class="timeline-event">
+                                <h4>9-Hole Match 4</h4>
+                                <p>Four Ball Match Play &middot; 85% Handicap</p>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-time">11:30 AM</div>
+                            <div class="timeline-event">
+                                <h4>Lunch / Putting Contest Championship</h4>
+                            </div>
+                        </div>
+                        <div class="timeline-item match">
+                            <div class="timeline-time">12:30 PM</div>
+                            <div class="timeline-event">
+                                <h4>9-Hole Match 5</h4>
+                                <p>Four Ball Match Play &middot; 85% Handicap</p>
+                            </div>
+                        </div>
+                        <div class="timeline-item highlight">
+                            <div class="timeline-time">4:00 PM</div>
+                            <div class="timeline-event">
+                                <h4>Championship Horse Race</h4>
+                                <p>Flight Winners &amp; Runners-Up compete for the title</p>
+                            </div>
+                        </div>
+                        <div class="timeline-item social">
+                            <div class="timeline-time">5:30 PM</div>
+                            <div class="timeline-event">
+                                <h4>Cocktails &amp; Heavy Hors D'oeuvres</h4>
+                            </div>
+                        </div>
+                        <div class="timeline-item social">
+                            <div class="timeline-time">6:30 PM</div>
+                            <div class="timeline-event">
+                                <h4>Awards Presentation</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Competition Format Section -->
+    <section id="format" class="section format">
+        <div class="container">
+            <div class="section-header">
+                <h2>Competition Format</h2>
+                <div class="section-divider"></div>
+            </div>
+
+            <!-- Main Competition -->
+            <div class="format-block">
+                <h3>Main Competition</h3>
+                <p>Two-man teams compete in five 9-hole matches in <strong>Four Ball Match Play Format</strong> (85% Handicap).</p>
+
+                <div class="scoring-grid">
+                    <div class="scoring-item">
+                        <span class="scoring-value">2 pts</span>
+                        <span class="scoring-label">Hole Won</span>
+                    </div>
+                    <div class="scoring-item">
+                        <span class="scoring-value">1 pt</span>
+                        <span class="scoring-label">Hole Halved</span>
+                    </div>
+                    <div class="scoring-item">
+                        <span class="scoring-value">2 pts</span>
+                        <span class="scoring-label">Match Win Bonus</span>
+                    </div>
+                    <div class="scoring-item">
+                        <span class="scoring-value">20 pts</span>
+                        <span class="scoring-label">Total Per Match</span>
+                    </div>
+                </div>
+
+                <p>All 9 holes are played in each match. After all five matches, the team with the most points in their flight advances as <strong>Flight Winner</strong>. The 2nd place team advances as <strong>Flight Runner-Up</strong>. Both advance to the Championship Horse Race.</p>
+            </div>
+
+            <!-- Championship Horse Race -->
+            <div class="format-block">
+                <h3>Championship Horse Race</h3>
+                <p>Alternate shot from the White tees, 50% team handicap (rounded down), strokes as they fall on the card. Continuous putting from closest to furthest. Teammates alternate tee shots hole to hole.</p>
+
+                <div class="elimination-bracket">
+                    <div class="bracket-round">
+                        <div class="bracket-label">Hole 6</div>
+                        <div class="bracket-detail">12 Flight Winners play &mdash; 4 highest scores eliminated</div>
+                    </div>
+                    <div class="bracket-round">
+                        <div class="bracket-label">Hole 17</div>
+                        <div class="bracket-detail">12 Flight Runners-Up play &mdash; 8 highest scores eliminated</div>
+                    </div>
+                    <div class="bracket-round">
+                        <div class="bracket-label">Hole 7</div>
+                        <div class="bracket-detail">12 remaining teams combine &mdash; 6 highest scores eliminated</div>
+                    </div>
+                    <div class="bracket-round">
+                        <div class="bracket-label">Hole 8</div>
+                        <div class="bracket-detail">6 teams remain &mdash; 3 highest scores eliminated</div>
+                    </div>
+                    <div class="bracket-round final">
+                        <div class="bracket-label">Hole 9</div>
+                        <div class="bracket-detail">Final 3 teams play for <strong>Win, Place &amp; Show</strong></div>
+                    </div>
+                </div>
+                <p class="format-note">The winning team is crowned <strong>2026 Pheasant Invitational Champions</strong>. Chip-offs break all ties.</p>
+            </div>
+
+            <!-- Optional Competitions -->
+            <div class="format-block">
+                <h3>Optional Competitions</h3>
+
+                <div class="optional-grid">
+                    <div class="optional-card">
+                        <h4>Par 3 Contest</h4>
+                        <p class="optional-meta">Thursday, 8:30 AM &middot; $50/team</p>
+                        <p>9-hole par 3 course competition to kick off the tournament.</p>
+                    </div>
+
+                    <div class="optional-card">
+                        <h4>Open Horse Race</h4>
+                        <p class="optional-meta">Thursday, 3:15 PM &middot; $50/team</p>
+                        <p>Alternate shot elimination format. Field split into 4 groups across different holes. Top 2 from each group advance to finals on Holes 6&ndash;9. Elimination each hole down to a final 3 for Win, Place &amp; Show.</p>
+                    </div>
+
+                    <div class="optional-card">
+                        <h4>Putting Contest</h4>
+                        <p class="optional-meta">Thursday &ndash; Saturday &middot; First attempt free, $5 additional</p>
+                        <p>9-hole qualifying (most aces). Top 4 advance to Saturday semifinals. Top 2 from semis play the championship round. Enter as many times as you like. Top 4 finishers are in the money.</p>
+                    </div>
+
+                    <div class="optional-card">
+                        <h4>Team Long Drive</h4>
+                        <p class="optional-meta">Thursday &ndash; Friday &middot; First attempt free, $10/team additional</p>
+                        <p>Measured by TrackMan / GC Quad. Combined fairway distance plus age of both players determines total. Enter multiple times. Top 5 finishers are in the money.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Registration Section -->
+    <section id="registration" class="section registration">
+        <div class="container">
+            <div class="section-header">
+                <h2>Registration</h2>
+                <div class="section-divider"></div>
+                <p class="section-subtitle">72 teams &middot; Limited field &middot; Don't miss your spot</p>
+            </div>
+
+            <!-- Key Dates -->
+            <div class="reg-dates">
+                <div class="reg-date-card">
+                    <div class="reg-date-icon">&#128197;</div>
+                    <h4>Hole Sponsorships Open</h4>
+                    <p class="reg-date-value">June 5, 2026 @ 10:00 AM PDT</p>
+                    <p>18 available &middot; $750 per hole &middot; Guarantees tournament entry</p>
+                </div>
+                <div class="reg-date-card">
+                    <div class="reg-date-icon">&#127775;</div>
+                    <h4>Competition Registration Opens</h4>
+                    <p class="reg-date-value">June 12, 2026 @ 10:00 AM PDT</p>
+                    <p>All membership categories eligible</p>
+                </div>
+                <div class="reg-date-card">
+                    <div class="reg-date-icon">&#128274;</div>
+                    <h4>Priority Access Closes</h4>
+                    <p class="reg-date-value">June 14, 2026 @ 11:59 PM PDT</p>
+                    <p>Proprietary &amp; Emeritus members receive priority during this window</p>
+                </div>
+            </div>
+
+            <!-- Registration Process -->
+            <div class="reg-process">
+                <h3>Registration Process</h3>
+                <div class="process-steps">
+                    <div class="process-step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h4>Hole Sponsorships (June 5)</h4>
+                            <p>18 hole sponsorships available at $750 each (in addition to entry fees). Sponsors receive guaranteed entry into the tournament. First come, first served. Available for one week only.</p>
+                        </div>
+                    </div>
+                    <div class="process-step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h4>Priority Access (June 12&ndash;14)</h4>
+                            <p>Proprietary and Emeritus members are accepted immediately upon submission. All other categories are logged and date-stamped.</p>
+                        </div>
+                    </div>
+                    <div class="process-step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h4>Open Registration (June 15+)</h4>
+                            <p>Remaining registrations from the priority window are accepted by submission time. All new registrations accepted strictly by submission order.</p>
+                        </div>
+                    </div>
+                    <div class="process-step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <h4>Waitlist</h4>
+                            <p>Once we reach 72 teams, a waitlist is maintained. Cancellations are refunded only if the spot can be filled.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pricing -->
+            <div class="pricing">
+                <h3>Entry Fees</h3>
+                <p class="pricing-subtitle">Per team &middot; Covers all golf, meals, and hosted bar</p>
+
+                <div class="pricing-grid">
+                    <div class="pricing-card">
+                        <h4>Men's Club Members</h4>
+                        <div class="price">$950</div>
+                        <p class="price-detail">+ $150 Mandatory Buy-in</p>
+                        <p class="price-total">$1,100 total</p>
+                    </div>
+                    <div class="pricing-card">
+                        <h4>Non-Men's Club Members</h4>
+                        <div class="price">$1,100</div>
+                        <p class="price-detail">+ $150 Mandatory Buy-in</p>
+                        <p class="price-total">$1,250 total</p>
+                    </div>
+                    <div class="pricing-card">
+                        <h4>Vertical Members</h4>
+                        <div class="price">$1,350</div>
+                        <p class="price-detail">+ $150 Mandatory Buy-in</p>
+                        <p class="price-total">$1,500 total</p>
+                    </div>
+                </div>
+
+                <div class="optional-pricing">
+                    <h4>Optional Events</h4>
+                    <div class="optional-pricing-items">
+                        <div class="optional-price-item">
+                            <span>Par 3 Contest (Thursday Morning)</span>
+                            <span class="optional-price">$50/team</span>
+                        </div>
+                        <div class="optional-price-item">
+                            <span>Open Horse Race (Thursday Afternoon)</span>
+                            <span class="optional-price">$50/team</span>
+                        </div>
+                        <div class="optional-price-item">
+                            <span>Hole Sponsorship (Guarantees Entry)</span>
+                            <span class="optional-price">$750</span>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="deposit-notice">A non-refundable $250 deposit (credited towards entry fee) is required upon registration acceptance.</p>
+            </div>
+
+            <!-- Registration Form -->
+            <div class="reg-form-container" id="regFormContainer">
+                <h3>Registration Form</h3>
+                <p class="form-status" id="formStatus">Registration opens June 12, 2026 at 10:00 AM PDT</p>
+
+                <form id="registrationForm" class="reg-form" style="display:none;">
+                    <fieldset>
+                        <legend>Member Information</legend>
+                        <div class="form-group">
+                            <label for="memberEmail">Email *</label>
+                            <input type="email" id="memberEmail" name="memberEmail" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="memberName">Member Name *</label>
+                            <input type="text" id="memberName" name="memberName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="membershipLevel">Membership Level *</label>
+                            <select id="membershipLevel" name="membershipLevel" required>
+                                <option value="">Select your membership level</option>
+                                <option value="proprietary_emeritus">Proprietary or Emeritus</option>
+                                <option value="single_golfer">Single Golfer</option>
+                                <option value="young_professional">Young Professional</option>
+                                <option value="vertical">Vertical</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="memberGhin">Member GHIN # *</label>
+                            <input type="text" id="memberGhin" name="memberGhin" required placeholder="All players must have an established handicap">
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Guest Information</legend>
+                        <div class="form-group">
+                            <label for="guestName">Guest Name *</label>
+                            <input type="text" id="guestName" name="guestName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="guestGhin">Guest GHIN # *</label>
+                            <input type="text" id="guestGhin" name="guestGhin" required placeholder="All players must have an established handicap">
+                        </div>
+                        <div class="form-group">
+                            <label for="guestEmail">Guest Email</label>
+                            <input type="email" id="guestEmail" name="guestEmail">
+                        </div>
+                        <div class="form-group">
+                            <label for="guestClub">Guest Club Affiliation</label>
+                            <input type="text" id="guestClub" name="guestClub">
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Optional Events</legend>
+                        <div class="form-group checkbox-group">
+                            <label>
+                                <input type="checkbox" name="par3Contest" value="yes">
+                                Thursday Par 3 Contest ($50/team)
+                            </label>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label>
+                                <input type="checkbox" name="openHorseRace" value="yes">
+                                Thursday Open Horse Race ($50/team)
+                            </label>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Saturday Awards Dinner</legend>
+                        <div class="form-group">
+                            <label for="partySize">Cocktails &amp; Hors D'oeuvres &mdash; Additional Guests</label>
+                            <select id="partySize" name="partySize" required>
+                                <option value="0">0 additional guests</option>
+                                <option value="1">1 additional guest</option>
+                                <option value="2">2 additional guests</option>
+                                <option value="3">3 additional guests</option>
+                                <option value="4">4 additional guests</option>
+                            </select>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Acknowledgement</legend>
+                        <div class="form-group checkbox-group">
+                            <label>
+                                <input type="checkbox" name="depositAck" required>
+                                I understand that by registering today I will be billed a non-refundable $250 deposit (credited towards entry fee) if my registration is accepted. *
+                            </label>
+                        </div>
+                    </fieldset>
+
+                    <button type="submit" class="btn btn-primary btn-submit">Submit Registration</button>
+                </form>
+
+                <div id="formSuccess" class="form-success" style="display:none;">
+                    <div class="success-icon">&#10003;</div>
+                    <h4>Registration Submitted!</h4>
+                    <p>Your registration has been logged and date-stamped. You will receive a confirmation email. Registration does not guarantee a spot &mdash; accepted registrations will follow the process outlined above.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Past Champions Section -->
+    <section id="champions" class="section champions">
+        <div class="container">
+            <div class="section-header">
+                <h2>Past Champions</h2>
+                <div class="section-divider"></div>
+                <p class="section-subtitle">Six decades of Pheasant Invitational history</p>
+            </div>
+
+            <div class="champions-list">
+                <div class="champion-row defending">
+                    <span class="champion-year">2025</span>
+                    <span class="champion-names">Brad Strong &amp; Ryan Strong</span>
+                    <span class="champion-badge">Defending Champions</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2024</span>
+                    <span class="champion-names">Brad Strong &amp; Ryan Strong</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2023</span>
+                    <span class="champion-names">Lyn Christopulos &amp; Ted Messner</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2022</span>
+                    <span class="champion-names">Harrison Roth &amp; Sergio Pelayo</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2021</span>
+                    <span class="champion-names">Harrison Roth &amp; Sergio Pelayo</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2020</span>
+                    <span class="champion-names">Luis Bloise &amp; David Abrahamian</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2019</span>
+                    <span class="champion-names">Ron Peters &amp; Joe Silvestri **</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2018</span>
+                    <span class="champion-names">Taylor Wolfe &amp; Jeff Woodard</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2017</span>
+                    <span class="champion-names">Tom Walcott &amp; Kevin Partington</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2016</span>
+                    <span class="champion-names">Bob Muttera &amp; Orin Bennett</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2015</span>
+                    <span class="champion-names">Andy Worley &amp; Gordon Smith</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2014</span>
+                    <span class="champion-names">Mike Newell &amp; Brad Lagomarsino</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2013</span>
+                    <span class="champion-names">Brandon Kavrell &amp; Steve Backman</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2012</span>
+                    <span class="champion-names">Gary Magana &amp; Rich Gregson</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2011</span>
+                    <span class="champion-names">Rich White &amp; Jim White</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2010</span>
+                    <span class="champion-names">Craig Senders &amp; Brady Myers</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2009</span>
+                    <span class="champion-names">Justin English &amp; Larry Bass</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2008</span>
+                    <span class="champion-names">Ron North &amp; Mark North</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2007</span>
+                    <span class="champion-names">Tim Lien &amp; Tom Corlett</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2006</span>
+                    <span class="champion-names">Ken Wegner &amp; Gary Tinseth</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2005</span>
+                    <span class="champion-names">Jeff Novelli &amp; Andy Olsfuka</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2004</span>
+                    <span class="champion-names">Dyke Mundy &amp; Paul Dahlberg</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2003</span>
+                    <span class="champion-names">Jeff Novelli &amp; Andy Olsfuka</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2002</span>
+                    <span class="champion-names">Kevin Partington &amp; Kris Reilly</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2001</span>
+                    <span class="champion-names">Dave Crodis &amp; Dave Oranan</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">2000</span>
+                    <span class="champion-names">Jim Mart &amp; Rob Van Tuyle</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1999</span>
+                    <span class="champion-names">Roger Kluth &amp; Dick Rexin</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1998</span>
+                    <span class="champion-names">Dick Foulk &amp; Jerry Holley</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1997</span>
+                    <span class="champion-names">Dave Crodis &amp; Dave Oranan</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1996</span>
+                    <span class="champion-names">Craig Senders &amp; Brady Meyers</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1995</span>
+                    <span class="champion-names">Ritz Naygrow &amp; Vic Martinelli</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1994</span>
+                    <span class="champion-names">Bill Barry &amp; Steve Silman</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1993</span>
+                    <span class="champion-names">Bagher Sheikholislam &amp; T. Sazano</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1986</span>
+                    <span class="champion-names">Paul Cress &amp; Bob Blattner</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1985</span>
+                    <span class="champion-names">Jud English Jr &amp; Jud English Sr</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1980</span>
+                    <span class="champion-names">Dave Domingo &amp; Tom Lane</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1979</span>
+                    <span class="champion-names">Bill Dougherty &amp; Bob Smith</span>
+                </div>
+                <div class="champion-row co-champ">
+                    <span class="champion-year">1978*</span>
+                    <span class="champion-names">Lou Monfort &amp; Dr. W. Dugdale</span>
+                </div>
+                <div class="champion-row co-champ">
+                    <span class="champion-year">1978*</span>
+                    <span class="champion-names">Dick Holloway &amp; John Marti</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1977</span>
+                    <span class="champion-names">Jud English Jr &amp; Jud English Sr</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1976</span>
+                    <span class="champion-names">Phil Marsky &amp; Carl Best</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1975</span>
+                    <span class="champion-names">Ed Schell &amp; Jim Clifton</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1974</span>
+                    <span class="champion-names">Jack Fuller &amp; Ken Ratto</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1973</span>
+                    <span class="champion-names">Mike Domich &amp; Ross Relles</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1972</span>
+                    <span class="champion-names">Larry Maes &amp; Henry Cornelous</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1971</span>
+                    <span class="champion-names">Ed Blakemore &amp; Jack Fuller</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1970</span>
+                    <span class="champion-names">George Valenti &amp; George Curry</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1969</span>
+                    <span class="champion-names">Slim Barovetto &amp; Tom Corbett</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1968</span>
+                    <span class="champion-names">Jerry Sham &amp; Art Hendricks</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1967</span>
+                    <span class="champion-names">Jack Rich &amp; Leo Manning</span>
+                </div>
+                <div class="champion-row">
+                    <span class="champion-year">1966</span>
+                    <span class="champion-names">Al Bender &amp; Tom Sawyer</span>
+                </div>
+            </div>
+
+            <p class="champions-footnote">* Co-Champions &nbsp;&nbsp; ** Under Dispute</p>
+        </div>
+    </section>
+
+    <!-- Rules Section -->
+    <section id="rules" class="section rules">
+        <div class="container">
+            <div class="section-header">
+                <h2>Rules &amp; Handicaps</h2>
+                <div class="section-divider"></div>
+            </div>
+
+            <div class="rules-grid">
+                <div class="rule-card">
+                    <h4>Governing Rules</h4>
+                    <p>Competition decisions follow NCGA rules and guidance.</p>
+                </div>
+                <div class="rule-card">
+                    <h4>Handicap Requirements</h4>
+                    <p>All competitors must have established handicaps using GHIN or equivalent. Handicaps are based on each competitor's <strong>low handicap for the prior 6 months</strong> at <strong>90%</strong> per NCGA guidance.</p>
+                </div>
+                <div class="rule-card">
+                    <h4>Match Play Handicap</h4>
+                    <p>Main competition matches use <strong>85% handicap</strong>. The Championship Horse Race uses <strong>50% of team handicap</strong> (rounded down).</p>
+                </div>
+                <div class="rule-card">
+                    <h4>Maximum Differential</h4>
+                    <p>Maximum handicap differential for a team is <strong>10</strong>. Teams may have a greater differential, but the high handicap player will be capped.</p>
+                </div>
+                <div class="rule-card">
+                    <h4>Committee Authority</h4>
+                    <p>The Pheasant Committee reserves the right to adjust any handicap it deems fitting to ensure competitive integrity, both before and during the tournament.</p>
+                </div>
+                <div class="rule-card">
+                    <h4>Substitutions</h4>
+                    <p>Substitutions are <strong>not allowed</strong> once the competition has begun.</p>
+                </div>
+                <div class="rule-card">
+                    <h4>Withdrawal</h4>
+                    <p>If a team is forced to withdraw during the event, all of their prior and future matches will be scored <strong>0&ndash;20</strong>.</p>
+                </div>
+                <div class="rule-card">
+                    <h4>Tiebreakers</h4>
+                    <p>Flight winner tiebreaker: head to head, scorecard playoff, chip-off. Horse race ties broken by chip-off.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <h3>The Pheasant Invitational</h3>
+                    <p>El Macero Country Club</p>
+                    <p>Est. 1966</p>
+                </div>
+                <div class="footer-links">
+                    <a href="#about">About</a>
+                    <a href="#schedule">Schedule</a>
+                    <a href="#format">Format</a>
+                    <a href="#registration">Registration</a>
+                    <a href="#champions">Champions</a>
+                    <a href="#rules">Rules</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 The Pheasant Invitational. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
