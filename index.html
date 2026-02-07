@@ -865,11 +865,13 @@ const Game = {
           }
           if (!ok) return;
           const k = Math.floor(Math.abs(cum) / 2);
-          if (k > line.pressesTriggered && !pressed) {
-            const next = h + 1;
-            if (!lines.some(l => l.start === next)) {
-              lines.push({start:next, end, stake, pressedBy:cum<0?'A':'B', pressesTriggered:0});
-              pressed = true;
+          if (k > line.pressesTriggered) {
+            if (!pressed) {
+              const next = h + 1;
+              if (!lines.some(l => l.start === next)) {
+                lines.push({start:next, end, stake, pressedBy:cum<0?'A':'B', pressesTriggered:0});
+                pressed = true;
+              }
             }
             line.pressesTriggered = k;
           }
