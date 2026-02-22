@@ -251,7 +251,14 @@ body:has(.wizard-overlay) { overflow:hidden; }
 .hole-player-info { display:flex; flex-direction:column; gap:2px; flex:1; min-width:0; }
 .hole-player-name { font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .hole-player-hcp { font-size:11px; color:var(--muted); }
-.hole-stroke-dots { color:var(--danger); font-size:10px; letter-spacing:1px; }
+.hole-stroke-dots { display:flex; gap:3px; align-items:center; }
+.hole-stroke-dots .dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
+.hole-stroke-dots .dot.g1 { background-color:#16a34a; }
+.hole-stroke-dots .dot.g2 { background-color:#dc2626; }
+.hole-stroke-dots .dot.g3 { background-color:#d97706; }
+.hole-stroke-dots .dot.g4 { background-color:#6366f1; }
+.hole-stroke-dots .dot.g5 { background-color:#14b8a6; }
+.hole-stroke-dots .dot.g6 { background-color:#db2777; }
 .hole-score-controls { display:flex; align-items:center; gap:8px; }
 .hole-score-adj { width:40px; height:40px; border-radius:50%; border:1px solid var(--border); background:var(--card); color:var(--txt); font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s; -webkit-tap-highlight-color:transparent; }
 .hole-score-adj:active { transform:scale(0.9); background:var(--acc); color:#fff; border-color:var(--acc); }
@@ -3676,7 +3683,7 @@ const UI = {
     const playerRows = allPlayers.map(p => {
       const gross = g.gross[p.id] ? g.gross[p.id][hole] : null;
 
-      // Stroke dots for this hole across all games
+      // Stroke dots for this hole across all games (color-coded per game)
       const strokeDots = [];
       State.data.games.forEach((gm, gi) => {
         const inA = (gm.teamA||[]).includes(p.id);
@@ -3686,7 +3693,7 @@ const UI = {
         const inNP = (gm.ninePointPlayers||[]).includes(p.id);
         if (!inA && !inB && !inSkins && !inWolf && !inNP) return;
         const s = Game.strokes(gm, p.id, hole);
-        if (s > 0) strokeDots.push('\u25CF');
+        if (s > 0) strokeDots.push(h('span',{class:`dot g${gi+1}`}));
       });
 
       const adjustScore = (delta) => {
@@ -3707,7 +3714,7 @@ const UI = {
           h('div',{class:'hole-player-name'},p.name),
           h('div',{style:'display:flex;gap:6px;align-items:center;'},[
             h('span',{class:'hole-player-hcp'},`HCP ${g.strokesCount[p.id]||0}`),
-            strokeDots.length ? h('span',{class:'hole-stroke-dots'},strokeDots.join(' ')) : null
+            strokeDots.length ? h('span',{class:'hole-stroke-dots'},strokeDots) : null
           ].filter(Boolean))
         ]),
         h('div',{class:'hole-score-controls'},[
