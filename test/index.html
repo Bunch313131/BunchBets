@@ -3845,10 +3845,11 @@ const UI = {
       h('div',{style:'width:32px;'})
     ];
     if (g.withJunk) {
-      colHeaderControls.push(h('div',{class:'hole-junk-inline'},[
-        h('div',{style:'width:22px;'}),
-        h('span',{class:'hole-col-hdr junk',style:'width:18px;'},'Junk'),
-        h('div',{style:'width:22px;'})
+      colHeaderControls.push(h('div',{class:'hole-junk-inline',style:'position:relative;'},[
+        h('div',{style:'width:22px;'},'\u00A0'),
+        h('div',{style:'width:18px;'},'\u00A0'),
+        h('div',{style:'width:22px;'},'\u00A0'),
+        h('span',{class:'hole-col-hdr junk',style:'position:absolute;left:0;right:0;text-align:center;'},'Junk')
       ]));
     }
     const colHeader = h('div',{class:'hole-player-row',style:'padding:4px 12px 3px;'},[
