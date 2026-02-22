@@ -23,10 +23,11 @@
 :root[data-theme="augusta"] { --bg:#002b10; --card:#003d16; --txt:#f5f0e1; --muted:#a8c4a0; --border:#1a5c2e; --acc:#c8a951; --success:#6fd08c; --danger:#e74c4c; --warning:#daa520; --gold:#c8a951; --radius:6px; --font-display:Georgia,'Times New Roman',serif; --header-bg:linear-gradient(180deg,#003d16,#002b10); color-scheme: dark; }
 :root[data-theme="augusta"].light-mode { --bg:#f5f0e1; --card:#fffef8; --txt:#1a2e1d; --muted:#5a7a62; --border:#c5d4b8; --acc:#8b6f2e; --success:#16a34a; --danger:#dc2626; --warning:#b8860b; --gold:#8b6f2e; --header-bg:linear-gradient(180deg,#2d6a3f,#1a5c2e); color-scheme: light; }
 /* Augusta structural overrides */
-[data-theme="augusta"] h1, [data-theme="augusta"] h2, [data-theme="augusta"] h3 { font-family:Georgia,'Times New Roman',serif; letter-spacing:0.5px; }
+[data-theme="augusta"] main h2, [data-theme="augusta"] main h3, [data-theme="augusta"] .card h2, [data-theme="augusta"] .card h3 { font-family:Georgia,'Times New Roman',serif; letter-spacing:0.5px; }
 [data-theme="augusta"] .card { border-radius:var(--radius); box-shadow:0 1px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05); border:1px solid var(--border); }
 [data-theme="augusta"] header { background:var(--header-bg); border-bottom:2px solid var(--gold); color:#f5f0e1; }
-[data-theme="augusta"] .header-brand h1 { color:#f5f0e1; }
+[data-theme="augusta"] .header-info .header-date { color:#f5f0e1; }
+[data-theme="augusta"] .header-info .header-weather { color:#a8c4a0; }
 [data-theme="augusta"] .hamburger { color:#f5f0e1; }
 [data-theme="augusta"] .btn { border-radius:4px; text-transform:uppercase; letter-spacing:1px; font-size:12px; }
 [data-theme="augusta"] .btn.primary { background:var(--gold); color:#002b10; border-color:var(--gold); }
@@ -193,7 +194,9 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 /* Hamburger Menu Styles */
 .header-brand { display:flex; align-items:center; gap:10px; }
 .header-brand img { width:36px; height:36px; border-radius:8px; }
-.header-brand h1 { font-size:18px; margin:0; }
+.header-info { display:flex; flex-direction:column; gap:1px; }
+.header-date { font-size:14px; font-weight:600; letter-spacing:0.3px; }
+.header-weather { font-size:11px; color:var(--muted); font-weight:500; }
 .hamburger { background:none; border:none; color:var(--txt); font-size:28px; cursor:pointer; padding:4px 8px; line-height:1; }
 .hamburger:hover { color:var(--acc); }
 .menu-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100; opacity:0; visibility:hidden; transition:opacity 0.3s, visibility 0.3s; }
@@ -396,7 +399,10 @@ td:nth-child(10), th:nth-child(10) { border-left:3px double var(--muted); }
   <div class="row" style="align-items:center; justify-content:space-between;">
     <div class="header-brand">
       <img src="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/BunchBets180.png" alt="Bunch Bets">
-      <h1>Bunch Bets</h1>
+      <div class="header-info">
+        <div class="header-date" id="headerDate"></div>
+        <div class="header-weather" id="headerWeather"></div>
+      </div>
     </div>
     <button class="hamburger" id="menuToggle" aria-label="Menu">&#9776;</button>
   </div>
@@ -7237,6 +7243,39 @@ let joiningViaUrl = false;
 
 UI.render();
 UI.initMenu();
+
+// Header: date + weather
+(function() {
+  const dateEl = document.getElementById('headerDate');
+  const weatherEl = document.getElementById('headerWeather');
+  if (dateEl) {
+    const now = new Date();
+    const opts = { weekday: 'long', month: 'long', day: 'numeric' };
+    dateEl.textContent = now.toLocaleDateString('en-US', opts);
+  }
+  if (weatherEl) {
+    weatherEl.textContent = 'Loading weather...';
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude: lat, longitude: lon } = pos.coords;
+        fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`)
+          .then(r => r.json())
+          .then(data => {
+            const c = data.current;
+            const temp = Math.round(c.temperature_2m);
+            const wind = Math.round(c.wind_speed_10m);
+            const codes = {0:'Clear',1:'Mostly Clear',2:'Partly Cloudy',3:'Overcast',45:'Foggy',48:'Foggy',51:'Light Drizzle',53:'Drizzle',55:'Heavy Drizzle',61:'Light Rain',63:'Rain',65:'Heavy Rain',71:'Light Snow',73:'Snow',75:'Heavy Snow',80:'Light Showers',81:'Showers',82:'Heavy Showers',95:'Thunderstorm',96:'Thunderstorm',99:'Thunderstorm'};
+            const desc = codes[c.weather_code] || 'Clear';
+            weatherEl.textContent = `${temp}°F  ${desc}  Wind ${wind}mph`;
+          })
+          .catch(() => { weatherEl.textContent = ''; });
+      },
+      () => { weatherEl.textContent = ''; },
+      { timeout: 5000 }
+    );
+  }
+})();
+
 
 // Intelligent launch detection
 (function() {
