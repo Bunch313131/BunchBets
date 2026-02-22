@@ -3835,19 +3835,22 @@ const UI = {
       ]);
     }).filter(Boolean);
 
-    // Column headers — mirrors the exact layout of hole-score-controls so labels align over value boxes
-    const colHeader = h('div',{class:'hole-col-headers'},[
-      h('div',{style:'display:flex;align-items:center;gap:4px;'},[
-        h('div',{style:'width:32px;'}), // spacer for minus btn
-        h('div',{class:'hole-col-hdr score',style:'width:40px;'},'Score'),
-        h('div',{style:'width:32px;'})  // spacer for plus btn
-      ]),
-      g.withJunk ? h('div',{style:'display:flex;align-items:center;gap:3px;border-left:1px solid var(--border);padding-left:6px;margin-left:2px;'},[
-        h('div',{style:'width:22px;'}), // spacer for minus btn
+    // Column headers — wrapped in same flex+gap:4px as hole-score-controls to match alignment
+    const colHeaderInner = [
+      h('div',{style:'width:32px;'}),
+      h('div',{class:'hole-col-hdr score',style:'width:40px;'},'Score'),
+      h('div',{style:'width:32px;'})
+    ];
+    if (g.withJunk) {
+      colHeaderInner.push(h('div',{style:'display:flex;align-items:center;gap:3px;border-left:1px solid var(--border);padding-left:6px;margin-left:2px;'},[
+        h('div',{style:'width:22px;'}),
         h('div',{class:'hole-col-hdr junk',style:'width:18px;'},'Junk'),
-        h('div',{style:'width:22px;'})  // spacer for plus btn
-      ]) : null
-    ].filter(Boolean));
+        h('div',{style:'width:22px;'})
+      ]));
+    }
+    const colHeader = h('div',{class:'hole-col-headers'},[
+      h('div',{style:'display:flex;align-items:center;gap:4px;'},colHeaderInner)
+    ]);
 
     // Clear hole button
     const clearHole = () => {
