@@ -3294,14 +3294,18 @@ const UI = {
     requestAnimationFrame(() => {
       if (UI._drumHandlers) {
         const CELL = 52; // px per number cell
-        UI._drumHandlers.forEach(({ drumId, currentScore, setScore }) => {
+        const DRUM_W = 160; // drum visible width
+        const haptic = () => { try { navigator.vibrate(10); } catch(e){} };
+
+        UI._drumHandlers.forEach(({ drumId, currentScore, setScore, centerIdx }) => {
           const el = document.getElementById(drumId);
           if (!el) return;
           const touchEl = el.querySelector('.score-drum-touch');
           const track = el.querySelector('.score-drum-track');
           if (!touchEl || !track) return;
-          let startX = 0, dragging = false, dx = 0, locked = false;
-          const baseOffset = 2; // resting offset tweak
+          let startX = 0, dragging = false, dx = 0;
+          // Base offset: centers the currentScore cell in the drum window
+          const baseOffset = (DRUM_W / 2) - (centerIdx * CELL) - (CELL / 2);
 
           const updateTrack = (offset) => {
             track.style.transition = 'none';
@@ -3311,38 +3315,37 @@ const UI = {
             track.style.transition = 'transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94)';
             track.style.transform = `translateX(${offset}px)`;
           };
+          const commit = (newScore) => {
+            haptic();
+            setScore(newScore);
+          };
 
           // Touch events
           touchEl.ontouchstart = (e) => {
             startX = e.touches[0].clientX;
-            dragging = true; locked = false; dx = 0;
+            dragging = true; dx = 0;
             track.style.transition = 'none';
           };
           touchEl.ontouchmove = (e) => {
             if (!dragging) return;
             dx = e.touches[0].clientX - startX;
-            // Lock to horizontal after small movement
-            if (!locked && Math.abs(dx) > 5) {
-              const dy = e.touches[0].clientY - (e.touches[0]._startY || e.touches[0].clientY);
-              locked = true;
-            }
-            // Clamp drag so you can't scroll past valid scores
+            // Clamp to one cell in each valid direction
             const maxDrag = currentScore > MIN_SCORE ? CELL : 0;
             const minDrag = currentScore < MAX_SCORE ? -CELL : 0;
             const clamped = Math.max(minDrag, Math.min(maxDrag, dx));
             updateTrack(baseOffset + clamped);
             if (Math.abs(dx) > 5) e.preventDefault();
           };
-          touchEl.ontouchend = (e) => {
+          touchEl.ontouchend = () => {
             if (!dragging) return;
             dragging = false;
             const threshold = CELL * 0.3;
             if (dx < -threshold && currentScore < MAX_SCORE) {
               snapTrack(baseOffset - CELL);
-              setTimeout(() => setScore(currentScore + 1), 200);
+              setTimeout(() => commit(currentScore + 1), 180);
             } else if (dx > threshold && currentScore > MIN_SCORE) {
               snapTrack(baseOffset + CELL);
-              setTimeout(() => setScore(currentScore - 1), 200);
+              setTimeout(() => commit(currentScore - 1), 180);
             } else {
               snapTrack(baseOffset);
             }
@@ -3355,7 +3358,7 @@ const UI = {
             track.style.transition = 'none';
             e.preventDefault();
           };
-          const onMouseMove = (e) => {
+          touchEl.onmousemove = (e) => {
             if (!dragging) return;
             dx = e.clientX - startX;
             const maxDrag = currentScore > MIN_SCORE ? CELL : 0;
@@ -3363,22 +3366,20 @@ const UI = {
             const clamped = Math.max(minDrag, Math.min(maxDrag, dx));
             updateTrack(baseOffset + clamped);
           };
-          const onMouseUp = (e) => {
+          touchEl.onmouseup = () => {
             if (!dragging) return;
             dragging = false;
             const threshold = CELL * 0.3;
             if (dx < -threshold && currentScore < MAX_SCORE) {
               snapTrack(baseOffset - CELL);
-              setTimeout(() => setScore(currentScore + 1), 200);
+              setTimeout(() => commit(currentScore + 1), 180);
             } else if (dx > threshold && currentScore > MIN_SCORE) {
               snapTrack(baseOffset + CELL);
-              setTimeout(() => setScore(currentScore - 1), 200);
+              setTimeout(() => commit(currentScore - 1), 180);
             } else {
               snapTrack(baseOffset);
             }
           };
-          touchEl.onmousemove = onMouseMove;
-          touchEl.onmouseup = onMouseUp;
           touchEl.onmouseleave = () => { if (dragging) { dragging = false; snapTrack(baseOffset); } };
         });
         UI._drumHandlers = [];
@@ -4169,15 +4170,11 @@ const UI = {
         ]);
       }
 
-      // Drum picker — shows 3 numbers, center is selected
+      // Drum picker — 5 numbers loaded (2 off-screen), 3 visible, center is selected
       const currentScore = gross != null ? gross : par;
-      const drumNums = [currentScore - 1, currentScore, currentScore + 1]
-        .filter(n => n >= MIN_SCORE && n <= MAX_SCORE);
-      // Pad to always have 3 visible
-      while (drumNums.length < 3) {
-        if (drumNums[0] > MIN_SCORE) drumNums.unshift(drumNums[0] - 1);
-        else if (drumNums[drumNums.length-1] < MAX_SCORE) drumNums.push(drumNums[drumNums.length-1] + 1);
-        else break;
+      const drumNums = [];
+      for (let n = currentScore - 2; n <= currentScore + 2; n++) {
+        if (n >= MIN_SCORE && n <= MAX_SCORE) drumNums.push(n);
       }
       const centerIdx = drumNums.indexOf(currentScore);
       const centerDiff = currentScore - par;
@@ -4187,7 +4184,11 @@ const UI = {
       else if (centerDiff === 1) frameClass += ' bogey';
       else if (centerDiff >= 2) frameClass += ' double-bogey';
 
-      const drumTrack = h('div',{class:'score-drum-track',style:`transform:translateX(${(1 - centerIdx) * 52 + 2}px);`},
+      // Position track so currentScore is centered in the visible window
+      const CELL = 52;
+      const drumCenter = 80; // half of 160px drum width
+      const trackOffset = drumCenter - (centerIdx * CELL) - (CELL / 2);
+      const drumTrack = h('div',{class:'score-drum-track',style:`transform:translateX(${trackOffset}px);`},
         drumNums.map((n, i) => {
           const diff = n - par;
           let cls = 'score-drum-num';
@@ -4219,7 +4220,7 @@ const UI = {
 
       // Store swipe handler data for post-render wiring
       if (!UI._drumHandlers) UI._drumHandlers = [];
-      UI._drumHandlers.push({ drumId, pid: p.id, currentScore, par, hole, setScore });
+      UI._drumHandlers.push({ drumId, pid: p.id, currentScore, par, hole, setScore, centerIdx });
 
       return h('div',{class:'hole-player-row'},[
         h('div',{style:'display:flex;align-items:center;justify-content:space-between;'},[
