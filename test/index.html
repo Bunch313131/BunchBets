@@ -232,6 +232,73 @@ body:has(.wizard-overlay) { overflow:hidden; }
 /* Help button for game explanations */
 .help-btn { width:28px; height:28px; border-radius:50%; border:1px solid var(--border); background:var(--card); color:var(--acc); font-weight:700; font-size:14px; cursor:pointer; flex-shrink:0; }
 .help-btn:hover { background:var(--acc); color:#fff; }
+
+/* ═══════════════════════════════════════════════════════
+   NEW HOLE-BY-HOLE SCORING SCREEN
+   ═══════════════════════════════════════════════════════ */
+.hole-scoring { background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+.hole-scoring-nav { display:flex; align-items:center; justify-content:space-between; background:var(--acc); padding:10px 12px; }
+.hole-scoring-nav .hole-nav-btn { width:44px; height:44px; border-radius:50%; border:none; background:rgba(255,255,255,0.15); color:#fff; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s; }
+.hole-scoring-nav .hole-nav-btn:active { transform:scale(0.92); background:rgba(255,255,255,0.25); }
+.hole-scoring-nav .hole-nav-btn:disabled { opacity:0.3; cursor:default; }
+.hole-nav-info { text-align:center; color:#fff; }
+.hole-nav-info .hole-num { font-size:20px; font-weight:700; }
+.hole-nav-info .hole-details { font-size:13px; opacity:0.85; }
+
+/* Player score rows */
+.hole-player-row { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid var(--border); }
+.hole-player-row:last-child { border-bottom:none; }
+.hole-player-info { display:flex; flex-direction:column; gap:2px; flex:1; min-width:0; }
+.hole-player-name { font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hole-player-hcp { font-size:11px; color:var(--muted); }
+.hole-stroke-dots { color:var(--danger); font-size:10px; letter-spacing:1px; }
+.hole-score-controls { display:flex; align-items:center; gap:8px; }
+.hole-score-adj { width:40px; height:40px; border-radius:50%; border:1px solid var(--border); background:var(--card); color:var(--txt); font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s; -webkit-tap-highlight-color:transparent; }
+.hole-score-adj:active { transform:scale(0.9); background:var(--acc); color:#fff; border-color:var(--acc); }
+.hole-score-display { width:48px; height:48px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:22px; font-weight:700; border:2px solid var(--border); background:var(--card); position:relative; }
+.hole-score-display.eagle { border-color:var(--success); color:var(--success); background:rgba(22,163,74,0.08); }
+.hole-score-display.birdie { border-color:var(--success); color:var(--success); }
+.hole-score-display.bogey { border-color:var(--danger); color:var(--danger); }
+.hole-score-display.double-bogey { border-color:var(--danger); color:var(--danger); background:rgba(220,38,38,0.08); }
+.hole-score-display .vs-par { font-size:9px; font-weight:500; opacity:0.7; position:absolute; bottom:2px; right:4px; }
+.hole-score-display.no-score { color:var(--muted); border-color:var(--border); font-size:16px; }
+
+/* Junk entry inline */
+.hole-junk-section { padding:8px 12px; border-top:1px solid var(--border); background:rgba(255,255,255,0.02); }
+.hole-junk-section .section-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px; font-weight:600; }
+.hole-junk-row { display:flex; align-items:center; justify-content:space-between; padding:4px 0; }
+.hole-junk-row .player-name { font-size:13px; flex:1; }
+.hole-junk-controls { display:flex; align-items:center; gap:6px; }
+.hole-junk-adj { width:28px; height:28px; border-radius:50%; border:1px solid var(--border); background:var(--card); color:var(--txt); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent; }
+.hole-junk-adj:active { background:var(--acc); color:#fff; border-color:var(--acc); }
+.hole-junk-val { width:28px; text-align:center; font-size:16px; font-weight:600; }
+
+/* KP button */
+.kp-btn { width:100%; padding:10px; border:1px dashed var(--warning); border-radius:10px; background:rgba(217,119,6,0.08); color:var(--warning); font-size:14px; font-weight:600; cursor:pointer; margin-top:8px; transition:all 0.15s; }
+.kp-btn:active { background:rgba(217,119,6,0.2); }
+.kp-btn.has-kp { border-style:solid; background:rgba(217,119,6,0.15); }
+
+/* KP Wizard Modal */
+.kp-modal { position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:1000; display:flex; align-items:center; justify-content:center; padding:16px; }
+.kp-modal-content { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:20px; max-width:360px; width:100%; }
+.kp-modal-content h3 { margin:0 0 4px; font-size:17px; }
+.kp-modal-content .subtitle { color:var(--muted); font-size:13px; margin-bottom:16px; }
+.kp-player-btn { display:block; width:100%; padding:12px 16px; margin-bottom:8px; border:1px solid var(--border); border-radius:10px; background:var(--card); color:var(--txt); font-size:15px; font-weight:500; cursor:pointer; text-align:left; transition:all 0.15s; }
+.kp-player-btn:active { background:var(--acc); color:#fff; border-color:var(--acc); }
+.kp-player-btn.no-one { color:var(--muted); font-style:italic; }
+
+/* Hole strip */
+.hole-strip { display:flex; gap:4px; padding:10px 12px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+.hole-strip::-webkit-scrollbar { display:none; }
+.hole-dot { width:28px; height:28px; border-radius:50%; border:2px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; cursor:pointer; flex-shrink:0; color:var(--muted); background:var(--card); transition:all 0.15s; }
+.hole-dot.current { background:var(--acc); color:#fff; border-color:var(--acc); }
+.hole-dot.has-scores { border-color:var(--success); color:var(--success); }
+.hole-dot.par3 { border-style:dashed; border-color:var(--warning); }
+.hole-dot.par3.current { border-style:solid; }
+.hole-dot.par3.has-scores { border-color:var(--success); border-style:solid; }
+
+/* Game status summary cards below scoring */
+.game-status-card { padding:8px 12px; margin-bottom:6px; }
 </style>
 </head>
 <body>
@@ -608,7 +675,9 @@ const State = {
     settings: { thTop: 12, thMin: 5 },
     debugStatus: false,
     lastActiveDate: null,
-    roundCompleteShown: false
+    roundCompleteShown: false,
+    scoringHole: 0,
+    scoringView: 'hole'
   },
   presets: {
     'El Macero': { hcp:[7,15,9,1,11,3,17,13,5,4,2,10,8,12,14,18,6,16], par:[4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5] },
@@ -689,6 +758,8 @@ const State = {
       const validTabs = ['setup','scores','junk','status','game','transactions','highlights','rules','live'];
       this.data.tab = validTabs.includes(obj.tab) ? obj.tab : 'scores';
       this.data.debugStatus = !!obj.debugStatus;
+      this.data.scoringHole = obj.scoringHole || 0;
+      this.data.scoringView = obj.scoringView || 'hole';
       return true;
     } catch(e) { 
       Err.show('Load failed: ' + e.message);
@@ -727,7 +798,12 @@ const Game = {
       ninePointBirdieDouble: false,
       gross: {},
       junkCounts: {},
-      strokesCount: {}
+      strokesCount: {},
+      // KP tracking per hole (only relevant for par 3s)
+      // Each entry: { ranking: [pid1, pid2, ...] } ordered closest to farthest (on green + made par or better)
+      // null = no KP data entered for this hole
+      kpData: Utils.make18(null),
+      quadsConfirmed: {}
     };
     State.data.players.forEach(p => {
       g.junkCounts[p.id] = Utils.make18(0);
@@ -777,7 +853,11 @@ const Game = {
     g.gross = g.gross || {};
     g.junkCounts = g.junkCounts || {};
     g.strokesCount = g.strokesCount || {};
-    
+    let kp = Array.isArray(g.kpData) ? g.kpData.slice(0,18) : Utils.make18(null);
+    while (kp.length < 18) kp.push(null);
+    g.kpData = kp;
+    g.quadsConfirmed = g.quadsConfirmed || {};
+
     State.data.players.forEach(p => {
       let ga = Array.isArray(g.gross[p.id]) ? g.gross[p.id].slice(0,18) : Utils.make18(null);
       while (ga.length < 18) ga.push(null);
@@ -912,6 +992,120 @@ const Game = {
     return State.data.players.some(p => {
       const arr = g.gross[p.id] || [];
       return arr.some(score => score != null);
+    });
+  },
+
+  // === KP LOGIC ===
+  // Get par 3 hole indices for the course
+  getPar3Holes() {
+    return State.data.course.par.map((p,i) => p === 3 ? i : -1).filter(i => i >= 0);
+  },
+
+  // Compute KP results for a specific game (match)
+  // Returns per-hole KP winners and carryover state, plus sweeps/quads
+  computeKP(g) {
+    const par3s = this.getPar3Holes();
+    const allPlayers = [...(g.teamA||[]), ...(g.teamB||[])];
+    const results = []; // { hole, winner: pid|null, teamWinner: 'A'|'B'|null, carried: bool, value: number }
+    let carryStack = 0;
+    let teamAKPs = 0, teamBKPs = 0;
+    let anyKPAwarded = false;
+
+    for (const hole of par3s) {
+      const junkVal = hole <= 8 ? (g.junkValue.front||0) : (g.junkValue.back||0);
+      const kpEntry = g.kpData[hole];
+
+      if (!kpEntry || !kpEntry.ranking || kpEntry.ranking.length === 0) {
+        // No one got KP on this hole — carry over
+        carryStack++;
+        results.push({ hole, winner: null, teamWinner: null, carried: true, value: 0, carryStack });
+        continue;
+      }
+
+      // Walk the ranking to find the first player in THIS match who made par or better
+      let matchWinner = null;
+      for (const pid of kpEntry.ranking) {
+        if (allPlayers.includes(pid)) {
+          // Check if player made par or better on this hole
+          const gross = g.gross[pid] && g.gross[pid][hole];
+          const par = State.data.course.par[hole] || 3;
+          const net = gross != null ? gross - this.strokes(g, pid, hole) : null;
+          if (net != null && net <= par) {
+            matchWinner = pid;
+            break;
+          }
+        }
+      }
+
+      if (!matchWinner) {
+        // No qualifying player in this match — carry over
+        carryStack++;
+        results.push({ hole, winner: null, teamWinner: null, carried: true, value: 0, carryStack });
+        continue;
+      }
+
+      // Award KP with stacked carryovers
+      carryStack++;
+      const value = carryStack * junkVal;
+      const teamWinner = (g.teamA||[]).includes(matchWinner) ? 'A' : 'B';
+      if (teamWinner === 'A') teamAKPs += carryStack;
+      else teamBKPs += carryStack;
+      anyKPAwarded = true;
+
+      results.push({ hole, winner: matchWinner, teamWinner, carried: false, value, carryStack });
+      carryStack = 0;
+    }
+
+    // Sweeps: one team won ALL KPs (and at least one was awarded)
+    const totalKPs = teamAKPs + teamBKPs;
+    const hasSweeps = anyKPAwarded && totalKPs > 0 && (teamAKPs === 0 || teamBKPs === 0);
+    const sweepsTeam = hasSweeps ? (teamAKPs > 0 ? 'A' : 'B') : null;
+
+    // Calculate total KP value
+    let totalKPValue = 0;
+    results.forEach(r => { totalKPValue += r.value; });
+
+    // Sweeps doubles KP value
+    const sweepsBonus = hasSweeps ? totalKPValue : 0;
+
+    // Quads: only if sweeps, and opposing team didn't hit any par 3 greens
+    // This is stored as a flag on the game: g.quadsConfirmed = { A: bool, B: bool }
+    // meaning "did team X fail to hit any greens"
+    const quadsData = g.quadsConfirmed || {};
+    const losingTeam = sweepsTeam === 'A' ? 'B' : 'A';
+    const hasQuads = hasSweeps && quadsData[losingTeam] === true;
+    const quadsBonus = hasQuads ? totalKPValue + sweepsBonus : 0;
+
+    const grandTotal = totalKPValue + sweepsBonus + quadsBonus;
+
+    return {
+      results,
+      teamAKPs, teamBKPs,
+      hasSweeps, sweepsTeam,
+      hasQuads,
+      totalKPValue, sweepsBonus, quadsBonus, grandTotal,
+      // Net value from Team A's perspective
+      netA: sweepsTeam === 'A' ? grandTotal : (sweepsTeam === 'B' ? -grandTotal : (
+        // No sweeps: just sum up per-hole values
+        results.reduce((acc, r) => acc + (r.teamWinner === 'A' ? r.value : (r.teamWinner === 'B' ? -r.value : 0)), 0)
+      ))
+    };
+  },
+
+  // Get the global KP ranking for a hole (shared across all games)
+  // kpData on game[0] stores the master ranking
+  getKPRanking(hole) {
+    const g = State.data.games[0];
+    if (!g) return [];
+    const entry = g.kpData[hole];
+    return (entry && entry.ranking) ? entry.ranking : [];
+  },
+
+  // Set KP ranking for a hole (propagated to all games)
+  setKPRanking(hole, ranking) {
+    State.data.games.forEach(gm => {
+      if (!gm.kpData) gm.kpData = Utils.make18(null);
+      gm.kpData[hole] = ranking.length > 0 ? { ranking } : null;
     });
   },
 
@@ -2911,7 +3105,7 @@ const UI = {
     let view;
     switch (State.data.tab) {
       case 'setup': view = this.setup(); break;
-      case 'scores': view = this.scores(); break;
+      case 'scores': view = (State.data.scoringView === 'table') ? this.scores() : this.holeScoring(); break;
       case 'junk': view = this.junk(); break;
       case 'status': view = this.status(); break;
       case 'game': view = this.game(); break;
@@ -3430,6 +3624,340 @@ const UI = {
     ]);
   },
 
+  // ═══════════════════════════════════════════════════════
+  // NEW HOLE-BY-HOLE SCORING VIEW
+  // ═══════════════════════════════════════════════════════
+  holeScoring() {
+    const g = State.data.games[0];
+    if (!g) return h('div',{class:'card'},'No game. Add one in Setup.');
+
+    const hole = State.data.scoringHole || 0;
+    const par = State.data.course.par[hole] || 4;
+    const hcp = State.data.course.hcp[hole] || 0;
+    const isPar3 = par === 3;
+    const junkVal = hole <= 8 ? (g.junkValue.front||0) : (g.junkValue.back||0);
+    const allPlayers = State.data.players;
+
+    // Navigation
+    const goToHole = (h) => {
+      State.data.scoringHole = Math.max(0, Math.min(17, h));
+      State.scheduleRender();
+    };
+
+    const navBar = h('div',{class:'hole-scoring-nav'},[
+      h('button',{class:'hole-nav-btn', disabled:hole===0, onclick:()=>goToHole(hole-1)},'\u2039'),
+      h('div',{class:'hole-nav-info'},[
+        h('div',{class:'hole-num'},`Hole ${hole+1}`),
+        h('div',{class:'hole-details'},`Par ${par}  \u00B7  HCP ${hcp}`)
+      ]),
+      h('button',{class:'hole-nav-btn', disabled:hole===17, onclick:()=>goToHole(hole+1)},'\u203A')
+    ]);
+
+    // Score class helper
+    const scoreClass = (score) => {
+      if (score == null) return 'no-score';
+      const diff = score - par;
+      if (diff <= -2) return 'eagle';
+      if (diff === -1) return 'birdie';
+      if (diff === 1) return 'bogey';
+      if (diff >= 2) return 'double-bogey';
+      return '';
+    };
+
+    const vsPar = (score) => {
+      if (score == null) return '';
+      const diff = score - par;
+      if (diff > 0) return `+${diff}`;
+      if (diff < 0) return String(diff);
+      return 'E';
+    };
+
+    // Player score rows
+    const playerRows = allPlayers.map(p => {
+      const gross = g.gross[p.id] ? g.gross[p.id][hole] : null;
+
+      // Stroke dots for this hole across all games
+      const strokeDots = [];
+      State.data.games.forEach((gm, gi) => {
+        const inA = (gm.teamA||[]).includes(p.id);
+        const inB = (gm.teamB||[]).includes(p.id);
+        const inSkins = (gm.skinsPlayers||[]).includes(p.id);
+        const inWolf = (gm.wolfPlayers||[]).includes(p.id);
+        const inNP = (gm.ninePointPlayers||[]).includes(p.id);
+        if (!inA && !inB && !inSkins && !inWolf && !inNP) return;
+        const s = Game.strokes(gm, p.id, hole);
+        if (s > 0) strokeDots.push('\u25CF');
+      });
+
+      const adjustScore = (delta) => {
+        let current = gross;
+        if (current == null) current = par;
+        else current += delta;
+        current = Math.max(MIN_SCORE, Math.min(MAX_SCORE, current));
+        // Set score in ALL games that include this player
+        State.data.games.forEach(gm => {
+          if (gm.gross[p.id]) gm.gross[p.id][hole] = current;
+        });
+        State.scheduleSave();
+        State.scheduleRender();
+      };
+
+      return h('div',{class:'hole-player-row'},[
+        h('div',{class:'hole-player-info'},[
+          h('div',{class:'hole-player-name'},p.name),
+          h('div',{style:'display:flex;gap:6px;align-items:center;'},[
+            h('span',{class:'hole-player-hcp'},`HCP ${g.strokesCount[p.id]||0}`),
+            strokeDots.length ? h('span',{class:'hole-stroke-dots'},strokeDots.join(' ')) : null
+          ].filter(Boolean))
+        ]),
+        h('div',{class:'hole-score-controls'},[
+          h('button',{class:'hole-score-adj',onclick:()=>adjustScore(-1)},'\u2212'),
+          h('div',{class:`hole-score-display ${scoreClass(gross)}`},[
+            gross != null ? String(gross) : '\u2013',
+            gross != null ? h('span',{class:'vs-par'},vsPar(gross)) : null
+          ].filter(Boolean).map(c => typeof c === 'string' ? document.createTextNode(c) : c)),
+          h('button',{class:'hole-score-adj',onclick:()=>adjustScore(1)},'+')
+        ])
+      ]);
+    });
+
+    // Junk section - per player junk count entry for this hole
+    const junkRows = allPlayers.map(p => {
+      if (!g.junkCounts[p.id]) g.junkCounts[p.id] = Utils.make18(0);
+      const junkCount = g.junkCounts[p.id][hole] || 0;
+
+      const adjustJunk = (delta) => {
+        // Update junk in ALL games that include this player
+        State.data.games.forEach(gm => {
+          if (!gm.junkCounts[p.id]) gm.junkCounts[p.id] = Utils.make18(0);
+          const cur = gm.junkCounts[p.id][hole] || 0;
+          gm.junkCounts[p.id][hole] = Math.max(0, cur + delta);
+        });
+        State.scheduleSave();
+        State.scheduleRender();
+      };
+
+      return h('div',{class:'hole-junk-row'},[
+        h('span',{class:'player-name'},p.name),
+        h('div',{class:'hole-junk-controls'},[
+          h('button',{class:'hole-junk-adj',onclick:()=>adjustJunk(-1)},'\u2212'),
+          h('span',{class:'hole-junk-val',style:junkCount>0?'color:var(--warning);':''},junkCount > 0 ? String(junkCount) : '\u2013'),
+          h('button',{class:'hole-junk-adj',onclick:()=>adjustJunk(1)},'+')
+        ])
+      ]);
+    });
+
+    const junkSection = g.withJunk ? h('div',{class:'hole-junk-section'},[
+      h('div',{class:'section-label'},`Junk ($${junkVal}/pt)`),
+      ...junkRows
+    ]) : null;
+
+    // KP Button for par 3s
+    let kpSection = null;
+    if (isPar3) {
+      const ranking = Game.getKPRanking(hole);
+      const hasKP = ranking.length > 0;
+      const kpNames = ranking.map(pid => {
+        const p = allPlayers.find(pl => pl.id === pid);
+        return p ? p.name : '?';
+      });
+
+      kpSection = h('div',{style:'padding:8px 12px;'},[
+        h('button',{class:`kp-btn ${hasKP?'has-kp':''}`, onclick:()=>this.showKPWizard(hole)},[
+          hasKP ? `\u2691 KP: ${kpNames.join(', then ')}` : '\u2691 Tap to Enter KP'
+        ])
+      ]);
+    }
+
+    // Hole strip (bottom navigation dots)
+    const holeDots = [];
+    for (let i = 0; i < 18; i++) {
+      const iPar = State.data.course.par[i] || 4;
+      const hasScores = allPlayers.some(p => g.gross[p.id] && g.gross[p.id][i] != null);
+      let cls = 'hole-dot';
+      if (i === hole) cls += ' current';
+      if (hasScores) cls += ' has-scores';
+      if (iPar === 3) cls += ' par3';
+      holeDots.push(h('div',{class:cls, onclick:()=>goToHole(i)},String(i+1)));
+    }
+    const holeStrip = h('div',{class:'hole-strip'},holeDots);
+
+    // Game status summary cards
+    const statusCards = State.data.games.map((game, idx) => {
+      const theme = `theme-g${(idx%6)+1}`;
+      if (!Game.hasAnyScores(game)) return null;
+
+      let statusText = '';
+      if (game.gameType === 'nassau') {
+        const result = Game.computeResult(game);
+        const fmtSeg = (s) => s.winners.join('/');
+        const junk = game.withJunk ? Game.computeJunk(game) : null;
+        const frontPay = result.segments.front.payA;
+        const backPay = result.segments.back.payA;
+        const junkNet = junk ? junk.netA : 0;
+        statusText = `F:${fmtSeg(result.segments.front)} B:${fmtSeg(result.segments.back)}`;
+        if (junkNet !== 0) statusText += ` J:${junkNet>0?'+':''}${junkNet}`;
+      } else if (game.gameType === 'vegas') {
+        const result = Game.computeVegasResult(game);
+        statusText = `F:${result.frontPoints} B:${result.backPoints}`;
+      } else if (game.gameType === 'skins') {
+        const result = Game.computeSkinsResult(game);
+        statusText = `Skins`;
+      } else if (game.gameType === 'wolf') {
+        statusText = 'Wolf';
+      } else if (game.gameType === 'ninepoint') {
+        statusText = '9-Point';
+      }
+
+      return h('div',{class:`${theme} game-status-card card`,style:'padding:6px 10px;margin-bottom:4px;'},[
+        h('div',{class:'row',style:'align-items:center;justify-content:space-between;font-size:12px;'},[
+          h('span',{class:'pill',style:'font-size:11px;'},UI.gameLabel(game)),
+          h('span',{},statusText)
+        ])
+      ]);
+    }).filter(Boolean);
+
+    // Scoring card
+    const scoringCard = h('div',{class:'hole-scoring'},[
+      navBar,
+      ...playerRows,
+      junkSection,
+      kpSection
+    ].filter(Boolean));
+
+    // Toggle bar for switching between hole view and table view
+    const toggleBar = h('div',{class:'scoring-toggle'},[
+      h('button',{class:'scoring-toggle-btn active',onclick:()=>{}},'Hole View'),
+      h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.scoringView='table';State.scheduleRender();}},'Table View'),
+      h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.tab='junk';State.scheduleRender();}},'Junk')
+    ]);
+
+    return h('div',{},[
+      toggleBar,
+      scoringCard,
+      holeStrip,
+      ...(statusCards.length ? statusCards : [])
+    ]);
+  },
+
+  // KP Wizard Modal
+  showKPWizard(hole) {
+    const allPlayers = State.data.players;
+    const par = State.data.course.par[hole] || 3;
+    const existingRanking = Game.getKPRanking(hole);
+
+    // Build the wizard step by step
+    const buildStep = (ranking, unresolvedGames) => {
+      // Remove any existing modal
+      const existing = document.querySelector('.kp-modal');
+      if (existing) existing.remove();
+
+      // If no unresolved games, we're done
+      if (unresolvedGames.length === 0) {
+        Game.setKPRanking(hole, ranking);
+        State.scheduleSave();
+        State.scheduleRender();
+        return;
+      }
+
+      // Figure out which players to show
+      // Only players in unresolved games who aren't already ranked
+      const rankedSet = new Set(ranking);
+      const eligiblePids = new Set();
+      unresolvedGames.forEach(gm => {
+        [...(gm.teamA||[]), ...(gm.teamB||[])].forEach(pid => {
+          if (!rankedSet.has(pid)) eligiblePids.add(pid);
+        });
+      });
+
+      const eligiblePlayers = allPlayers.filter(p => eligiblePids.has(p.id));
+      const isFirst = ranking.length === 0;
+
+      const overlay = document.createElement('div');
+      overlay.className = 'kp-modal';
+
+      const title = isFirst
+        ? 'Who was closest to the pin and made par or better?'
+        : 'Next closest to the pin and made par or better?';
+
+      const subtitle = `Hole ${hole+1} \u2022 Par ${par}`;
+
+      const content = document.createElement('div');
+      content.className = 'kp-modal-content';
+
+      const titleEl = document.createElement('h3');
+      titleEl.textContent = title;
+      content.appendChild(titleEl);
+
+      const subEl = document.createElement('div');
+      subEl.className = 'subtitle';
+      subEl.textContent = subtitle;
+      content.appendChild(subEl);
+
+      // Player buttons
+      eligiblePlayers.forEach(p => {
+        const btn = document.createElement('button');
+        btn.className = 'kp-player-btn';
+        btn.textContent = p.name;
+        btn.onclick = () => {
+          const newRanking = [...ranking, p.id];
+          overlay.remove();
+
+          // Check which games are now resolved
+          const stillUnresolved = unresolvedGames.filter(gm => {
+            const gamePlayers = [...(gm.teamA||[]), ...(gm.teamB||[])];
+            // Is any ranked player in this game?
+            return !newRanking.some(pid => gamePlayers.includes(pid));
+          });
+
+          if (stillUnresolved.length === 0) {
+            Game.setKPRanking(hole, newRanking);
+            State.scheduleSave();
+            State.scheduleRender();
+          } else {
+            buildStep(newRanking, stillUnresolved);
+          }
+        };
+        content.appendChild(btn);
+      });
+
+      // "No one" button
+      const noOneBtn = document.createElement('button');
+      noOneBtn.className = 'kp-player-btn no-one';
+      noOneBtn.textContent = 'No one';
+      noOneBtn.onclick = () => {
+        overlay.remove();
+        Game.setKPRanking(hole, ranking);
+        State.scheduleSave();
+        State.scheduleRender();
+      };
+      content.appendChild(noOneBtn);
+
+      // Clear button if there's existing data
+      if (existingRanking.length > 0 && isFirst) {
+        const clearBtn = document.createElement('button');
+        clearBtn.className = 'kp-player-btn';
+        clearBtn.style.cssText = 'color:var(--danger);border-color:var(--danger);margin-top:8px;';
+        clearBtn.textContent = 'Clear KP';
+        clearBtn.onclick = () => {
+          overlay.remove();
+          Game.setKPRanking(hole, []);
+          State.scheduleSave();
+          State.scheduleRender();
+        };
+        content.appendChild(clearBtn);
+      }
+
+      overlay.appendChild(content);
+      overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+      document.body.appendChild(overlay);
+    };
+
+    // Start wizard with all nassau games as unresolved
+    const nassauGames = State.data.games.filter(gm => gm.gameType === 'nassau' || gm.gameType === 'vegas');
+    buildStep([], nassauGames);
+  },
+
   scores() {
     const g = State.data.games[0];
     if (!g) return h('div',{class:'card'},'No game. Add one in Setup.');
@@ -3885,7 +4413,8 @@ const UI = {
     const gameStatusRows = buildGameStatusRows();
 
     const toggleBar = h('div',{class:'scoring-toggle'},[
-      h('button',{class:'scoring-toggle-btn active',onclick:()=>{}},'Scores'),
+      h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.scoringView='hole';State.scheduleRender();}},'Hole View'),
+      h('button',{class:'scoring-toggle-btn active',onclick:()=>{}},'Table View'),
       h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.tab='junk';State.scheduleRender();}},'Junk')
     ]);
 
@@ -3998,7 +4527,8 @@ const UI = {
     });
 
     const toggleBar = h('div',{class:'scoring-toggle'},[
-      h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.tab='scores';State.scheduleRender();}},'Scores'),
+      h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.scoringView='hole';State.data.tab='scores';State.scheduleRender();}},'Hole View'),
+      h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.scoringView='table';State.data.tab='scores';State.scheduleRender();}},'Table View'),
       h('button',{class:'scoring-toggle-btn active',onclick:()=>{}},'Junk')
     ]);
 
