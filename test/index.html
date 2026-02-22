@@ -2115,6 +2115,10 @@ const Wizard = {
   },
 
   render() {
+    // Preserve scroll position across re-renders
+    const oldContent = document.querySelector('.wizard-content');
+    const savedScroll = oldContent ? oldContent.scrollTop : 0;
+
     this.removeOverlay();
     if (!this.active) return;
     // Clear splash auto-advance timer if we've moved past splash
@@ -2136,6 +2140,12 @@ const Wizard = {
 
     overlay.appendChild(content);
     document.body.appendChild(overlay);
+
+    // Restore scroll position
+    if (savedScroll > 0) {
+      const newContent = document.querySelector('.wizard-content');
+      if (newContent) newContent.scrollTop = savedScroll;
+    }
   },
 
   renderSplash() {
@@ -3978,15 +3988,13 @@ const UI = {
       let statusText = '';
       if (game.gameType === 'nassau') {
         const result = Game.computeResult(game);
+        const sz = (game.teamA||[]).length || 1;
         const fmtSeg = (s) => s.winners.join('/');
-        statusText = `F:${fmtSeg(result.segments.front)} B:${fmtSeg(result.segments.back)}`;
-        if (result.teamTotals.junk !== 0) statusText += ` J:${result.teamTotals.junk>0?'+':''}${Utils.fmt(result.teamTotals.junk)}`;
-        if (result.teamTotals.kp !== 0) statusText += ` KP:${result.teamTotals.kp>0?'+':''}${Utils.fmt(result.teamTotals.kp)}`;
-        statusText += ` = ${Utils.fmt(result.teamTotals.total)}`;
+        statusText = `F:${fmtSeg(result.segments.front)} B:${fmtSeg(result.segments.back)} = ${Utils.fmt(result.teamTotals.total / sz)}/ea`;
       } else if (game.gameType === 'vegas') {
         const result = Game.computeVegasResult(game);
-        statusText = `F:${result.frontPoints} B:${result.backPoints}`;
-        if (result.kpValue !== 0) statusText += ` KP:${result.kpValue>0?'+':''}${Utils.fmt(result.kpValue)}`;
+        const sz = (game.teamA||[]).length || 1;
+        statusText = `F:${result.frontPoints} B:${result.backPoints} = ${Utils.fmt(result.totalValue / sz)}/ea`;
       } else if (game.gameType === 'skins') {
         const result = Game.computeSkinsResult(game);
         statusText = `Skins`;
@@ -4693,42 +4701,44 @@ const UI = {
         backLine = `$${game.ninePointValue}/pt`;
       } else if (game.gameType === 'vegas') {
         const result = Game.computeVegasResult(game);
-        // Per-player value = points × $/point (no team multiplier)
-        const frontPerPlayer = result.frontPoints * (game.pointValue.front || 0);
-        const backPerPlayer = result.backPoints * (game.pointValue.back || 0);
-        const frontTotal = frontPerPlayer + frontJunkVal;
-        const backTotal = backPerPlayer + backJunkVal;
         frontLine = junk
-          ? `Front: ${fmtPts(result.frontPoints)} pts | Junk: ${fmtPts(junk.frontNetPts)} | Tot: ${Utils.fmt(frontTotal)}/ea`
-          : `Front: ${fmtPts(result.frontPoints)} pts (${Utils.fmt(frontPerPlayer)}/ea)`;
+          ? `Front: ${fmtPts(result.frontPoints)} pts | Junk: ${fmtPts(junk.frontNetPts)}`
+          : `Front: ${fmtPts(result.frontPoints)} pts`;
         backLine = hasBack9Score ? (junk
-          ? `Back: ${fmtPts(result.backPoints)} pts | Junk: ${fmtPts(junk.backNetPts)} | Tot: ${Utils.fmt(backTotal)}/ea`
-          : `Back: ${fmtPts(result.backPoints)} pts (${Utils.fmt(backPerPlayer)}/ea)`) : null;
+          ? `Back: ${fmtPts(result.backPoints)} pts | Junk: ${fmtPts(junk.backNetPts)}`
+          : `Back: ${fmtPts(result.backPoints)} pts`) : null;
       } else {
         const result = Game.computeResult(game);
         const seg = result.segments;
-        // Format Nassau status: show each bet line result (always from Team A perspective)
         const fmtSeg = (s) => s.winners.join('/');
-        // Per-player value = just the stake, no team multiplier (payA not teamPayA)
-        const frontPerPlayer = seg.front.payA;
-        const backPerPlayer = seg.back.payA;
-        const frontTotal = frontPerPlayer + frontJunkVal;
-        const backTotal = backPerPlayer + backJunkVal;
         frontLine = junk
-          ? `Front: ${fmtSeg(seg.front)} | Junk: ${fmtPts(junk.frontNetPts)} | Tot: ${Utils.fmt(frontTotal)}/ea`
-          : `Front: ${fmtSeg(seg.front)} (${Utils.fmt(frontPerPlayer)}/ea)`;
+          ? `Front: ${fmtSeg(seg.front)} | Junk: ${fmtPts(junk.frontNetPts)}`
+          : `Front: ${fmtSeg(seg.front)}`;
         backLine = hasBack9Score ? (junk
-          ? `Back: ${fmtSeg(seg.back)} | Junk: ${fmtPts(junk.backNetPts)} | Tot: ${Utils.fmt(backTotal)}/ea`
-          : `Back: ${fmtSeg(seg.back)} (${Utils.fmt(backPerPlayer)}/ea)`) : null;
+          ? `Back: ${fmtSeg(seg.back)} | Junk: ${fmtPts(junk.backNetPts)}`
+          : `Back: ${fmtSeg(seg.back)}`) : null;
       }
 
-      // KP line for team games
+      // KP line for team games — show as points notation
       let kpLine = null;
-      if (kpResult && kpResult.netA !== 0 && (game.gameType === 'nassau' || game.gameType === 'vegas')) {
-        const kpSign = kpResult.netA > 0 ? '+' : '';
-        kpLine = `KP: ${kpSign}${Utils.fmt(kpResult.netA)}/ea`;
-        if (kpResult.hasSweeps) kpLine += ' (Sweeps!)';
-        if (kpResult.hasQuads) kpLine += ' (Quads!)';
+      if (kpResult && (game.gameType === 'nassau' || game.gameType === 'vegas')) {
+        const kpNet = kpResult.teamAKPs - kpResult.teamBKPs;
+        if (kpNet !== 0) {
+          kpLine = `KP: ${fmtPts(kpNet)}`;
+          if (kpResult.hasSweeps) kpLine += ' (Sweeps!)';
+          if (kpResult.hasQuads) kpLine += ' (Quads!)';
+        }
+      }
+
+      // Overall per-player $ line
+      let overallLine = null;
+      const gameNet = Game.computeGamePlayerNet(game);
+      if (game.gameType === 'nassau' || game.gameType === 'vegas') {
+        const pid1 = (game.teamA||[])[0];
+        if (pid1 && gameNet[pid1] != null) {
+          const pp = gameNet[pid1];
+          overallLine = `${Utils.fmt(pp)}/ea`;
+        }
       }
 
       return h('div',{class:theme,style:'margin-bottom:6px;'},[
@@ -4738,7 +4748,8 @@ const UI = {
             h('div',{style:'text-align:right;font-size:13px;'},[
               h('div',{},frontLine),
               backLine ? h('div',{style:'margin-top:2px;'},backLine) : '',
-              kpLine ? h('div',{style:'margin-top:2px;color:var(--warning);'},kpLine) : ''
+              kpLine ? h('div',{style:'margin-top:2px;color:var(--warning);'},kpLine) : '',
+              overallLine ? h('div',{style:'margin-top:4px;font-weight:700;'},overallLine) : ''
             ].filter(Boolean))
           ])
         ])
@@ -4896,13 +4907,21 @@ const UI = {
           h('div',{class:'card'},[
             h('div',{class:'pill'},UI.gameLabel(g)),
             h('div',{class:'note',style:'margin-top:6px;'},`A: ${teamANames}  |  B: ${teamBNames}`),
-            h('div',{style:'margin-top:12px;'},[
-              h('div',{class:'muted'},'Front: ' + (result.frontPoints>0?'+':'') + result.frontPoints + ' pts = ' + Utils.fmt(result.frontValue)),
-              h('div',{class:'muted',style:'margin-top:4px;'},'Back: ' + (result.backPoints>0?'+':'') + result.backPoints + ' pts = ' + Utils.fmt(result.backValue)),
-              h('div',{class:'muted',style:'margin-top:4px;'},'Junk: ' + Utils.fmt(result.junkValue)),
-              result.kpValue !== 0 ? h('div',{class:'muted',style:'margin-top:4px;color:var(--warning);'},'KP: ' + Utils.fmt(result.kpValue) + (result.kp.hasSweeps ? ' (Sweeps!)' : '') + (result.kp.hasQuads ? ' (Quads!)' : '')) : null,
-              h('div',{style:'margin-top:8px;font-weight:700;'},'Total: ' + Utils.fmt(result.totalValue))
-            ])
+            h('div',{style:'margin-top:12px;'},(() => {
+              const sz = (g.teamA||[]).length || 1;
+              const frontPP = result.frontPoints * (g.pointValue.front || 0);
+              const backPP = result.backPoints * (g.pointValue.back || 0);
+              const junkPP = result.junkValue / sz;
+              const kpPP = result.kpValue / sz;
+              const totalPP = result.totalValue / sz;
+              return [
+                h('div',{class:'muted'},'Front: ' + (result.frontPoints>0?'+':'') + result.frontPoints + ' pts = ' + Utils.fmt(frontPP) + '/ea'),
+                h('div',{class:'muted',style:'margin-top:4px;'},'Back: ' + (result.backPoints>0?'+':'') + result.backPoints + ' pts = ' + Utils.fmt(backPP) + '/ea'),
+                h('div',{class:'muted',style:'margin-top:4px;'},'Junk: ' + Utils.fmt(junkPP) + '/ea'),
+                result.kpValue !== 0 ? h('div',{class:'muted',style:'margin-top:4px;color:var(--warning);'},'KP: ' + Utils.fmt(kpPP) + '/ea' + (result.kp.hasSweeps ? ' (Sweeps!)' : '') + (result.kp.hasQuads ? ' (Quads!)' : '')) : null,
+                h('div',{style:'margin-top:8px;font-weight:700;'},'Total: ' + Utils.fmt(totalPP) + '/ea')
+              ];
+            })())
           ])
         ]);
       }
@@ -5231,26 +5250,31 @@ const UI = {
             ]),
 
             // Junk & KP
-            h('div',{class:'card',style:'margin-top:12px;'},[
-              h('div',{class:'row',style:'justify-content:space-between;'},[
-                h('div',{class:'muted'},'Junk (team total):'),
-                h('div',{style:'font-weight:600;'},Utils.fmt(result.junkValue) + ' (' + Utils.fmt(result.junkValue / ((g.teamA||[]).length || 1)) + '/ea)')
-              ]),
-              result.kpValue !== 0 ? h('div',{class:'row',style:'justify-content:space-between;margin-top:4px;'},[
-                h('div',{class:'muted',style:'color:var(--warning);'},'KP (team total):'),
-                h('div',{style:'font-weight:600;color:var(--warning);'},Utils.fmt(result.kpValue) + ' (' + Utils.fmt(result.kpValue / ((g.teamA||[]).length || 1)) + '/ea)')
-              ]) : null
-            ].filter(Boolean)),
-            h('div',{class:'card',style:'margin-top:12px;background:linear-gradient(135deg,rgba(59,130,246,0.1),rgba(22,163,74,0.1));'},[
-              h('div',{class:'row',style:'justify-content:space-between;align-items:center;'},[
-                h('div',{},[
-                  h('div',{class:'muted'},'TOTAL TO TEAM A'),
-                  h('div',{class:'muted',style:'font-size:11px;margin-top:2px;'},Utils.fmt(result.totalValue / ((g.teamA||[]).length || 1))+' per player')
-                ]),
-                h('div',{style:'font-size:24px;font-weight:700;',class:result.totalValue>0?'points-positive':'points-negative'},
-                  Utils.fmt(result.totalValue))
-              ])
-            ])
+            (() => {
+              const sz = (g.teamA||[]).length || 1;
+              const junkPP = result.junkValue / sz;
+              const kpPP = result.kpValue / sz;
+              const totalPP = result.totalValue / sz;
+              return h('div',{},[
+                h('div',{class:'card',style:'margin-top:12px;'},[
+                  h('div',{class:'row',style:'justify-content:space-between;'},[
+                    h('div',{class:'muted'},'Junk:'),
+                    h('div',{style:'font-weight:600;'},Utils.fmt(junkPP) + '/ea')
+                  ]),
+                  result.kpValue !== 0 ? h('div',{class:'row',style:'justify-content:space-between;margin-top:4px;'},[
+                    h('div',{class:'muted',style:'color:var(--warning);'},'KP:'),
+                    h('div',{style:'font-weight:600;color:var(--warning);'},Utils.fmt(kpPP) + '/ea' + (result.kp.hasSweeps ? ' (Sweeps!)' : '') + (result.kp.hasQuads ? ' (Quads!)' : ''))
+                  ]) : null
+                ].filter(Boolean)),
+                h('div',{class:'card',style:'margin-top:12px;background:linear-gradient(135deg,rgba(59,130,246,0.1),rgba(22,163,74,0.1));'},[
+                  h('div',{class:'row',style:'justify-content:space-between;align-items:center;'},[
+                    h('div',{class:'muted'},'PER PLAYER'),
+                    h('div',{style:'font-size:24px;font-weight:700;',class:totalPP>0?'points-positive':'points-negative'},
+                      Utils.fmt(totalPP))
+                  ])
+                ])
+              ]);
+            })()
           ])
         ]);
       }
@@ -5770,21 +5794,27 @@ const UI = {
           ]),
 
           // Junk + KP
-          h('div',{class:'card',style:'margin-top:8px;'},[
-            h('div',{class:'pill'},`Junk to Team A: ${fmtTP(res.teamTotals.junk,(g.teamA||[]).length)}`),
-            res.teamTotals.kp !== 0 ? h('div',{class:'pill',style:'margin-top:4px;'},`KP to Team A: ${fmtTP(res.teamTotals.kp,(g.teamA||[]).length)}`) : null
-          ].filter(Boolean)),
+          (() => {
+            const sz = (g.teamA||[]).length || 1;
+            const junkPP = res.teamTotals.junk / sz;
+            const kpPP = res.teamTotals.kp / sz;
+            const totalPP = res.teamTotals.total / sz;
+            return h('div',{},[
+              h('div',{class:'card',style:'margin-top:8px;'},[
+                h('div',{class:'pill'},`Junk: ${Utils.fmt(junkPP)}/ea`),
+                res.teamTotals.kp !== 0 ? h('div',{class:'pill',style:'margin-top:4px;'},`KP: ${Utils.fmt(kpPP)}/ea`) : null
+              ].filter(Boolean)),
 
-          // Total
-          h('div',{class:'card',style:'margin-top:8px;background:linear-gradient(135deg,rgba(59,130,246,0.05),rgba(22,163,74,0.05));'},[
-            h('div',{class:'row',style:'justify-content:space-between;align-items:center;'},[
-              h('div',{},[
-                h('div',{style:'font-weight:600;'},'GAME TOTAL TO TEAM A'),
-                h('div',{class:'muted',style:'font-size:12px;margin-top:2px;'},Utils.fmt(res.teamTotals.total/((g.teamA||[]).length||1))+' per player')
-              ]),
-              h('div',{style:'font-size:20px;font-weight:700;',class:res.teamTotals.total>0?'points-positive':'points-negative'},
-                Utils.fmt(res.teamTotals.total))
-            ])
+              // Total
+              h('div',{class:'card',style:'margin-top:8px;background:linear-gradient(135deg,rgba(59,130,246,0.05),rgba(22,163,74,0.05));'},[
+                h('div',{class:'row',style:'justify-content:space-between;align-items:center;'},[
+                  h('div',{class:'muted'},'PER PLAYER'),
+                  h('div',{style:'font-size:20px;font-weight:700;',class:totalPP>0?'points-positive':'points-negative'},
+                    Utils.fmt(totalPP))
+                ])
+              ])
+            ]);
+          })()
           ])
         ])
       ]);
@@ -5836,11 +5866,13 @@ const UI = {
         return h('li',{},`${this.gameLabel(g)}: ${best && bestAmt > 0 ? UI.playerName(best) + ' +' + Utils.fmt(bestAmt) : 'No winner yet'}`);
       }
 
-      // Nassau/Vegas — show team total
-      let tot;
-      if (g.gameType === 'vegas') { tot = Game.computeVegasResult(g).totalValue; }
-      else { tot = Game.computeResult(g).teamTotals.total; }
-      return h('li',{},`${this.gameLabel(g)}: ${Utils.fmt(tot)} to Team A`);
+      // Nassau/Vegas — show per-player amount
+      const allTeamPids = [...(g.teamA||[]), ...(g.teamB||[])];
+      let best = null, bestAmt = -Infinity;
+      allTeamPids.forEach(pid => {
+        if ((gameNet[pid]||0) > bestAmt) { best = pid; bestAmt = gameNet[pid]||0; }
+      });
+      return h('li',{},`${this.gameLabel(g)}: ${best && bestAmt > 0 ? UI.playerName(best) + ' +' + Utils.fmt(bestAmt) + '/ea' : 'No winner yet'}`);
     });
 
     const perPlayerRows = State.data.players.map(p => 
@@ -5860,7 +5892,7 @@ const UI = {
     return h('div',{},[
       shareBtn,
       h('div',{class:'card'},[
-        h('div',{class:'pill'},'Per-Game Totals (to Team A)'),
+        h('div',{class:'pill'},'Per-Game Leaders'),
         perGameRows.length ? h('ul',{},perGameRows) : h('div',{class:'muted'},'No games yet.')
       ]),
       h('div',{class:'card'},[
@@ -6093,11 +6125,12 @@ const UI = {
         lines.push(this.gameLabel(g));
         if (g.gameType === 'vegas') {
           const res = Game.computeVegasResult(g);
-          lines.push(`  Front:   ${Utils.fmt(res.frontValue)}`);
-          lines.push(`  Back:    ${Utils.fmt(res.backValue)}`);
-          lines.push(`  Junk:    ${Utils.fmt(res.junkValue)}`);
-          if (res.kpValue !== 0) lines.push(`  KP:      ${Utils.fmt(res.kpValue)}${res.kp.hasSweeps ? ' (Sweeps!)' : ''}${res.kp.hasQuads ? ' (Quads!)' : ''}`);
-          lines.push(`  Total:   ${Utils.fmt(res.totalValue)}`);
+          const sz = (g.teamA||[]).length || 1;
+          lines.push(`  Front:   ${Utils.fmt(res.frontPoints * (g.pointValue.front||0))}/ea`);
+          lines.push(`  Back:    ${Utils.fmt(res.backPoints * (g.pointValue.back||0))}/ea`);
+          lines.push(`  Junk:    ${Utils.fmt(res.junkValue / sz)}/ea`);
+          if (res.kpValue !== 0) lines.push(`  KP:      ${Utils.fmt(res.kpValue / sz)}/ea${res.kp.hasSweeps ? ' (Sweeps!)' : ''}${res.kp.hasQuads ? ' (Quads!)' : ''}`);
+          lines.push(`  Total:   ${Utils.fmt(res.totalValue / sz)}/ea`);
         } else if (g.gameType === 'skins') {
           const res = Game.computeSkinsResult(g);
           const players = g.skinsPlayers || [];
@@ -6117,12 +6150,13 @@ const UI = {
           });
         } else {
           const res = Game.computeResult(g);
-          lines.push(`  Front:   ${Utils.fmt(res.teamTotals.front)}`);
-          lines.push(`  Back:    ${Utils.fmt(res.teamTotals.back)}`);
-          lines.push(`  Overall: ${Utils.fmt(res.teamTotals.overall)}`);
-          lines.push(`  Junk:    ${Utils.fmt(res.teamTotals.junk)}`);
-          if (res.teamTotals.kp !== 0) lines.push(`  KP:      ${Utils.fmt(res.teamTotals.kp)}${res.kp.hasSweeps ? ' (Sweeps!)' : ''}${res.kp.hasQuads ? ' (Quads!)' : ''}`);
-          lines.push(`  Total:   ${Utils.fmt(res.teamTotals.total)}`);
+          const sz = (g.teamA||[]).length || 1;
+          lines.push(`  Front:   ${Utils.fmt(res.segments.front.payA)}/ea`);
+          lines.push(`  Back:    ${Utils.fmt(res.segments.back.payA)}/ea`);
+          lines.push(`  Overall: ${Utils.fmt(res.segments.overall.payA)}/ea`);
+          lines.push(`  Junk:    ${Utils.fmt(res.teamTotals.junk / sz)}/ea`);
+          if (res.teamTotals.kp !== 0) lines.push(`  KP:      ${Utils.fmt(res.teamTotals.kp / sz)}/ea${res.kp.hasSweeps ? ' (Sweeps!)' : ''}${res.kp.hasQuads ? ' (Quads!)' : ''}`);
+          lines.push(`  Total:   ${Utils.fmt(res.teamTotals.total / sz)}/ea`);
         }
         lines.push('');
       });
@@ -6186,9 +6220,10 @@ const UI = {
         const color = gameThemes[gi % 6];
         if (g.gameType === 'vegas') {
           const res = Game.computeVegasResult(g);
-          const vegasVals = [`Front: ${Utils.fmt(res.frontValue)}`, `Back: ${Utils.fmt(res.backValue)}`, `Junk: ${Utils.fmt(res.junkValue)}`];
-          if (res.kpValue !== 0) vegasVals.push(`KP: ${Utils.fmt(res.kpValue)}`);
-          vegasVals.push(`Total: ${Utils.fmt(res.totalValue)}`);
+          const sz = (g.teamA||[]).length || 1;
+          const vegasVals = [`Front: ${Utils.fmt(res.frontPoints*(g.pointValue.front||0))}/ea`, `Back: ${Utils.fmt(res.backPoints*(g.pointValue.back||0))}/ea`, `Junk: ${Utils.fmt(res.junkValue/sz)}/ea`];
+          if (res.kpValue !== 0) vegasVals.push(`KP: ${Utils.fmt(res.kpValue/sz)}/ea`);
+          vegasVals.push(`Total: ${Utils.fmt(res.totalValue/sz)}/ea`);
           gameLines.push({ label: this.gameLabel(g), color, values: vegasVals});
         } else if (g.gameType === 'skins') {
           const res = Game.computeSkinsResult(g);
@@ -6204,10 +6239,10 @@ const UI = {
           gameLines.push({ label: this.gameLabel(g), color, values: [`Total Pot: ${Utils.fmt(res.totalMoney)}`]});
         } else {
           const res = Game.computeResult(g);
-          const t = res.teamTotals;
-          const nassauVals = [`Front: ${Utils.fmt(t.front)}`, `Back: ${Utils.fmt(t.back)}`, `Overall: ${Utils.fmt(t.overall)}`, `Junk: ${Utils.fmt(t.junk)}`];
-          if (t.kp !== 0) nassauVals.push(`KP: ${Utils.fmt(t.kp)}`);
-          nassauVals.push(`Total: ${Utils.fmt(t.total)}`);
+          const sz = (g.teamA||[]).length || 1;
+          const nassauVals = [`Front: ${Utils.fmt(res.segments.front.payA)}/ea`, `Back: ${Utils.fmt(res.segments.back.payA)}/ea`, `Overall: ${Utils.fmt(res.segments.overall.payA)}/ea`, `Junk: ${Utils.fmt(res.teamTotals.junk/sz)}/ea`];
+          if (res.teamTotals.kp !== 0) nassauVals.push(`KP: ${Utils.fmt(res.teamTotals.kp/sz)}/ea`);
+          nassauVals.push(`Total: ${Utils.fmt(res.teamTotals.total/sz)}/ea`);
           gameLines.push({ label: this.gameLabel(g), color, values: nassauVals});
         }
       });
@@ -6660,11 +6695,13 @@ const UI = {
       }
 
       const toward = swing > 0 ? 'Team A' : 'Team B';
+      const swingSz = (top.game.teamA||[]).length || 1;
+      const swingPP = Math.abs(swing) / swingSz;
       lines.push({
         hole,
         value:Math.abs(swing),
         swing,
-        text:`Hole ${hole+1}: ${whoText} swung ${Utils.fmt(Math.abs(swing))} toward ${toward}`
+        text:`Hole ${hole+1}: ${whoText} swung ${Utils.fmt(swingPP)}/ea toward ${toward}`
       });
     }
 
