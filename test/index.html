@@ -822,7 +822,8 @@ const Game = {
       // Each entry: { ranking: [pid1, pid2, ...] } ordered closest to farthest (on green + made par or better)
       // null = no KP data entered for this hole
       kpData: Utils.make18(null),
-      quadsConfirmed: {}
+      quadsConfirmed: {},
+      handicapMode: 'full' // full, off_low, team_delta
     };
     State.data.players.forEach(p => {
       g.junkCounts[p.id] = Utils.make18(0);
@@ -865,7 +866,8 @@ const Game = {
     g.ninePointMode = ['net','gross'].includes(g.ninePointMode) ? g.ninePointMode : 'net';
     g.ninePointWinBy2 = g.ninePointWinBy2 !== false;
     g.ninePointBirdieDouble = g.ninePointBirdieDouble === true;
-    
+    g.handicapMode = ['full','off_low','team_delta'].includes(g.handicapMode) ? g.handicapMode : 'full';
+
     let pa = Array.isArray(g.presses) ? g.presses.slice(0,18) : Utils.make18('');
     while (pa.length < 18) pa.push('');
     g.presses = pa.map(v => ['','press','blind'].includes(v) ? v : '');
@@ -895,6 +897,41 @@ const Game = {
       g.strokesCount[p.id] = Math.max(0, parseInt(g.strokesCount[p.id])||0);
     });
     return g;
+  },
+
+  applyHandicapMode(g) {
+    const playerHandicaps = {};
+    State.data.players.forEach(p => {
+      playerHandicaps[p.id] = p.handicap || 0;
+    });
+    if (g.handicapMode === 'full') {
+      Object.keys(playerHandicaps).forEach(pid => {
+        g.strokesCount[pid] = playerHandicaps[pid];
+      });
+    } else if (g.handicapMode === 'off_low') {
+      const vals = Object.values(playerHandicaps);
+      const min = vals.length ? Math.min(...vals) : 0;
+      Object.keys(playerHandicaps).forEach(pid => {
+        g.strokesCount[pid] = playerHandicaps[pid] - min;
+      });
+    } else if (g.handicapMode === 'team_delta') {
+      const teamATotal = (g.teamA||[]).reduce((s, pid) => s + (playerHandicaps[pid]||0), 0);
+      const teamBTotal = (g.teamB||[]).reduce((s, pid) => s + (playerHandicaps[pid]||0), 0);
+      Object.keys(playerHandicaps).forEach(pid => g.strokesCount[pid] = 0);
+      if (teamATotal > teamBTotal) {
+        let highPid = (g.teamA||[])[0], highVal = playerHandicaps[(g.teamA||[])[0]] || 0;
+        (g.teamA||[]).forEach(pid => {
+          if ((playerHandicaps[pid]||0) > highVal) { highPid = pid; highVal = playerHandicaps[pid]||0; }
+        });
+        if (highPid) g.strokesCount[highPid] = teamATotal - teamBTotal;
+      } else if (teamBTotal > teamATotal) {
+        let highPid = (g.teamB||[])[0], highVal = playerHandicaps[(g.teamB||[])[0]] || 0;
+        (g.teamB||[]).forEach(pid => {
+          if ((playerHandicaps[pid]||0) > highVal) { highPid = pid; highVal = playerHandicaps[pid]||0; }
+        });
+        if (highPid) g.strokesCount[highPid] = teamBTotal - teamATotal;
+      }
+    }
   },
 
   strokes(g, pid, hole) {
@@ -1958,10 +1995,11 @@ const Wizard = {
 
   finish() {
     // Apply wizard data to State
-    // Players
+    // Players (preserve handicaps for advanced settings recalculation)
     State.data.players = this.data.players.filter(p => p.name.trim()).map((p, i) => ({
       id: 'p' + (i+1),
-      name: p.name.trim()
+      name: p.name.trim(),
+      handicap: p.handicap || 0
     }));
 
     // Course (if new one was selected/created, it's already in State.data.course)
@@ -1989,46 +2027,10 @@ const Wizard = {
       g.ninePointValue = wg.ninePointValue || 1;
       g.ninePointWinBy2 = wg.ninePointWinBy2 !== false;
       g.ninePointBirdieDouble = wg.ninePointBirdieDouble === true;
+      g.handicapMode = wg.handicapMode || 'full';
 
       // Apply handicap strokes based on mode
-      const playerHandicaps = {};
-      this.data.players.forEach((p, i) => {
-        if (p.name.trim()) playerHandicaps['p'+(i+1)] = p.handicap || 0;
-      });
-
-      if (wg.handicapMode === 'full') {
-        // Everyone gets full strokes
-        Object.keys(playerHandicaps).forEach(pid => {
-          g.strokesCount[pid] = playerHandicaps[pid];
-        });
-      } else if (wg.handicapMode === 'off_low') {
-        // Reduce by lowest
-        const min = Math.min(...Object.values(playerHandicaps));
-        Object.keys(playerHandicaps).forEach(pid => {
-          g.strokesCount[pid] = playerHandicaps[pid] - min;
-        });
-      } else if (wg.handicapMode === 'team_delta') {
-        // High player on high team gets delta
-        const teamATotal = wg.teamA.reduce((s, pid) => s + (playerHandicaps[pid]||0), 0);
-        const teamBTotal = wg.teamB.reduce((s, pid) => s + (playerHandicaps[pid]||0), 0);
-        Object.keys(playerHandicaps).forEach(pid => g.strokesCount[pid] = 0);
-
-        if (teamATotal > teamBTotal) {
-          // Team A is high, find high player on Team A
-          let highPid = wg.teamA[0], highVal = playerHandicaps[wg.teamA[0]] || 0;
-          wg.teamA.forEach(pid => {
-            if ((playerHandicaps[pid]||0) > highVal) { highPid = pid; highVal = playerHandicaps[pid]||0; }
-          });
-          g.strokesCount[highPid] = teamATotal - teamBTotal;
-        } else if (teamBTotal > teamATotal) {
-          // Team B is high
-          let highPid = wg.teamB[0], highVal = playerHandicaps[wg.teamB[0]] || 0;
-          wg.teamB.forEach(pid => {
-            if ((playerHandicaps[pid]||0) > highVal) { highPid = pid; highVal = playerHandicaps[pid]||0; }
-          });
-          g.strokesCount[highPid] = teamBTotal - teamATotal;
-        }
-      }
+      Game.applyHandicapMode(g);
 
       return Game.sanitize(g);
     });
@@ -3269,14 +3271,28 @@ const UI = {
 
   setup() {
     // Players
-    const playerInputs = State.data.players.map(p => 
-      h('div', {style:'display:grid;grid-template-columns:64px 1fr;gap:8px;'}, [
+    const playerInputs = State.data.players.map(p =>
+      h('div', {style:'display:grid;grid-template-columns:64px 1fr 72px;gap:8px;align-items:center;'}, [
         h('span', {class:'muted',style:'text-align:right;'}, p.id),
         h('input', {
           type:'text', value:p.name,
           onfocus:() => State.begin(),
           oninput:(e) => p.name = e.target.value,
           onblur:() => State.end()
+        }),
+        h('input', {
+          type:'tel', inputmode:'numeric', value:p.handicap||0,
+          style:'text-align:center;',
+          placeholder:'HCP',
+          onfocus:() => State.begin(),
+          oninput:(e) => { e.target.value = Utils.sanitize(e.target.value); },
+          onblur:(e) => {
+            p.handicap = Math.min(54, Math.max(0, parseInt(e.target.value)||0));
+            e.target.value = String(p.handicap);
+            // Recalculate strokes for all games using a handicap mode
+            State.data.games.forEach(g => Game.applyHandicapMode(g));
+            State.end();
+          }
         })
       ])
     );
@@ -3552,11 +3568,15 @@ const UI = {
             h('label',{},[h('input',{type:'checkbox',checked:g.autoPress.back,onclick:(e)=>{g.autoPress.back=e.target.checked;State.scheduleSave();State.scheduleRender();}}),' Auto-Press 2DN']),
             h('label',{},[h('input',{type:'checkbox',checked:g.autoPress.overall,onclick:(e)=>{g.autoPress.overall=e.target.checked;State.scheduleSave();State.scheduleRender();}}),' Auto-Press 2DN'])
           ]),
-          h('div',{class:'row',style:'align-items:center;gap:12px;margin:8px 0;'},[
+          h('label',{style:'display:flex;align-items:center;gap:8px;margin:8px 0;cursor:pointer;'},[
+            h('input',{type:'checkbox',checked:g.withJunk,onclick:(e)=>{g.withJunk=e.target.checked;State.scheduleSave();State.scheduleRender();}}),
+            ' Include Junk + KP'
+          ]),
+          g.withJunk ? h('div',{class:'row',style:'align-items:center;gap:12px;margin:8px 0;'},[
             h('div',{class:'pill'},'Junk $/point'),
             h('div',{},[h('div',{class:'muted'},'Front'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.front,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.front=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.front);State.end();}})]),
             h('div',{},[h('div',{class:'muted'},'Back'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.back,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.back=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.back);State.end();}})]),
-          ]),
+          ]) : h('div',{}),
 ]) : h('div',{}),
 
           g.gameType === 'vegas' ? h('div',{},[
@@ -3568,11 +3588,15 @@ const UI = {
               h('div',{},[h('div',{class:'muted'},'Front $/pt'),h('input',{type:'number',step:'0.25',value:g.pointValue.front,onfocus:()=>State.begin(),onblur:(e)=>{g.pointValue.front=parseFloat(e.target.value)||1;State.end();}})]),
               h('div',{},[h('div',{class:'muted'},'Back $/pt'),h('input',{type:'number',step:'0.25',value:g.pointValue.back,onfocus:()=>State.begin(),onblur:(e)=>{g.pointValue.back=parseFloat(e.target.value)||1;State.end();}})]),
             ]),
-            h('div',{class:'row',style:'align-items:center;gap:12px;margin:8px 0;'},[
+            h('label',{style:'display:flex;align-items:center;gap:8px;margin:8px 0;cursor:pointer;'},[
+              h('input',{type:'checkbox',checked:g.withJunk,onclick:(e)=>{g.withJunk=e.target.checked;State.scheduleSave();State.scheduleRender();}}),
+              ' Include Junk + KP'
+            ]),
+            g.withJunk ? h('div',{class:'row',style:'align-items:center;gap:12px;margin:8px 0;'},[
               h('div',{class:'pill'},'Junk $/point'),
               h('div',{},[h('div',{class:'muted'},'Front'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.front,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.front=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.front);State.end();}})]),
               h('div',{},[h('div',{class:'muted'},'Back'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.back,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.back=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.back);State.end();}})]),
-            ]),
+            ]) : h('div',{}),
             h('div',{class:'note',style:'margin-top:8px;'},'Flip if: opponent birdie, OR no one on your team has net par or better')
           ]) : h('div',{}),
 
@@ -3639,15 +3663,47 @@ const UI = {
                 })
               )
             ]),
+            // Wolf Tee Order
+            (g.wolfPlayers||[]).length >= 4 ? h('div',{style:'margin:8px 0;'},[
+              h('div',{class:'muted'},'Tee Order (tap arrows to reorder)'),
+              h('div',{style:'display:flex;flex-direction:column;gap:6px;margin-top:6px;'},
+                (g.wolfTeeOrder.length ? g.wolfTeeOrder : g.wolfPlayers).map((pid, idx, arr) => {
+                  const player = State.data.players.find(p => p.id === pid);
+                  const isFirst = idx === 0;
+                  const isLast = idx === arr.length - 1;
+                  return player ? h('div',{style:'display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;'},[
+                    h('span',{style:'flex:1;'},player.name),
+                    h('button',{class:'btn small',disabled:isFirst,style:`padding:4px 10px;${isFirst?'opacity:0.3;':''}`,onclick:()=>{
+                      const order = g.wolfTeeOrder.length ? [...g.wolfTeeOrder] : [...g.wolfPlayers];
+                      [order[idx-1], order[idx]] = [order[idx], order[idx-1]];
+                      g.wolfTeeOrder = order;
+                      State.scheduleSave();
+                      State.scheduleRender();
+                    }},'\u25B2'),
+                    h('button',{class:'btn small',disabled:isLast,style:`padding:4px 10px;${isLast?'opacity:0.3;':''}`,onclick:()=>{
+                      const order = g.wolfTeeOrder.length ? [...g.wolfTeeOrder] : [...g.wolfPlayers];
+                      [order[idx], order[idx+1]] = [order[idx+1], order[idx]];
+                      g.wolfTeeOrder = order;
+                      State.scheduleSave();
+                      State.scheduleRender();
+                    }},'\u25BC')
+                  ]) : h('div',{});
+                })
+              )
+            ]) : h('div',{}),
             h('div',{style:'margin:8px 0;'},[
               h('div',{class:'muted'},'Point Value $'),
               h('input',{type:'number',step:'0.25',value:g.wolfPointValue||1,style:'width:80px;',onfocus:()=>State.begin(),onblur:(e)=>{g.wolfPointValue=parseFloat(e.target.value)||1;State.end();}})
             ]),
-            h('div',{class:'row',style:'align-items:center;gap:12px;margin:8px 0;'},[
+            h('label',{style:'display:flex;align-items:center;gap:8px;margin:8px 0;cursor:pointer;'},[
+              h('input',{type:'checkbox',checked:g.withJunk,onclick:(e)=>{g.withJunk=e.target.checked;State.scheduleSave();State.scheduleRender();}}),
+              ' Include Junk + KP'
+            ]),
+            g.withJunk ? h('div',{class:'row',style:'align-items:center;gap:12px;margin:8px 0;'},[
               h('div',{class:'pill'},'Junk $/point'),
               h('div',{},[h('div',{class:'muted'},'Front'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.front,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.front=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.front);State.end();}})]),
               h('div',{},[h('div',{class:'muted'},'Back'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.back,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.back=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.back);State.end();}})]),
-            ]),
+            ]) : h('div',{}),
             h('div',{class:'note',style:'margin-top:8px;'},'Wolf=2x, Blind Wolf=4x. Catch-up: 17-18 (4P) or 16-18 (5P).')
           ]) : h('div',{}),
 
@@ -3691,13 +3747,41 @@ const UI = {
               h('div',{class:'muted'},'Point Value $'),
               h('input',{type:'number',step:'0.25',value:g.ninePointValue||1,style:'width:80px;',onfocus:()=>State.begin(),onblur:(e)=>{g.ninePointValue=parseFloat(e.target.value)||1;State.end();}})
             ]),
-            h('div',{class:'row',style:'align-items:center;gap:12px;margin:8px 0;'},[
+            h('label',{style:'display:flex;align-items:center;gap:8px;margin:8px 0;cursor:pointer;'},[
+              h('input',{type:'checkbox',checked:g.withJunk,onclick:(e)=>{g.withJunk=e.target.checked;State.scheduleSave();State.scheduleRender();}}),
+              ' Include Junk + KP'
+            ]),
+            g.withJunk ? h('div',{class:'row',style:'align-items:center;gap:12px;margin:8px 0;'},[
               h('div',{class:'pill'},'Junk $/point'),
               h('div',{},[h('div',{class:'muted'},'Front'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.front,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.front=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.front);State.end();}})]),
               h('div',{},[h('div',{class:'muted'},'Back'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.back,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.back=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.back);State.end();}})]),
-            ]),
+            ]) : h('div',{}),
             h('div',{class:'note',style:'margin-top:8px;'},'5/3/1 distribution. Win by 2=9/0/0, with birdie=18/0/0.')
           ]) : h('div',{}),
+
+          // Handicap Mode selector (hidden for skins gross mode)
+          g.gameType === 'skins' && g.skinsMode === 'gross' ? h('div',{}) :
+          h('div',{class:'card'},[
+            h('div',{class:'pill'},'Handicap Mode'),
+            h('div',{style:'margin-top:6px;'},[
+              h('label',{style:'display:block;margin-bottom:4px;'},[
+                h('input',{type:'radio',name:`hcpMode_${g.id}`,checked:g.handicapMode==='full',
+                  onchange:()=>{g.handicapMode='full';Game.applyHandicapMode(g);State.scheduleSave();State.scheduleRender();}}),
+                ' Full Strokes'
+              ]),
+              h('label',{style:'display:block;margin-bottom:4px;'},[
+                h('input',{type:'radio',name:`hcpMode_${g.id}`,checked:g.handicapMode==='off_low',
+                  onchange:()=>{g.handicapMode='off_low';Game.applyHandicapMode(g);State.scheduleSave();State.scheduleRender();}}),
+                ' Off the Low'
+              ]),
+              g.gameType === 'nassau' || g.gameType === 'vegas' ?
+                h('label',{style:'display:block;margin-bottom:4px;'},[
+                  h('input',{type:'radio',name:`hcpMode_${g.id}`,checked:g.handicapMode==='team_delta',
+                    onchange:()=>{g.handicapMode='team_delta';Game.applyHandicapMode(g);State.scheduleSave();State.scheduleRender();}}),
+                  ' Team Delta'
+                ]) : h('div',{})
+            ])
+          ]),
 
           strokesEditor(),
           h('div',{class:'note'},'Scores tab shows GROSS. Net is auto from strokes + course HCP.')
@@ -3706,7 +3790,15 @@ const UI = {
     });
 
     return h('div',{},[
-      h('div',{class:'card'},[h('div',{class:'pill'},'Players'),h('div',{},playerInputs)]),
+      h('div',{class:'card'},[
+        h('div',{class:'pill'},'Players'),
+        h('div',{style:'display:grid;grid-template-columns:64px 1fr 72px;gap:8px;margin-bottom:4px;'},[
+          h('span',{},''),
+          h('span',{class:'muted',style:'font-size:12px;'},'Name'),
+          h('span',{class:'muted',style:'font-size:12px;text-align:center;'},'HCP')
+        ]),
+        h('div',{},playerInputs)
+      ]),
       courseCard,
       h('div',{},[gamesHeader,...gameCards])
     ]);
