@@ -707,12 +707,6 @@ const State = {
     if (!this.locks) {
       this.scheduleSave();
       this.scheduleRender();
-      // Check if round just completed
-      if (!this.data.roundCompleteShown && this.isRoundComplete()) {
-        this.data.roundCompleteShown = true;
-        this.scheduleSave();
-        setTimeout(() => UI.showRoundCompleteModal(), 300);
-      }
     }
   },
 
@@ -3862,7 +3856,9 @@ const UI = {
         h('div',{class:'hole-num'},`Hole ${hole+1}`),
         h('div',{class:'hole-details'},`Par ${par}  \u00B7  HCP ${hcp}`)
       ]),
-      h('button',{class:'hole-nav-btn', disabled:hole===17, onclick:()=>goToHole(hole+1)},'\u203A')
+      hole === 17
+        ? h('button',{class:'hole-nav-btn',style:'width:auto;padding:0 14px;font-size:13px;font-weight:700;border-radius:20px;',onclick:()=>UI.showRoundCompleteModal()},'Finish')
+        : h('button',{class:'hole-nav-btn',onclick:()=>goToHole(hole+1)},'\u203A')
     ]);
 
     // Score class helper
@@ -3992,39 +3988,83 @@ const UI = {
       const theme = `theme-g${(idx%6)+1}`;
       if (!Game.hasAnyScores(game)) return null;
 
-      let statusText = '';
-      if (game.gameType === 'nassau') {
-        const result = Game.computeResult(game);
+      // Team games: multi-line card
+      if (game.gameType === 'nassau' || game.gameType === 'vegas') {
+        const isNassau = game.gameType === 'nassau';
+        const result = isNassau ? Game.computeResult(game) : Game.computeVegasResult(game);
         const sz = (game.teamA||[]).length || 1;
+        const junk = game.withJunk ? Game.computeJunk(game) : null;
+        const kpResult = game.withJunk ? Game.computeKP(game) : null;
+        const fmtPts = (pts) => pts > 0 ? `+${pts}` : pts === 0 ? 'E' : String(pts);
         const fmtSeg = (s) => s.winners.join('/');
-        const junk = game.withJunk ? Game.computeJunk(game) : null;
-        const kpResult = game.withJunk ? Game.computeKP(game) : null;
-        const fmtPts = (pts) => pts > 0 ? `+${pts}` : pts === 0 ? 'E' : String(pts);
-        let parts = [`F:${fmtSeg(result.segments.front)} B:${fmtSeg(result.segments.back)}`];
-        if (junk && (junk.frontNetPts !== 0 || junk.backNetPts !== 0)) parts.push(`J:${fmtPts(junk.frontNetPts + junk.backNetPts)}`);
-        if (kpResult) { const kpNet = kpResult.teamAKPs - kpResult.teamBKPs; if (kpNet !== 0) parts.push(`KP:${fmtPts(kpNet)}`); }
-        parts.push(`${Utils.fmt(result.teamTotals.total / sz)}/ea`);
-        statusText = parts.join(' | ');
-      } else if (game.gameType === 'vegas') {
-        const result = Game.computeVegasResult(game);
-        const sz = (game.teamA||[]).length || 1;
-        const junk = game.withJunk ? Game.computeJunk(game) : null;
-        const kpResult = game.withJunk ? Game.computeKP(game) : null;
-        const fmtPts = (pts) => pts > 0 ? `+${pts}` : pts === 0 ? 'E' : String(pts);
-        let parts = [`F:${result.frontPoints} B:${result.backPoints}`];
-        if (junk && (junk.frontNetPts !== 0 || junk.backNetPts !== 0)) parts.push(`J:${fmtPts(junk.frontNetPts + junk.backNetPts)}`);
-        if (kpResult) { const kpNet = kpResult.teamAKPs - kpResult.teamBKPs; if (kpNet !== 0) parts.push(`KP:${fmtPts(kpNet)}`); }
-        parts.push(`${Utils.fmt(result.totalValue / sz)}/ea`);
-        statusText = parts.join(' | ');
-      } else if (game.gameType === 'skins') {
-        const result = Game.computeSkinsResult(game);
-        statusText = `Skins`;
+        const hasBack9Score = State.data.players.some(p => {
+          const arr = game.gross[p.id] || [];
+          return arr.slice(9).some(score => score != null);
+        });
+        const allHolesScored = [...(game.teamA||[]), ...(game.teamB||[])].every(pid => {
+          const scores = game.gross[pid];
+          return scores && scores.every(s => s != null);
+        });
+
+        // KP front/back split
+        let frontKP = 0, backKP = 0;
+        if (kpResult) {
+          kpResult.results.forEach(r => {
+            if (r.carried || !r.teamWinner) return;
+            const net = r.teamWinner === 'A' ? (r.carryStack||1) : -(r.carryStack||1);
+            if (r.hole <= 8) frontKP += net; else backKP += net;
+          });
+        }
+
+        // Per-player total
+        const perPlayer = isNassau ? result.teamTotals.total / sz : result.totalValue / sz;
+
+        // Build lines
+        const lines = [];
+
+        // Line 1: Team names + total (bold)
+        const aN = (game.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
+        const bN = (game.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
+        const totStr = perPlayer !== 0 ? (perPlayer > 0 ? '+' : '') + Utils.fmt(perPlayer) + '/ea' : 'Even';
+        lines.push(h('div',{style:'display:flex;justify-content:space-between;font-weight:700;font-size:12px;'},[
+          h('span',{},`${aN} vs ${bN}`),
+          h('span',{},totStr)
+        ]));
+
+        // Line 2: Front
+        const buildNineLine = (label, betsStr, junkPts, kpNet, dollarPP) => {
+          let parts = [`Bets: ${betsStr}`];
+          if (junkPts !== 0) parts.push(`Junk: ${fmtPts(junkPts)}`);
+          if (kpNet !== 0) parts.push(`KP: ${fmtPts(kpNet)}`);
+          if (dollarPP !== 0) parts.push(Utils.fmt(dollarPP) + '/ea');
+          return h('div',{style:'font-size:11px;margin-top:3px;color:var(--muted);'},`${label}:  ${parts.join('  ')}`);
+        };
+
+        if (isNassau) {
+          lines.push(buildNineLine('Front', fmtSeg(result.segments.front), junk ? junk.frontNetPts : 0, frontKP, result.segments.front.payA));
+          if (hasBack9Score) lines.push(buildNineLine('Back', fmtSeg(result.segments.back), junk ? junk.backNetPts : 0, backKP, result.segments.back.payA));
+          if (allHolesScored) lines.push(buildNineLine('Overall', fmtSeg(result.segments.overall), 0, 0, result.segments.overall.payA));
+        } else {
+          const frontPP = result.frontPoints * (game.pointValue.front || 0);
+          const backPP = result.backPoints * (game.pointValue.back || 0);
+          lines.push(buildNineLine('Front', fmtPts(result.frontPoints) + ' pts', junk ? junk.frontNetPts : 0, frontKP, frontPP));
+          if (hasBack9Score) lines.push(buildNineLine('Back', fmtPts(result.backPoints) + ' pts', junk ? junk.backNetPts : 0, backKP, backPP));
+        }
+
+        return h('div',{class:`${theme} game-status-card`,style:'margin-bottom:4px;'},[
+          h('div',{class:'card',style:'padding:8px 10px;'},lines)
+        ]);
+      }
+
+      // Individual games: simple single-line
+      let statusText = '';
+      if (game.gameType === 'skins') {
+        statusText = 'Skins';
       } else if (game.gameType === 'wolf') {
         statusText = 'Wolf';
       } else if (game.gameType === 'ninepoint') {
         statusText = '9-Point';
       }
-
       return h('div',{class:`${theme} game-status-card`,style:'margin-bottom:4px;'},[
         h('div',{class:'card',style:'padding:6px 10px;'},[
           h('div',{class:'row',style:'align-items:center;justify-content:space-between;font-size:12px;'},[
