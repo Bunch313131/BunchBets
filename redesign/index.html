@@ -36,6 +36,8 @@
 [data-theme="augusta"] .wizard-splash { background:linear-gradient(135deg,#002b10,#004d1c,#002b10); }
 [data-theme="augusta"] .pill { border-radius:4px; }
 [data-theme="augusta"] .scoring-toggle-btn.active { background:var(--gold); color:#002b10; }
+[data-theme="augusta"] .score-drum { border-radius:6px; background:linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(200,169,81,0.06) 40%, rgba(200,169,81,0.06) 60%, rgba(0,0,0,0.4) 100%); box-shadow:inset 0 2px 6px rgba(0,0,0,0.5), inset 0 -2px 6px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.4); border-color:rgba(200,169,81,0.25); }
+[data-theme="augusta"] .score-drum-frame { border-color:var(--gold); border-radius:4px; box-shadow:0 0 8px rgba(200,169,81,0.3), inset 0 0 6px rgba(200,169,81,0.1); background:rgba(200,169,81,0.04); }
 
 /* Theme 3: Midnight — dark luxury, neon accents, glass morphism, futuristic */
 :root[data-theme="midnight"] { --bg:#0a0a0f; --card:rgba(20,20,35,0.85); --txt:#e8e8f0; --muted:#7a7a9a; --border:rgba(100,100,180,0.2); --acc:#7c3aed; --success:#10b981; --danger:#f43f5e; --warning:#f59e0b; --gold:#a78bfa; --radius:20px; --font-display:'SF Pro Display',system-ui,-apple-system,Segoe UI; --header-bg:rgba(10,10,15,0.8); color-scheme: dark; }
@@ -50,7 +52,8 @@
 [data-theme="midnight"] .hole-dot.current { background:linear-gradient(135deg,#7c3aed,#a855f7); border-color:#a855f7; box-shadow:0 0 12px rgba(124,58,237,0.5); }
 [data-theme="midnight"] .wizard-splash { background:linear-gradient(135deg,#0a0a0f,#1a1a3e,#7c3aed); }
 [data-theme="midnight"] .scoring-toggle-btn.active { background:linear-gradient(135deg,#7c3aed,#a855f7); }
-[data-theme="midnight"] .score-drum-frame { border-color:#a855f7; box-shadow:0 0 10px rgba(124,58,237,0.3); }
+[data-theme="midnight"] .score-drum { background:linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(124,58,237,0.05) 40%, rgba(124,58,237,0.05) 60%, rgba(0,0,0,0.5) 100%); box-shadow:inset 0 3px 8px rgba(0,0,0,0.6), inset 0 -3px 8px rgba(0,0,0,0.6), 0 0 20px rgba(124,58,237,0.15), 0 2px 4px rgba(0,0,0,0.4); border-color:rgba(124,58,237,0.3); }
+[data-theme="midnight"] .score-drum-frame { border-color:#a855f7; box-shadow:0 0 16px rgba(124,58,237,0.4), inset 0 0 10px rgba(124,58,237,0.15); background:rgba(124,58,237,0.06); }
 [data-theme="midnight"] body { background-image:radial-gradient(ellipse at 50% 0%, rgba(124,58,237,0.08) 0%, transparent 60%); }
 
 /* Theme 4: Tour — ESPN/CBS sports broadcast, bold, high-energy */
@@ -69,7 +72,8 @@
 [data-theme="tour"] .pill { border-radius:4px; font-weight:800; text-transform:uppercase; }
 [data-theme="tour"] .wizard-splash { background:linear-gradient(135deg,#0c0c0c,#1a1a1a,#ff3b30); }
 [data-theme="tour"] .scoring-toggle-btn.active { background:var(--acc); }
-[data-theme="tour"] .score-drum-frame { border-color:var(--acc); border-width:3px; border-radius:6px; }
+[data-theme="tour"] .score-drum { border-radius:8px; background:linear-gradient(180deg, rgba(0,0,0,0.6) 0%, rgba(255,59,48,0.03) 40%, rgba(255,59,48,0.03) 60%, rgba(0,0,0,0.6) 100%); box-shadow:inset 0 3px 8px rgba(0,0,0,0.7), inset 0 -3px 8px rgba(0,0,0,0.7), 0 2px 4px rgba(0,0,0,0.5); border-color:rgba(255,59,48,0.2); }
+[data-theme="tour"] .score-drum-frame { border-color:var(--acc); border-width:3px; border-radius:6px; box-shadow:0 0 10px rgba(255,59,48,0.3); }
 :root.light-mode input[type="text"], :root.light-mode input[type="tel"], :root.light-mode input[type="number"], :root.light-mode select { background:rgba(0,0,0,0.04); }
 :root.light-mode .menu-item:hover { background:rgba(0,0,0,0.05); }
 .theme-switch { position:relative; width:50px; height:26px; display:inline-block; }
@@ -358,18 +362,20 @@ body:has(.wizard-overlay) { overflow:hidden; }
 /* Game status summary cards below scoring */
 .game-status-card { padding:8px 12px; margin-bottom:6px; }
 
-/* Score drum picker — 3 visible numbers, center is selected */
-.score-drum-wrap { display:flex; align-items:center; gap:8px; }
-.score-drum { position:relative; width:140px; height:44px; overflow:hidden; -webkit-mask-image:linear-gradient(to right, transparent 0%, black 30%, black 70%, transparent 100%); mask-image:linear-gradient(to right, transparent 0%, black 30%, black 70%, transparent 100%); }
+/* Score drum picker — 3D wheel effect */
+.score-drum-wrap { display:flex; align-items:center; gap:8px; margin-left:auto; }
+.score-drum { position:relative; width:160px; height:52px; overflow:hidden; border-radius:14px; background:linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(255,255,255,0.03) 40%, rgba(255,255,255,0.03) 60%, rgba(0,0,0,0.3) 100%); box-shadow:inset 0 2px 6px rgba(0,0,0,0.5), inset 0 -2px 6px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.08); }
+.score-drum::before { content:''; position:absolute; inset:0; border-radius:14px; background:linear-gradient(90deg, rgba(0,0,0,0.4) 0%, transparent 20%, transparent 80%, rgba(0,0,0,0.4) 100%); z-index:1; pointer-events:none; }
+.score-drum::after { content:''; position:absolute; top:0; left:0; right:0; height:40%; background:linear-gradient(180deg, rgba(0,0,0,0.15) 0%, transparent 100%); border-radius:14px 14px 0 0; z-index:1; pointer-events:none; }
 .score-drum-track { display:flex; transition:transform 0.2s ease-out; height:100%; align-items:center; }
-.score-drum-num { width:46px; flex-shrink:0; height:36px; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:600; color:var(--muted); }
-.score-drum-num.center { font-size:22px; font-weight:800; color:var(--txt); }
-.score-drum-num.center.eagle, .score-drum-num.center.birdie { color:var(--success); }
-.score-drum-num.center.bogey, .score-drum-num.center.double-bogey { color:var(--danger); }
-.score-drum-frame { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:44px; height:40px; border:2px solid var(--acc); border-radius:10px; pointer-events:none; z-index:2; }
-.score-drum-frame.eagle, .score-drum-frame.birdie { border-color:var(--success); }
-.score-drum-frame.bogey, .score-drum-frame.double-bogey { border-color:var(--danger); }
-.score-drum-touch { position:absolute; inset:0; z-index:3; cursor:grab; }
+.score-drum-num { width:52px; flex-shrink:0; height:44px; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:600; color:var(--muted); opacity:0.5; text-shadow:0 1px 2px rgba(0,0,0,0.3); }
+.score-drum-num.center { font-size:26px; font-weight:800; color:var(--txt); opacity:1; text-shadow:0 1px 0 rgba(255,255,255,0.15), 0 2px 4px rgba(0,0,0,0.3); }
+.score-drum-num.center.eagle, .score-drum-num.center.birdie { color:var(--success); text-shadow:0 0 8px rgba(22,163,74,0.3), 0 1px 0 rgba(255,255,255,0.1); }
+.score-drum-num.center.bogey, .score-drum-num.center.double-bogey { color:var(--danger); text-shadow:0 0 8px rgba(220,38,38,0.3), 0 1px 0 rgba(255,255,255,0.1); }
+.score-drum-frame { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:50px; height:46px; border:2px solid var(--acc); border-radius:12px; pointer-events:none; z-index:4; box-shadow:0 0 12px rgba(59,130,246,0.25), inset 0 0 8px rgba(59,130,246,0.1); background:rgba(59,130,246,0.04); }
+.score-drum-frame.eagle, .score-drum-frame.birdie { border-color:var(--success); box-shadow:0 0 12px rgba(22,163,74,0.3), inset 0 0 8px rgba(22,163,74,0.1); background:rgba(22,163,74,0.04); }
+.score-drum-frame.bogey, .score-drum-frame.double-bogey { border-color:var(--danger); box-shadow:0 0 12px rgba(220,38,38,0.3), inset 0 0 8px rgba(220,38,38,0.1); background:rgba(220,38,38,0.04); }
+.score-drum-touch { position:absolute; inset:0; z-index:5; cursor:grab; }
 .score-drum-touch:active { cursor:grabbing; }
 /* Scorecard double-rule at Front/Back 9 boundary */
 td:nth-child(10), th:nth-child(10) { border-left:3px double var(--muted); }
@@ -3328,10 +3334,10 @@ const UI = {
       document.body.appendChild(bottomNav);
     }
     const navItems = [
-      { id: 'setup', label: 'Setup', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>' },
       { id: 'scores', label: 'Scores', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>' },
       { id: 'match', label: 'Match', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>' },
-      { id: 'settle', label: 'Settle', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>' }
+      { id: 'settle', label: 'Settle', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>' },
+      { id: 'setup', label: 'Setup', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>' }
     ];
     bottomNav.innerHTML = navItems.map(item =>
       `<button class="bottom-nav-btn ${State.data.tab === item.id ? 'active' : ''}" data-tab="${item.id}">${item.icon}<span>${item.label}</span></button>`
@@ -3346,10 +3352,10 @@ const UI = {
 
   renderTabs() {
     const tabs = [
-      ['setup','Setup'],
       ['scores','Scores'],
       ['match','Match'],
-      ['settle','Settle']
+      ['settle','Settle'],
+      ['setup','Setup']
     ];
 
     // Populate menu navigation
@@ -4122,7 +4128,7 @@ const UI = {
       else if (centerDiff === 1) frameClass += ' bogey';
       else if (centerDiff >= 2) frameClass += ' double-bogey';
 
-      const drumTrack = h('div',{class:'score-drum-track',style:`transform:translateX(${(1 - centerIdx) * 46 + 1}px);`},
+      const drumTrack = h('div',{class:'score-drum-track',style:`transform:translateX(${(1 - centerIdx) * 52 + 2}px);`},
         drumNums.map((n, i) => {
           const diff = n - par;
           let cls = 'score-drum-num';
