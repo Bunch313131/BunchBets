@@ -3909,6 +3909,12 @@ const UI = {
         Game.setKPRanking(hole, ranking);
         State.scheduleSave();
         State.scheduleRender();
+        // Check if this is the last par 3 — if so, check for sweeps/quads
+        const par3s = Game.getPar3Holes();
+        const lastPar3 = par3s[par3s.length - 1];
+        if (hole === lastPar3) {
+          setTimeout(() => UI.checkSweepsQuads(), 300);
+        }
         return;
       }
 
@@ -3966,6 +3972,10 @@ const UI = {
             Game.setKPRanking(hole, newRanking);
             State.scheduleSave();
             State.scheduleRender();
+            const par3s = Game.getPar3Holes();
+            if (hole === par3s[par3s.length - 1]) {
+              setTimeout(() => UI.checkSweepsQuads(), 300);
+            }
           } else {
             buildStep(newRanking, stillUnresolved);
           }
@@ -3982,6 +3992,10 @@ const UI = {
         Game.setKPRanking(hole, ranking);
         State.scheduleSave();
         State.scheduleRender();
+        const par3s = Game.getPar3Holes();
+        if (hole === par3s[par3s.length - 1]) {
+          setTimeout(() => UI.checkSweepsQuads(), 300);
+        }
       };
       content.appendChild(noOneBtn);
 
@@ -4008,6 +4022,98 @@ const UI = {
     // Start wizard with all nassau games as unresolved
     const nassauGames = State.data.games.filter(gm => gm.gameType === 'nassau' || gm.gameType === 'vegas');
     buildStep([], nassauGames);
+  },
+
+  // Check for sweeps after last par 3 KP entry, then ask quads question
+  checkSweepsQuads() {
+    const games = State.data.games.filter(gm => gm.gameType === 'nassau' || gm.gameType === 'vegas');
+    const sweepsGames = [];
+
+    games.forEach(gm => {
+      const kpResult = Game.computeKP(gm);
+      if (kpResult.hasSweeps) {
+        sweepsGames.push({ game: gm, kpResult });
+      }
+    });
+
+    if (sweepsGames.length === 0) return;
+
+    // Ask the quads question for each game with sweeps, one at a time
+    const askQuads = (index) => {
+      if (index >= sweepsGames.length) {
+        State.scheduleSave();
+        State.scheduleRender();
+        return;
+      }
+
+      const { game, kpResult } = sweepsGames[index];
+      const sweepsTeam = kpResult.sweepsTeam;
+      const losingTeam = sweepsTeam === 'A' ? 'B' : 'A';
+      const losingPlayers = losingTeam === 'A' ? (game.teamA||[]) : (game.teamB||[]);
+      const losingNames = losingPlayers.map(pid => {
+        const p = State.data.players.find(pl => pl.id === pid);
+        return p ? p.name : '?';
+      }).join(' / ');
+
+      const winningPlayers = sweepsTeam === 'A' ? (game.teamA||[]) : (game.teamB||[]);
+      const winningNames = winningPlayers.map(pid => {
+        const p = State.data.players.find(pl => pl.id === pid);
+        return p ? p.name : '?';
+      }).join(' / ');
+
+      const overlay = document.createElement('div');
+      overlay.className = 'kp-modal';
+
+      const content = document.createElement('div');
+      content.className = 'kp-modal-content';
+
+      const icon = document.createElement('div');
+      icon.style.cssText = 'text-align:center;font-size:28px;margin-bottom:8px;';
+      icon.textContent = '\uD83C\uDFC6';
+      content.appendChild(icon);
+
+      const title = document.createElement('h3');
+      title.style.cssText = 'text-align:center;';
+      title.textContent = 'Sweeps!';
+      content.appendChild(title);
+
+      const desc = document.createElement('div');
+      desc.className = 'subtitle';
+      desc.style.cssText = 'text-align:center;';
+      desc.textContent = `${winningNames} won all KPs in ${UI.gameLabel(game)}`;
+      content.appendChild(desc);
+
+      const question = document.createElement('div');
+      question.style.cssText = 'margin:16px 0 12px;font-size:15px;font-weight:500;text-align:center;';
+      question.textContent = `Did ${losingNames} hit ANY par 3 greens this round?`;
+      content.appendChild(question);
+
+      const yesBtn = document.createElement('button');
+      yesBtn.className = 'kp-player-btn';
+      yesBtn.textContent = 'Yes — Sweeps only (2x KP)';
+      yesBtn.onclick = () => {
+        game.quadsConfirmed[losingTeam] = false;
+        overlay.remove();
+        askQuads(index + 1);
+      };
+      content.appendChild(yesBtn);
+
+      const noBtn = document.createElement('button');
+      noBtn.className = 'kp-player-btn';
+      noBtn.style.cssText = 'background:rgba(217,119,6,0.1);border-color:var(--warning);color:var(--warning);';
+      noBtn.textContent = 'No — QUADS! (4x KP)';
+      noBtn.onclick = () => {
+        game.quadsConfirmed[losingTeam] = true;
+        overlay.remove();
+        askQuads(index + 1);
+      };
+      content.appendChild(noBtn);
+
+      overlay.appendChild(content);
+      document.body.appendChild(overlay);
+    };
+
+    askQuads(0);
   },
 
   scores() {
