@@ -1442,13 +1442,6 @@ const Game = {
           detail.grossWinner = winner;
           detail.grossSkins = grossCarry;
           grossCarry = 0;
-        } else if (h === 17 && grossCarry > 0) {
-          // Final hole tie with carryovers - split among tied
-          const split = grossCarry / grossLeaders.length;
-          grossLeaders.forEach(s => { grossSkins[s.pid] += split; });
-          detail.grossWinner = 'split';
-          detail.grossSkins = grossCarry;
-          grossCarry = 0;
         }
       }
 
@@ -1463,13 +1456,6 @@ const Game = {
           const winner = netLeaders[0].pid;
           netSkins[winner] += netCarry;
           detail.netWinner = winner;
-          detail.netSkins = netCarry;
-          netCarry = 0;
-        } else if (h === 17 && netCarry > 0) {
-          // Final hole tie with carryovers - split among tied
-          const split = netCarry / netLeaders.length;
-          netLeaders.forEach(s => { netSkins[s.pid] += split; });
-          detail.netWinner = 'split';
           detail.netSkins = netCarry;
           netCarry = 0;
         }
