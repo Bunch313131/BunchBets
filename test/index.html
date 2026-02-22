@@ -3651,9 +3651,10 @@ const UI = {
     const junkVal = hole <= 8 ? (g.junkValue.front||0) : (g.junkValue.back||0);
     const allPlayers = State.data.players;
 
-    // Default scores to par if hole has no scores yet
+    // Default scores to par if hole has no scores yet (and hasn't been intentionally cleared)
+    if (!State.data._clearedHoles) State.data._clearedHoles = {};
     const holeHasScores = allPlayers.some(p => g.gross[p.id] && g.gross[p.id][hole] != null);
-    if (!holeHasScores) {
+    if (!holeHasScores && !State.data._clearedHoles[hole]) {
       State.begin();
       State.data.games.forEach(gm => {
         allPlayers.forEach(p => {
@@ -3717,6 +3718,8 @@ const UI = {
       });
 
       const adjustScore = (delta) => {
+        // Re-entering scores clears the "intentionally cleared" flag
+        if (State.data._clearedHoles) delete State.data._clearedHoles[hole];
         let current = gross;
         if (current == null) current = par;
         else current += delta;
@@ -3854,6 +3857,8 @@ const UI = {
 
     // Clear hole button
     const clearHole = () => {
+      if (!State.data._clearedHoles) State.data._clearedHoles = {};
+      State.data._clearedHoles[hole] = true;
       State.data.games.forEach(gm => {
         allPlayers.forEach(p => {
           if (gm.gross[p.id]) gm.gross[p.id][hole] = null;
