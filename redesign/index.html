@@ -856,7 +856,7 @@ const State = {
       if (obj.lastActiveDate) this.data.lastActiveDate = obj.lastActiveDate;
       this.data.roundCompleteShown = !!obj.roundCompleteShown;
       // Validate tab value - only allow known tabs
-      const validTabs = ['setup','scores','match','settle','rules','live'];
+      const validTabs = ['setup','scores','match','settle','rules'];
       this.data.tab = validTabs.includes(obj.tab) ? obj.tab : 'scores';
       this.data.debugStatus = !!obj.debugStatus;
       this.data.scoringHole = obj.scoringHole || 0;
@@ -3285,8 +3285,7 @@ const UI = {
       case 'match': view = this.match(); break;
       case 'settle': view = this.transactions(); break;
       case 'rules': view = this.rules(); break;
-      case 'live': view = this.scores(); break; // Live tab defaults to scores view
-      default: view = this.scores(); // Default to scores instead of error
+      default: view = this.holeScoring(); // Default to hole view
     }
     // Header always visible now (contains hamburger menu)
     root.appendChild(view);
