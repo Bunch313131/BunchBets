@@ -3838,21 +3838,24 @@ const UI = {
       ]);
     }).filter(Boolean);
 
-    // Column headers — wrapped in same flex+gap:4px as hole-score-controls to match alignment
-    const colHeaderInner = [
+    // Column headers — use exact same structure as player row for pixel-perfect alignment
+    const colHeaderControls = [
       h('div',{style:'width:32px;'}),
       h('div',{class:'hole-col-hdr score',style:'width:40px;'},'Score'),
       h('div',{style:'width:32px;'})
     ];
     if (g.withJunk) {
-      colHeaderInner.push(h('div',{style:'display:flex;align-items:center;gap:3px;border-left:1px solid var(--border);padding-left:6px;margin-left:2px;'},[
+      colHeaderControls.push(h('div',{class:'hole-junk-inline'},[
         h('div',{style:'width:22px;'}),
-        h('div',{class:'hole-col-hdr junk',style:'width:18px;'},'Junk'),
+        h('span',{class:'hole-col-hdr junk',style:'width:18px;'},'Junk'),
         h('div',{style:'width:22px;'})
       ]));
     }
-    const colHeader = h('div',{class:'hole-col-headers'},[
-      h('div',{style:'display:flex;align-items:center;gap:4px;'},colHeaderInner)
+    const colHeader = h('div',{class:'hole-player-row',style:'padding:4px 12px 3px;'},[
+      h('div',{class:'hole-player-info',style:'visibility:hidden;'},[
+        h('div',{class:'hole-player-name'},'\u00A0')
+      ]),
+      h('div',{class:'hole-score-controls'},colHeaderControls)
     ]);
 
     // Clear hole button
