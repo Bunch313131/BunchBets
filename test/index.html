@@ -4046,41 +4046,34 @@ const UI = {
         ]);
       }
 
-      // Skins: multi-line card with player results
+      // Skins: player names, skin counts, and take
       if (game.gameType === 'skins') {
         const result = Game.computeSkinsResult(game);
         const mode = game.skinsMode || 'net';
         const players = game.skinsPlayers || [];
         const carry = mode === 'gross' ? result.grossCarry : mode === 'net' ? result.netCarry : (result.grossCarry + result.netCarry);
-        const skinVal = mode === 'gross' ? result.grossSkinValue : result.netSkinValue;
-        const lines = [];
 
-        // Line 1: Header — game label + pot
-        lines.push(h('div',{style:'display:flex;justify-content:space-between;font-weight:700;font-size:12px;'},[
-          h('span',{},UI.gameLabel(game)),
-          h('span',{},`Pot: ${Utils.fmt(result.totalPot)}`)
-        ]));
-
-        // Line 2: Each player's skins + profit
-        const playerParts = players.map(pid => {
+        // Each player: name, skins, take
+        const playerLines = players.map(pid => {
           const name = UI.playerName(pid);
           const skins = mode === 'gross' ? result.grossSkins[pid] :
                         mode === 'net' ? result.netSkins[pid] :
                         (result.grossSkins[pid] + result.netSkins[pid]);
           const pr = result.playerResults[pid];
-          const profit = pr ? pr.profit : 0;
-          const profitStr = profit !== 0 ? ` (${profit > 0 ? '+' : ''}${Utils.fmt(profit)})` : '';
-          return `${name}: ${skins || 0}${profitStr}`;
+          const take = pr ? pr.totalWin : 0;
+          return h('div',{style:'display:flex;justify-content:space-between;font-size:11px;color:var(--muted);'},[
+            h('span',{},`${name}: ${skins || 0} skin${(skins||0)===1?'':'s'}`),
+            take > 0 ? h('span',{},Utils.fmt(take)) : ''
+          ].filter(Boolean));
         });
-        lines.push(h('div',{style:'font-size:11px;margin-top:3px;color:var(--muted);'},playerParts.join('  ')));
 
-        // Line 3: Carry + per-skin value
-        const infoParts = [];
-        if (carry > 0) infoParts.push(`Carry: ${carry}`);
-        if (skinVal > 0) infoParts.push(`${Utils.fmt(skinVal)}/skin`);
-        if (infoParts.length) {
-          lines.push(h('div',{style:'font-size:11px;margin-top:2px;color:var(--muted);'},infoParts.join('  |  ')));
-        }
+        const lines = [];
+        // Header: game label + carry (if any)
+        lines.push(h('div',{style:'display:flex;justify-content:space-between;font-weight:700;font-size:12px;'},[
+          h('span',{},UI.gameLabel(game)),
+          carry > 0 ? h('span',{style:'font-weight:400;font-size:11px;color:var(--muted);'},`Carry: ${carry}`) : ''
+        ].filter(Boolean)));
+        lines.push(...playerLines);
 
         return h('div',{class:`${theme} game-status-card`,style:'margin-bottom:4px;'},[
           h('div',{class:'card',style:'padding:8px 10px;'},lines)
@@ -4691,32 +4684,26 @@ const UI = {
         const mode = game.skinsMode || 'net';
         const players = game.skinsPlayers || [];
         const carry = mode === 'gross' ? result.grossCarry : mode === 'net' ? result.netCarry : (result.grossCarry + result.netCarry);
-        const skinVal = mode === 'gross' ? result.grossSkinValue : result.netSkinValue;
-        const lines = [];
 
-        lines.push(h('div',{style:'display:flex;justify-content:space-between;font-weight:700;font-size:12px;'},[
-          h('span',{},UI.gameLabel(game)),
-          h('span',{},`Pot: ${Utils.fmt(result.totalPot)}`)
-        ]));
-
-        const playerParts = players.map(pid => {
+        const playerLines = players.map(pid => {
           const name = UI.playerName(pid);
           const skins = mode === 'gross' ? result.grossSkins[pid] :
                         mode === 'net' ? result.netSkins[pid] :
                         (result.grossSkins[pid] + result.netSkins[pid]);
           const pr = result.playerResults[pid];
-          const profit = pr ? pr.profit : 0;
-          const profitStr = profit !== 0 ? ` (${profit > 0 ? '+' : ''}${Utils.fmt(profit)})` : '';
-          return `${name}: ${skins || 0}${profitStr}`;
+          const take = pr ? pr.totalWin : 0;
+          return h('div',{style:'display:flex;justify-content:space-between;font-size:11px;color:var(--muted);'},[
+            h('span',{},`${name}: ${skins || 0} skin${(skins||0)===1?'':'s'}`),
+            take > 0 ? h('span',{},Utils.fmt(take)) : ''
+          ].filter(Boolean));
         });
-        lines.push(h('div',{style:'font-size:11px;margin-top:3px;color:var(--muted);'},playerParts.join('  ')));
 
-        const infoParts = [];
-        if (carry > 0) infoParts.push(`Carry: ${carry}`);
-        if (skinVal > 0) infoParts.push(`${Utils.fmt(skinVal)}/skin`);
-        if (infoParts.length) {
-          lines.push(h('div',{style:'font-size:11px;margin-top:2px;color:var(--muted);'},infoParts.join('  |  ')));
-        }
+        const lines = [];
+        lines.push(h('div',{style:'display:flex;justify-content:space-between;font-weight:700;font-size:12px;'},[
+          h('span',{},UI.gameLabel(game)),
+          carry > 0 ? h('span',{style:'font-weight:400;font-size:11px;color:var(--muted);'},`Carry: ${carry}`) : ''
+        ].filter(Boolean)));
+        lines.push(...playerLines);
 
         return h('div',{class:theme,style:'margin-bottom:6px;'},[
           h('div',{class:'card',style:'padding:8px 10px;'},lines)
