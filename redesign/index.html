@@ -192,9 +192,9 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .viewer-mode #joinBtn { display:none; }
 
 /* Hamburger Menu Styles */
-.header-brand { display:flex; align-items:center; gap:10px; }
-.header-brand img { width:36px; height:36px; border-radius:8px; }
-.header-info { display:flex; flex-direction:column; gap:1px; }
+.header-brand { display:flex; align-items:center; gap:10px; flex:1; min-width:0; }
+.header-brand img { width:36px; height:36px; border-radius:8px; flex-shrink:0; }
+.header-info { display:flex; flex-direction:column; gap:1px; flex:1; text-align:center; }
 .header-date { font-size:14px; font-weight:600; letter-spacing:0.3px; }
 .header-weather { font-size:11px; color:var(--muted); font-weight:500; }
 .hamburger { background:none; border:none; color:var(--txt); font-size:28px; cursor:pointer; padding:4px 8px; line-height:1; }
@@ -7264,9 +7264,10 @@ UI.initMenu();
             const c = data.current;
             const temp = Math.round(c.temperature_2m);
             const wind = Math.round(c.wind_speed_10m);
-            const codes = {0:'Clear',1:'Mostly Clear',2:'Partly Cloudy',3:'Overcast',45:'Foggy',48:'Foggy',51:'Light Drizzle',53:'Drizzle',55:'Heavy Drizzle',61:'Light Rain',63:'Rain',65:'Heavy Rain',71:'Light Snow',73:'Snow',75:'Heavy Snow',80:'Light Showers',81:'Showers',82:'Heavy Showers',95:'Thunderstorm',96:'Thunderstorm',99:'Thunderstorm'};
-            const desc = codes[c.weather_code] || 'Clear';
-            weatherEl.textContent = `${temp}°F  ${desc}  Wind ${wind}mph`;
+            const codes = {0:['☀️','Clear'],1:['🌤','Mostly Clear'],2:['⛅','Partly Cloudy'],3:['☁️','Overcast'],45:['🌫','Foggy'],48:['🌫','Foggy'],51:['🌦','Light Drizzle'],53:['🌦','Drizzle'],55:['🌧','Heavy Drizzle'],61:['🌧','Light Rain'],63:['🌧','Rain'],65:['🌧️','Heavy Rain'],71:['🌨','Light Snow'],73:['❄️','Snow'],75:['❄️','Heavy Snow'],80:['🌦','Showers'],81:['🌧','Showers'],82:['⛈','Heavy Showers'],95:['⛈','Thunderstorm'],96:['⛈','Thunderstorm'],99:['⛈','Thunderstorm']};
+            const [emoji, desc] = codes[c.weather_code] || ['☀️','Clear'];
+            const windEmoji = wind >= 15 ? '💨' : '🍃';
+            weatherEl.textContent = `${emoji} ${temp}°F ${desc}  ${windEmoji} ${wind}mph`;
           })
           .catch(() => { weatherEl.textContent = ''; });
       },
