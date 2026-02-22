@@ -300,7 +300,7 @@ body:has(.wizard-overlay) { overflow:hidden; }
 .hole-col-hdr.junk { color:var(--warning); }
 
 /* Player score rows */
-.hole-player-row { display:flex; flex-direction:column; gap:4px; padding:10px 12px; border-bottom:1px solid var(--border); }
+.hole-player-row { display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid var(--border); }
 .hole-player-row:last-child { border-bottom:none; }
 .hole-player-info { display:flex; flex-direction:column; gap:1px; flex:1; min-width:0; }
 .hole-player-name { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -4243,17 +4243,19 @@ const UI = {
       if (!UI._drumHandlers) UI._drumHandlers = [];
       UI._drumHandlers.push({ drumId, pid: p.id, currentScore, par, hole, setScore, centerIdx });
 
+      // vs-par label
+      const vsParColor = gross != null ? (scoreClass(gross).includes('birdie')||scoreClass(gross).includes('eagle')?'var(--success)':scoreClass(gross).includes('bogey')?'var(--danger)':'var(--muted)') : 'var(--muted)';
+      const vsParLabel = gross != null ? h('span',{style:`font-size:11px;font-weight:700;color:${vsParColor};`},vsPar(gross)) : null;
+
       return h('div',{class:'hole-player-row'},[
-        h('div',{style:'display:flex;align-items:center;justify-content:space-between;'},[
-          h('div',{class:'hole-player-info'},[
-            h('div',{class:'hole-player-name'},p.name),
-            h('div',{style:'display:flex;gap:6px;align-items:center;'},[
-              h('span',{class:'hole-player-hcp'},`HCP ${g.strokesCount[p.id]||0}`),
-              strokeDots.length ? h('span',{class:'hole-stroke-dots'},strokeDots) : null
-            ].filter(Boolean))
-          ]),
-          gross != null ? h('span',{style:`font-size:13px;font-weight:700;color:${scoreClass(gross).includes('birdie')||scoreClass(gross).includes('eagle')?'var(--success)':scoreClass(gross).includes('bogey')?'var(--danger)':'var(--muted)'};`},vsPar(gross)) : null
-        ].filter(Boolean)),
+        h('div',{class:'hole-player-info'},[
+          h('div',{class:'hole-player-name'},p.name),
+          h('div',{style:'display:flex;gap:6px;align-items:center;'},[
+            h('span',{class:'hole-player-hcp'},`HCP ${g.strokesCount[p.id]||0}`),
+            strokeDots.length ? h('span',{class:'hole-stroke-dots'},strokeDots) : null,
+            vsParLabel
+          ].filter(Boolean))
+        ]),
         scoreDrum
       ]);
     });
@@ -4415,25 +4417,15 @@ const UI = {
       ]);
     }).filter(Boolean);
 
-    // Column headers — use exact same structure as player row for pixel-perfect alignment
-    const colHeaderControls = [
-      h('div',{style:'width:32px;'}),
-      h('div',{class:'hole-col-hdr score',style:'width:40px;'},'Score'),
-      h('div',{style:'width:32px;'})
+    // Column headers — right-aligned above drum and junk
+    const colHeaderItems = [
+      h('span',{class:'hole-col-hdr score'},'Score')
     ];
     if (g.withJunk) {
-      colHeaderControls.push(h('div',{class:'hole-junk-inline',style:'position:relative;'},[
-        h('div',{style:'width:22px;'},'\u00A0'),
-        h('div',{style:'width:18px;'},'\u00A0'),
-        h('div',{style:'width:22px;'},'\u00A0'),
-        h('span',{class:'hole-col-hdr junk',style:'position:absolute;left:0;right:0;text-align:center;'},'Junk')
-      ]));
+      colHeaderItems.push(h('span',{class:'hole-col-hdr junk',style:'margin-left:8px;'},'Junk'));
     }
-    const colHeader = h('div',{class:'hole-player-row',style:'padding:4px 12px 3px;'},[
-      h('div',{class:'hole-player-info',style:'visibility:hidden;'},[
-        h('div',{class:'hole-player-name'},'\u00A0')
-      ]),
-      h('div',{class:'hole-score-controls'},colHeaderControls)
+    const colHeader = h('div',{style:'display:flex;justify-content:flex-end;padding:4px 12px 2px;gap:0;'},[
+      h('div',{style:`display:flex;gap:0;align-items:center;width:${g.withJunk ? '230' : '160'}px;justify-content:space-around;`},colHeaderItems)
     ]);
 
     // Clear hole button
