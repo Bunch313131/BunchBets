@@ -1150,23 +1150,30 @@ const Game = {
     const back = this.buildSegment(g, 9, 17, g.stakes.back, g.autoPress.back);
     const overall = this.buildSegment(g, 0, 17, g.stakes.overall, g.autoPress.overall);
     const junk = this.computeJunk(g);
-    
+
     const szA = (g.teamA||[]).length || 1;
     const szB = (g.teamB||[]).length || 1;
     let junkTeam = 0;
     if (junk.netA > 0) junkTeam = junk.netA * szB;
     else if (junk.netA < 0) junkTeam = junk.netA * szA;
-    
-    const total = front.teamPayA + back.teamPayA + overall.teamPayA + junkTeam;
-    
+
+    // KP values (match-specific closest-to-pin bets)
+    const kp = g.withJunk ? this.computeKP(g) : {netA:0, grandTotal:0, results:[], hasSweeps:false, hasQuads:false};
+    let kpTeam = 0;
+    if (kp.netA > 0) kpTeam = kp.netA * szB;
+    else if (kp.netA < 0) kpTeam = kp.netA * szA;
+
+    const total = front.teamPayA + back.teamPayA + overall.teamPayA + junkTeam + kpTeam;
+
     return {
       segments: {front, back, overall},
-      junk,
+      junk, kp,
       teamTotals: {
         front: front.teamPayA,
         back: back.teamPayA,
         overall: overall.teamPayA,
         junk: junkTeam,
+        kp: kpTeam,
         total
       }
     };
@@ -1259,7 +1266,13 @@ const Game = {
     let junkTeam = 0;
     if (junk.netA > 0) junkTeam = junk.netA * szB;
     else if (junk.netA < 0) junkTeam = junk.netA * szA;
-    
+
+    // KP values
+    const kp = g.withJunk ? this.computeKP(g) : {netA:0, grandTotal:0, results:[], hasSweeps:false, hasQuads:false};
+    let kpTeam = 0;
+    if (kp.netA > 0) kpTeam = kp.netA * szB;
+    else if (kp.netA < 0) kpTeam = kp.netA * szA;
+
     return {
       holeDetails,
       frontPoints,
@@ -1267,7 +1280,9 @@ const Game = {
       frontValue,
       backValue,
       junkValue: junkTeam,
-      totalValue: frontValue + backValue + junkTeam
+      kpValue: kpTeam,
+      kp,
+      totalValue: frontValue + backValue + junkTeam + kpTeam
     };
   },
 
@@ -3812,15 +3827,14 @@ const UI = {
       if (game.gameType === 'nassau') {
         const result = Game.computeResult(game);
         const fmtSeg = (s) => s.winners.join('/');
-        const junk = game.withJunk ? Game.computeJunk(game) : null;
-        const frontPay = result.segments.front.payA;
-        const backPay = result.segments.back.payA;
-        const junkNet = junk ? junk.netA : 0;
         statusText = `F:${fmtSeg(result.segments.front)} B:${fmtSeg(result.segments.back)}`;
-        if (junkNet !== 0) statusText += ` J:${junkNet>0?'+':''}${junkNet}`;
+        if (result.teamTotals.junk !== 0) statusText += ` J:${result.teamTotals.junk>0?'+':''}${Utils.fmt(result.teamTotals.junk)}`;
+        if (result.teamTotals.kp !== 0) statusText += ` KP:${result.teamTotals.kp>0?'+':''}${Utils.fmt(result.teamTotals.kp)}`;
+        statusText += ` = ${Utils.fmt(result.teamTotals.total)}`;
       } else if (game.gameType === 'vegas') {
         const result = Game.computeVegasResult(game);
         statusText = `F:${result.frontPoints} B:${result.backPoints}`;
+        if (result.kpValue !== 0) statusText += ` KP:${result.kpValue>0?'+':''}${Utils.fmt(result.kpValue)}`;
       } else if (game.gameType === 'skins') {
         const result = Game.computeSkinsResult(game);
         statusText = `Skins`;
@@ -4414,6 +4428,7 @@ const UI = {
 
       // Get junk breakdown for front/back if junk is enabled
       const junk = game.withJunk ? Game.computeJunk(game) : null;
+      const kpResult = game.withJunk ? Game.computeKP(game) : null;
 
       // Junk per-player = delta pts × junk value (simple flat amount per player)
       const frontJunkVal = junk ? junk.frontNetVal : 0;
@@ -4555,14 +4570,24 @@ const UI = {
           : `Back: ${fmtSeg(seg.back)} (${Utils.fmt(backPerPlayer)}/ea)`) : null;
       }
 
+      // KP line for team games
+      let kpLine = null;
+      if (kpResult && kpResult.netA !== 0 && (game.gameType === 'nassau' || game.gameType === 'vegas')) {
+        const kpSign = kpResult.netA > 0 ? '+' : '';
+        kpLine = `KP: ${kpSign}${Utils.fmt(kpResult.netA)}/ea`;
+        if (kpResult.hasSweeps) kpLine += ' (Sweeps!)';
+        if (kpResult.hasQuads) kpLine += ' (Quads!)';
+      }
+
       return h('div',{class:theme,style:'margin-bottom:6px;'},[
         h('div',{class:'card',style:'padding:8px 12px;'},[
           h('div',{class:'row',style:'align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;'},[
             h('div',{class:'pill',style:'font-size:12px;'},UI.gameLabel(game)),
             h('div',{style:'text-align:right;font-size:13px;'},[
               h('div',{},frontLine),
-              backLine ? h('div',{style:'margin-top:2px;'},backLine) : ''
-            ])
+              backLine ? h('div',{style:'margin-top:2px;'},backLine) : '',
+              kpLine ? h('div',{style:'margin-top:2px;color:var(--warning);'},kpLine) : ''
+            ].filter(Boolean))
           ])
         ])
       ]);
@@ -4723,6 +4748,7 @@ const UI = {
               h('div',{class:'muted'},'Front: ' + (result.frontPoints>0?'+':'') + result.frontPoints + ' pts = ' + Utils.fmt(result.frontValue)),
               h('div',{class:'muted',style:'margin-top:4px;'},'Back: ' + (result.backPoints>0?'+':'') + result.backPoints + ' pts = ' + Utils.fmt(result.backValue)),
               h('div',{class:'muted',style:'margin-top:4px;'},'Junk: ' + Utils.fmt(result.junkValue)),
+              result.kpValue !== 0 ? h('div',{class:'muted',style:'margin-top:4px;color:var(--warning);'},'KP: ' + Utils.fmt(result.kpValue) + (result.kp.hasSweeps ? ' (Sweeps!)' : '') + (result.kp.hasQuads ? ' (Quads!)' : '')) : null,
               h('div',{style:'margin-top:8px;font-weight:700;'},'Total: ' + Utils.fmt(result.totalValue))
             ])
           ])
@@ -5587,8 +5613,11 @@ const UI = {
             h('div',{class:'muted'},`Result: ${res.segments.overall.winners.join(' / ')} = ${Utils.fmt(res.segments.overall.payA)}`)
           ]),
 
-          // Junk
-          h('div',{class:'card',style:'margin-top:8px;'},[h('div',{class:'pill'},`Junk to Team A: ${fmtTP(res.teamTotals.junk,(g.teamA||[]).length)}`)]),
+          // Junk + KP
+          h('div',{class:'card',style:'margin-top:8px;'},[
+            h('div',{class:'pill'},`Junk to Team A: ${fmtTP(res.teamTotals.junk,(g.teamA||[]).length)}`),
+            res.teamTotals.kp !== 0 ? h('div',{class:'pill',style:'margin-top:4px;'},`KP to Team A: ${fmtTP(res.teamTotals.kp,(g.teamA||[]).length)}`) : null
+          ].filter(Boolean)),
 
           // Total
           h('div',{class:'card',style:'margin-top:8px;background:linear-gradient(135deg,rgba(59,130,246,0.05),rgba(22,163,74,0.05));'},[
@@ -5755,7 +5784,7 @@ const UI = {
         perGameRows.length ? h('ul',{},perGameRows) : h('div',{class:'muted'},'No games yet.')
       ]),
       h('div',{class:'card'},[
-        h('div',{class:'pill'},'Per-Player Net (All Games + Junk)'),
+        h('div',{class:'pill'},'Per-Player Net (All Games + Junk + KP)'),
         h('ul',{},perPlayerRows)
       ]),
       h('div',{class:'card'},[
@@ -5999,6 +6028,7 @@ const UI = {
           lines.push(`  Front:   ${Utils.fmt(res.frontValue)}`);
           lines.push(`  Back:    ${Utils.fmt(res.backValue)}`);
           lines.push(`  Junk:    ${Utils.fmt(res.junkValue)}`);
+          if (res.kpValue !== 0) lines.push(`  KP:      ${Utils.fmt(res.kpValue)}${res.kp.hasSweeps ? ' (Sweeps!)' : ''}${res.kp.hasQuads ? ' (Quads!)' : ''}`);
           lines.push(`  Total:   ${Utils.fmt(res.totalValue)}`);
           lines.push('');
         } else {
@@ -6008,6 +6038,7 @@ const UI = {
           lines.push(`  Back:    ${Utils.fmt(res.teamTotals.back)}`);
           lines.push(`  Overall: ${Utils.fmt(res.teamTotals.overall)}`);
           lines.push(`  Junk:    ${Utils.fmt(res.teamTotals.junk)}`);
+          if (res.teamTotals.kp !== 0) lines.push(`  KP:      ${Utils.fmt(res.teamTotals.kp)}${res.kp.hasSweeps ? ' (Sweeps!)' : ''}${res.kp.hasQuads ? ' (Quads!)' : ''}`);
           lines.push(`  Total:   ${Utils.fmt(res.teamTotals.total)}`);
           lines.push('');
         }
@@ -6084,10 +6115,10 @@ const UI = {
         const color = gameThemes[gi % 6];
         if (g.gameType === 'vegas') {
           const res = Game.computeVegasResult(g);
-          gameLines.push({ label: this.gameLabel(g), color, values: [
-            `Front: ${Utils.fmt(res.frontValue)}`, `Back: ${Utils.fmt(res.backValue)}`,
-            `Junk: ${Utils.fmt(res.junkValue)}`, `Total: ${Utils.fmt(res.totalValue)}`
-          ]});
+          const vegasVals = [`Front: ${Utils.fmt(res.frontValue)}`, `Back: ${Utils.fmt(res.backValue)}`, `Junk: ${Utils.fmt(res.junkValue)}`];
+          if (res.kpValue !== 0) vegasVals.push(`KP: ${Utils.fmt(res.kpValue)}`);
+          vegasVals.push(`Total: ${Utils.fmt(res.totalValue)}`);
+          gameLines.push({ label: this.gameLabel(g), color, values: vegasVals});
         } else if (g.gameType === 'skins') {
           const res = Game.computeSkinsResult(g);
           const top = (g.skinsPlayers||[]).reduce((best, pid) => {
@@ -6103,10 +6134,10 @@ const UI = {
         } else {
           const res = Game.computeResult(g);
           const t = res.teamTotals;
-          gameLines.push({ label: this.gameLabel(g), color, values: [
-            `Front: ${Utils.fmt(t.front)}`, `Back: ${Utils.fmt(t.back)}`,
-            `Overall: ${Utils.fmt(t.overall)}`, `Junk: ${Utils.fmt(t.junk)}`, `Total: ${Utils.fmt(t.total)}`
-          ]});
+          const nassauVals = [`Front: ${Utils.fmt(t.front)}`, `Back: ${Utils.fmt(t.back)}`, `Overall: ${Utils.fmt(t.overall)}`, `Junk: ${Utils.fmt(t.junk)}`];
+          if (t.kp !== 0) nassauVals.push(`KP: ${Utils.fmt(t.kp)}`);
+          nassauVals.push(`Total: ${Utils.fmt(t.total)}`);
+          gameLines.push({ label: this.gameLabel(g), color, values: nassauVals});
         }
       });
 
