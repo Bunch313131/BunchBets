@@ -4416,16 +4416,14 @@ const UI = {
       ]);
     }).filter(Boolean);
 
-    // Column headers — right-aligned above drum and junk
+    // Column headers — centered above drum and junk controls
     const colHeaderItems = [
-      h('span',{class:'hole-col-hdr score'},'Score')
+      h('div',{class:'hole-col-hdr score',style:'width:160px;text-align:center;'},'Score')
     ];
     if (g.withJunk) {
-      colHeaderItems.push(h('span',{class:'hole-col-hdr junk',style:'margin-left:8px;'},'Junk'));
+      colHeaderItems.push(h('div',{class:'hole-col-hdr junk',style:'width:75px;text-align:center;margin-left:8px;'},'Junk'));
     }
-    const colHeader = h('div',{style:'display:flex;justify-content:flex-end;padding:4px 12px 2px;gap:0;'},[
-      h('div',{style:`display:flex;gap:0;align-items:center;width:${g.withJunk ? '230' : '160'}px;justify-content:space-around;`},colHeaderItems)
-    ]);
+    const colHeader = h('div',{style:'display:flex;justify-content:flex-end;padding:4px 12px 2px;'},colHeaderItems);
 
     // Clear hole button
     const clearHole = () => {
