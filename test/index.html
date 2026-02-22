@@ -4046,11 +4046,50 @@ const UI = {
         ]);
       }
 
-      // Individual games: simple single-line
-      let statusText = '';
+      // Skins: multi-line card with player results
       if (game.gameType === 'skins') {
-        statusText = 'Skins';
-      } else if (game.gameType === 'wolf') {
+        const result = Game.computeSkinsResult(game);
+        const mode = game.skinsMode || 'net';
+        const players = game.skinsPlayers || [];
+        const carry = mode === 'gross' ? result.grossCarry : mode === 'net' ? result.netCarry : (result.grossCarry + result.netCarry);
+        const skinVal = mode === 'gross' ? result.grossSkinValue : result.netSkinValue;
+        const lines = [];
+
+        // Line 1: Header — game label + pot
+        lines.push(h('div',{style:'display:flex;justify-content:space-between;font-weight:700;font-size:12px;'},[
+          h('span',{},UI.gameLabel(game)),
+          h('span',{},`Pot: ${Utils.fmt(result.totalPot)}`)
+        ]));
+
+        // Line 2: Each player's skins + profit
+        const playerParts = players.map(pid => {
+          const name = UI.playerName(pid);
+          const skins = mode === 'gross' ? result.grossSkins[pid] :
+                        mode === 'net' ? result.netSkins[pid] :
+                        (result.grossSkins[pid] + result.netSkins[pid]);
+          const pr = result.playerResults[pid];
+          const profit = pr ? pr.profit : 0;
+          const profitStr = profit !== 0 ? ` (${profit > 0 ? '+' : ''}${Utils.fmt(profit)})` : '';
+          return `${name}: ${skins || 0}${profitStr}`;
+        });
+        lines.push(h('div',{style:'font-size:11px;margin-top:3px;color:var(--muted);'},playerParts.join('  ')));
+
+        // Line 3: Carry + per-skin value
+        const infoParts = [];
+        if (carry > 0) infoParts.push(`Carry: ${carry}`);
+        if (skinVal > 0) infoParts.push(`${Utils.fmt(skinVal)}/skin`);
+        if (infoParts.length) {
+          lines.push(h('div',{style:'font-size:11px;margin-top:2px;color:var(--muted);'},infoParts.join('  |  ')));
+        }
+
+        return h('div',{class:`${theme} game-status-card`,style:'margin-bottom:4px;'},[
+          h('div',{class:'card',style:'padding:8px 10px;'},lines)
+        ]);
+      }
+
+      // Wolf / 9-Point: simple single-line
+      let statusText = '';
+      if (game.gameType === 'wolf') {
         statusText = 'Wolf';
       } else if (game.gameType === 'ninepoint') {
         statusText = '9-Point';
@@ -4651,23 +4690,37 @@ const UI = {
         const result = Game.computeSkinsResult(game);
         const mode = game.skinsMode || 'net';
         const players = game.skinsPlayers || [];
+        const carry = mode === 'gross' ? result.grossCarry : mode === 'net' ? result.netCarry : (result.grossCarry + result.netCarry);
+        const skinVal = mode === 'gross' ? result.grossSkinValue : result.netSkinValue;
+        const lines = [];
 
-        // Build player skin counts (e.g., "Tom:1 Dick:0 Harry:2")
-        const playerCounts = players.map(pid => {
+        lines.push(h('div',{style:'display:flex;justify-content:space-between;font-weight:700;font-size:12px;'},[
+          h('span',{},UI.gameLabel(game)),
+          h('span',{},`Pot: ${Utils.fmt(result.totalPot)}`)
+        ]));
+
+        const playerParts = players.map(pid => {
           const name = UI.playerName(pid);
-          const abbr = name.length <= 4 ? name : name.slice(0,3);
           const skins = mode === 'gross' ? result.grossSkins[pid] :
                         mode === 'net' ? result.netSkins[pid] :
                         (result.grossSkins[pid] + result.netSkins[pid]);
-          return `${abbr}:${skins || 0}`;
-        }).join(' ');
+          const pr = result.playerResults[pid];
+          const profit = pr ? pr.profit : 0;
+          const profitStr = profit !== 0 ? ` (${profit > 0 ? '+' : ''}${Utils.fmt(profit)})` : '';
+          return `${name}: ${skins || 0}${profitStr}`;
+        });
+        lines.push(h('div',{style:'font-size:11px;margin-top:3px;color:var(--muted);'},playerParts.join('  ')));
 
-        const carry = mode === 'gross' ? result.grossCarry :
-                      mode === 'net' ? result.netCarry :
-                      (result.grossCarry + result.netCarry);
+        const infoParts = [];
+        if (carry > 0) infoParts.push(`Carry: ${carry}`);
+        if (skinVal > 0) infoParts.push(`${Utils.fmt(skinVal)}/skin`);
+        if (infoParts.length) {
+          lines.push(h('div',{style:'font-size:11px;margin-top:2px;color:var(--muted);'},infoParts.join('  |  ')));
+        }
 
-        frontLine = playerCounts + (carry > 0 ? ` | Carry:${carry}` : '');
-        backLine = `Pot: ${Utils.fmt(result.totalPot)} | $/Skin: ${Utils.fmt(mode === 'gross' ? result.grossSkinValue : result.netSkinValue)}`;
+        return h('div',{class:theme,style:'margin-bottom:6px;'},[
+          h('div',{class:'card',style:'padding:8px 10px;'},lines)
+        ]);
       } else if (game.gameType === 'wolf') {
         const result = Game.computeWolfResult(game);
         const players = game.wolfPlayers || [];
