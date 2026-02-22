@@ -1114,8 +1114,15 @@ const Game = {
     }
 
     // Sweeps: one team won ALL KPs (and at least one was awarded)
+    // Only declare sweeps after ALL par 3s have been scored
+    const allPar3sScored = par3s.every(hole => {
+      return allPlayers.some(pid => {
+        const gross = g.gross[pid] && g.gross[pid][hole];
+        return gross != null;
+      });
+    });
     const totalKPs = teamAKPs + teamBKPs;
-    const hasSweeps = anyKPAwarded && totalKPs > 0 && (teamAKPs === 0 || teamBKPs === 0);
+    const hasSweeps = anyKPAwarded && totalKPs > 0 && (teamAKPs === 0 || teamBKPs === 0) && allPar3sScored;
     const sweepsTeam = hasSweeps ? (teamAKPs > 0 ? 'A' : 'B') : null;
 
     // Calculate total KP value
@@ -3990,11 +3997,25 @@ const UI = {
         const result = Game.computeResult(game);
         const sz = (game.teamA||[]).length || 1;
         const fmtSeg = (s) => s.winners.join('/');
-        statusText = `F:${fmtSeg(result.segments.front)} B:${fmtSeg(result.segments.back)} = ${Utils.fmt(result.teamTotals.total / sz)}/ea`;
+        const junk = game.withJunk ? Game.computeJunk(game) : null;
+        const kpResult = game.withJunk ? Game.computeKP(game) : null;
+        const fmtPts = (pts) => pts > 0 ? `+${pts}` : pts === 0 ? 'E' : String(pts);
+        let parts = [`F:${fmtSeg(result.segments.front)} B:${fmtSeg(result.segments.back)}`];
+        if (junk && (junk.frontNetPts !== 0 || junk.backNetPts !== 0)) parts.push(`J:${fmtPts(junk.frontNetPts + junk.backNetPts)}`);
+        if (kpResult) { const kpNet = kpResult.teamAKPs - kpResult.teamBKPs; if (kpNet !== 0) parts.push(`KP:${fmtPts(kpNet)}`); }
+        parts.push(`${Utils.fmt(result.teamTotals.total / sz)}/ea`);
+        statusText = parts.join(' | ');
       } else if (game.gameType === 'vegas') {
         const result = Game.computeVegasResult(game);
         const sz = (game.teamA||[]).length || 1;
-        statusText = `F:${result.frontPoints} B:${result.backPoints} = ${Utils.fmt(result.totalValue / sz)}/ea`;
+        const junk = game.withJunk ? Game.computeJunk(game) : null;
+        const kpResult = game.withJunk ? Game.computeKP(game) : null;
+        const fmtPts = (pts) => pts > 0 ? `+${pts}` : pts === 0 ? 'E' : String(pts);
+        let parts = [`F:${result.frontPoints} B:${result.backPoints}`];
+        if (junk && (junk.frontNetPts !== 0 || junk.backNetPts !== 0)) parts.push(`J:${fmtPts(junk.frontNetPts + junk.backNetPts)}`);
+        if (kpResult) { const kpNet = kpResult.teamAKPs - kpResult.teamBKPs; if (kpNet !== 0) parts.push(`KP:${fmtPts(kpNet)}`); }
+        parts.push(`${Utils.fmt(result.totalValue / sz)}/ea`);
+        statusText = parts.join(' | ');
       } else if (game.gameType === 'skins') {
         const result = Game.computeSkinsResult(game);
         statusText = `Skins`;
