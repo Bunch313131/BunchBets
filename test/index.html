@@ -580,6 +580,7 @@ window.LiveSync = {
 
   showShareModal(code) {
     const url = window.location.origin + window.location.pathname + '?join=' + code;
+    const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.innerHTML = `
@@ -588,6 +589,10 @@ window.LiveSync = {
         <p class="muted" style="margin-bottom:16px;">Others can join with this code to view live scores:</p>
         <div style="text-align:center;margin:20px 0;">
           <div class="share-code">${code}</div>
+        </div>
+        <div style="text-align:center;margin:16px 0;">
+          <img src="${qrImgUrl}" alt="QR Code" style="width:180px;height:180px;border-radius:12px;background:#fff;padding:8px;">
+          <p class="muted" style="font-size:11px;margin-top:8px;">Scan to join instantly</p>
         </div>
         <p class="muted" style="font-size:12px;">Or share this link:</p>
         <input type="text" value="${url}" readonly style="font-size:12px;margin-bottom:8px;" onclick="this.select()">
