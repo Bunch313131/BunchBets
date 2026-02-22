@@ -247,8 +247,9 @@ body:has(.wizard-overlay) { overflow:hidden; }
 
 /* Column headers */
 .hole-col-headers { display:flex; align-items:center; justify-content:flex-end; padding:4px 12px 3px; border-bottom:1px solid var(--border); }
-.hole-col-score-hdr { width:108px; text-align:center; font-size:10px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; }
-.hole-col-junk-hdr { width:68px; text-align:center; font-size:10px; color:var(--warning); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; border-left:1px solid var(--border); padding-left:4px; }
+.hole-col-hdr { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; text-align:center; }
+.hole-col-hdr.score { color:var(--muted); }
+.hole-col-hdr.junk { color:var(--warning); }
 
 /* Player score rows */
 .hole-player-row { display:flex; align-items:center; justify-content:space-between; padding:7px 12px; border-bottom:1px solid var(--border); }
@@ -264,7 +265,7 @@ body:has(.wizard-overlay) { overflow:hidden; }
 .hole-stroke-dots .dot.g4 { background-color:#6366f1; }
 .hole-stroke-dots .dot.g5 { background-color:#14b8a6; }
 .hole-stroke-dots .dot.g6 { background-color:#db2777; }
-.hole-score-controls { display:flex; align-items:center; gap:4px; }
+.hole-score-controls { display:flex; align-items:center; gap:4px; flex-shrink:0; }
 .hole-score-adj { width:32px; height:32px; border-radius:50%; border:1px solid var(--border); background:var(--card); color:var(--txt); font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s; -webkit-tap-highlight-color:transparent; }
 .hole-score-adj:active { transform:scale(0.9); background:var(--acc); color:#fff; border-color:var(--acc); }
 .hole-score-display { width:40px; height:40px; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:20px; font-weight:700; border:2px solid var(--border); background:var(--card); position:relative; }
@@ -3834,10 +3835,18 @@ const UI = {
       ]);
     }).filter(Boolean);
 
-    // Column headers aligned to controls
+    // Column headers — mirrors the exact layout of hole-score-controls so labels align over value boxes
     const colHeader = h('div',{class:'hole-col-headers'},[
-      h('span',{class:'hole-col-score-hdr'},'Score'),
-      g.withJunk ? h('span',{class:'hole-col-junk-hdr'},'Junk') : null
+      h('div',{style:'display:flex;align-items:center;gap:4px;'},[
+        h('div',{style:'width:32px;'}), // spacer for minus btn
+        h('div',{class:'hole-col-hdr score',style:'width:40px;'},'Score'),
+        h('div',{style:'width:32px;'})  // spacer for plus btn
+      ]),
+      g.withJunk ? h('div',{style:'display:flex;align-items:center;gap:3px;border-left:1px solid var(--border);padding-left:6px;margin-left:2px;'},[
+        h('div',{style:'width:22px;'}), // spacer for minus btn
+        h('div',{class:'hole-col-hdr junk',style:'width:18px;'},'Junk'),
+        h('div',{style:'width:22px;'})  // spacer for plus btn
+      ]) : null
     ].filter(Boolean));
 
     // Clear hole button
