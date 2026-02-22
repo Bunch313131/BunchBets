@@ -4025,10 +4025,12 @@ const UI = {
         statusText = '9-Point';
       }
 
-      return h('div',{class:`${theme} game-status-card card`,style:'padding:6px 10px;margin-bottom:4px;'},[
-        h('div',{class:'row',style:'align-items:center;justify-content:space-between;font-size:12px;'},[
-          h('span',{class:'pill',style:'font-size:11px;'},UI.gameLabel(game)),
-          h('span',{},statusText)
+      return h('div',{class:`${theme} game-status-card`,style:'margin-bottom:4px;'},[
+        h('div',{class:'card',style:'padding:6px 10px;'},[
+          h('div',{class:'row',style:'align-items:center;justify-content:space-between;font-size:12px;'},[
+            h('span',{class:'pill',style:'font-size:11px;'},UI.gameLabel(game)),
+            h('span',{},statusText)
+          ])
         ])
       ]);
     }).filter(Boolean);
