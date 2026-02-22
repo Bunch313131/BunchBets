@@ -4036,8 +4036,11 @@ const UI = {
           let parts = [`Bets: ${betsStr}`];
           if (junkPts !== 0) parts.push(`Junk: ${fmtPts(junkPts)}`);
           if (kpNet !== 0) parts.push(`KP: ${fmtPts(kpNet)}`);
-          if (dollarPP !== 0) parts.push(Utils.fmt(dollarPP) + '/ea');
-          return h('div',{style:'font-size:11px;margin-top:3px;color:var(--muted);'},`${label}:  ${parts.join('  ')}`);
+          const dollarStr = dollarPP !== 0 ? Utils.fmt(dollarPP) + '/ea' : '';
+          return h('div',{style:'display:flex;justify-content:space-between;font-size:11px;margin-top:3px;color:var(--muted);'},[
+            h('span',{},`${label}:  ${parts.join('  ')}`),
+            dollarStr ? h('span',{},dollarStr) : ''
+          ].filter(Boolean));
         };
 
         if (isNassau) {
