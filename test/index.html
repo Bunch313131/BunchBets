@@ -717,14 +717,19 @@ const State = {
   },
 
   isRoundComplete() {
-    // Check if all players have scores for all 18 holes
-    const g = this.data.games[0];
-    if (!g) return false;
-    for (const p of this.data.players) {
-      const scores = g.gross[p.id];
-      if (!scores) return false;
-      for (let i = 0; i < 18; i++) {
-        if (scores[i] === null || scores[i] === undefined) return false;
+    // Check if all players across all games have scores for all 18 holes
+    if (this.data.games.length === 0) return false;
+    for (const g of this.data.games) {
+      const pids = g.gameType === 'skins' ? (g.skinsPlayers||[])
+        : g.gameType === 'wolf' ? (g.wolfPlayers||[])
+        : g.gameType === 'ninepoint' ? (g.ninePointPlayers||[])
+        : [...(g.teamA||[]), ...(g.teamB||[])];
+      for (const pid of pids) {
+        const scores = g.gross[pid];
+        if (!scores) return false;
+        for (let i = 0; i < 18; i++) {
+          if (scores[i] === null || scores[i] === undefined) return false;
+        }
       }
     }
     return true;
@@ -772,7 +777,8 @@ const State = {
       this.data.tab = validTabs.includes(obj.tab) ? obj.tab : 'scores';
       this.data.debugStatus = !!obj.debugStatus;
       this.data.scoringHole = obj.scoringHole || 0;
-      this.data.scoringView = obj.scoringView || 'hole';
+      this.data.scoringView = ['hole','table'].includes(obj.scoringView) ? obj.scoringView : 'hole';
+      this.data._clearedHoles = obj._clearedHoles || {};
       return true;
     } catch(e) { 
       Err.show('Load failed: ' + e.message);
@@ -839,6 +845,7 @@ const Game = {
     g.stakes = g.stakes || {front:2,back:5,overall:2};
     ['front','back','overall'].forEach(k => g.stakes[k] = Math.max(0, parseInt(g.stakes[k])||0));
     g.autoPress = g.autoPress || {front:true,back:true,overall:false};
+    g.withJunk = g.withJunk === true;
     g.junkValue = g.junkValue || {front:1,back:2};
     ['front','back'].forEach(k => g.junkValue[k] = Math.max(0, parseInt(g.junkValue[k])||0));
     g.pointValue = g.pointValue || {front:1,back:1};
@@ -1114,9 +1121,10 @@ const Game = {
     return (entry && entry.ranking) ? entry.ranking : [];
   },
 
-  // Set KP ranking for a hole (propagated to all games)
+  // Set KP ranking for a hole (propagated to team-based games only)
   setKPRanking(hole, ranking) {
     State.data.games.forEach(gm => {
+      if (gm.gameType !== 'nassau' && gm.gameType !== 'vegas') return;
       if (!gm.kpData) gm.kpData = Utils.make18(null);
       gm.kpData[hole] = ranking.length > 0 ? { ranking } : null;
     });
@@ -1177,6 +1185,65 @@ const Game = {
         total
       }
     };
+  },
+
+  // Compute per-player net $ for any game type (used by transactions, share, round-complete modal)
+  computeGamePlayerNet(g) {
+    const net = {};
+    const addJunkLadder = (players) => {
+      const sumJunk = (pid, s, e) => {
+        let tot = 0; const arr = g.junkCounts[pid] || [];
+        for (let h = s; h <= e; h++) tot += (arr[h]||0);
+        return tot;
+      };
+      const standings = players.map(pid => {
+        const fj = sumJunk(pid, 0, 8), bj = sumJunk(pid, 9, 17);
+        return { pid, junkVal: fj * (g.junkValue.front||0) + bj * (g.junkValue.back||0) };
+      }).sort((a, b) => b.junkVal - a.junkVal);
+      for (let i = 0; i < standings.length; i++) {
+        for (let j = i + 1; j < standings.length; j++) {
+          const diff = standings[i].junkVal - standings[j].junkVal;
+          if (diff > 0) { net[standings[i].pid] += diff; net[standings[j].pid] -= diff; }
+        }
+      }
+    };
+
+    if (g.gameType === 'skins') {
+      const players = g.skinsPlayers || [];
+      players.forEach(pid => { net[pid] = 0; });
+      const res = this.computeSkinsResult(g);
+      players.forEach(pid => { const pr = res.playerResults[pid]; if (pr) net[pid] += pr.profit; });
+      if (g.withJunk) addJunkLadder(players);
+    } else if (g.gameType === 'wolf') {
+      const players = g.wolfPlayers || [];
+      players.forEach(pid => { net[pid] = 0; });
+      const res = this.computeWolfResult(g);
+      players.forEach(pid => { net[pid] += res.playerNet[pid] || 0; });
+      if (g.withJunk) addJunkLadder(players);
+    } else if (g.gameType === 'ninepoint') {
+      const players = g.ninePointPlayers || [];
+      players.forEach(pid => { net[pid] = 0; });
+      const res = this.computeNinePointResult(g);
+      players.forEach(pid => { net[pid] += res.playerNet[pid] || 0; });
+      if (g.withJunk) addJunkLadder(players);
+    } else {
+      // Nassau or Vegas — team-based
+      const allPids = [...(g.teamA||[]), ...(g.teamB||[])];
+      allPids.forEach(pid => { net[pid] = 0; });
+      let tot;
+      if (g.gameType === 'vegas') {
+        tot = this.computeVegasResult(g).totalValue;
+      } else {
+        tot = this.computeResult(g).teamTotals.total;
+      }
+      const szA = (g.teamA||[]).length || 1;
+      const szB = (g.teamB||[]).length || 1;
+      const aShare = tot / szA;
+      const bShare = -tot / szB;
+      (g.teamA||[]).forEach(id => net[id] += aShare);
+      (g.teamB||[]).forEach(id => net[id] += bShare);
+    }
+    return net;
   },
 
   computeVegasHole(g, hole) {
@@ -1311,10 +1378,7 @@ const Game = {
         if (gross == null || gross === '') {
           allScored = false;
         } else {
-          const strokes = g.strokesCount[pid] || 0;
-          const hdcpHoles = State.data.course.hdcp || [];
-          const getsStroke = hdcpHoles[h] <= strokes;
-          const net = gross - (getsStroke ? 1 : 0);
+          const net = Game.net(gross, Game.strokes(g, pid, h));
           scores.push({ pid, gross, net });
         }
       });
@@ -1529,10 +1593,7 @@ const Game = {
         if (gross == null || gross === '') {
           allScored = false;
         } else {
-          const strokes = g.strokesCount[pid] || 0;
-          const hdcpHoles = State.data.course.hdcp || [];
-          const getsStroke = hdcpHoles[h] <= strokes;
-          scores[pid] = { gross, net: gross - (getsStroke ? 1 : 0) };
+          scores[pid] = { gross, net: Game.net(gross, Game.strokes(g, pid, h)) };
         }
       });
 
@@ -1667,10 +1728,7 @@ const Game = {
         } else {
           let score = gross;
           if (mode === 'net') {
-            const strokes = g.strokesCount[pid] || 0;
-            const hdcpHoles = State.data.course.hdcp || [];
-            const getsStroke = hdcpHoles[h] <= strokes;
-            score = gross - (getsStroke ? 1 : 0);
+            score = Game.net(gross, Game.strokes(g, pid, h));
           }
           scores.push({ pid, gross, net: score, score });
           detail.scores[pid] = { gross, net: score };
@@ -1839,7 +1897,7 @@ const Wizard = {
     this.data.games.push(this.createGameData());
     this.render();
     // Auto-advance from splash after 4 seconds
-    setTimeout(() => {
+    this._splashTimer = setTimeout(() => {
       if (this.step === 'splash') {
         this.step = 'course';
         this.render();
@@ -2057,6 +2115,8 @@ const Wizard = {
   render() {
     this.removeOverlay();
     if (!this.active) return;
+    // Clear splash auto-advance timer if we've moved past splash
+    if (this.step !== 'splash' && this._splashTimer) { clearTimeout(this._splashTimer); this._splashTimer = null; }
 
     const overlay = document.createElement('div');
     overlay.id = 'wizardOverlay';
@@ -4726,7 +4786,7 @@ const UI = {
 
     return h('div',{},[
       toggleBar,
-      h('div',{class:'note',style:'margin-bottom:8px;'},'Sweeps (+3) Sweeps/Quads (+6) on last Par 3'),
+      h('div',{class:'note',style:'margin-bottom:8px;'},'Enter junk counts per hole. KPs are entered via the Hole View on par 3s.'),
       ...blocks
     ]);
   },
@@ -5078,13 +5138,17 @@ const UI = {
               ...backRows
             ]),
 
-            // Junk & Total
+            // Junk & KP
             h('div',{class:'card',style:'margin-top:12px;'},[
               h('div',{class:'row',style:'justify-content:space-between;'},[
-                h('div',{class:'muted'},'Junk:'),
+                h('div',{class:'muted'},'Junk (team total):'),
                 h('div',{style:'font-weight:600;'},Utils.fmt(result.junkValue) + ' (' + Utils.fmt(result.junkValue / ((g.teamA||[]).length || 1)) + '/ea)')
-              ])
-            ]),
+              ]),
+              result.kpValue !== 0 ? h('div',{class:'row',style:'justify-content:space-between;margin-top:4px;'},[
+                h('div',{class:'muted',style:'color:var(--warning);'},'KP (team total):'),
+                h('div',{style:'font-weight:600;color:var(--warning);'},Utils.fmt(result.kpValue) + ' (' + Utils.fmt(result.kpValue / ((g.teamA||[]).length || 1)) + '/ea)')
+              ]) : null
+            ].filter(Boolean)),
             h('div',{class:'card',style:'margin-top:12px;background:linear-gradient(135deg,rgba(59,130,246,0.1),rgba(22,163,74,0.1));'},[
               h('div',{class:'row',style:'justify-content:space-between;align-items:center;'},[
                 h('div',{},[
@@ -5647,119 +5711,43 @@ const UI = {
     State.data.players.forEach(p => net[p.id] = 0);
 
     const perGameRows = State.data.games.map(g => {
-      // Skip if no scores
       if (!Game.hasAnyScores(g)) {
         return h('li',{class:'muted'},`${this.gameLabel(g)}: No scores yet`);
       }
 
+      // Accumulate per-player net using unified helper
+      const gameNet = Game.computeGamePlayerNet(g);
+      Object.keys(gameNet).forEach(pid => { net[pid] = (net[pid]||0) + gameNet[pid]; });
+
+      // Display summary per game type
       if (g.gameType === 'skins') {
         const res = Game.computeSkinsResult(g);
-        const players = g.skinsPlayers || [];
-        players.forEach(pid => {
-          const pr = res.playerResults[pid];
-          if (pr) net[pid] += pr.profit;
-        });
-        // Find biggest winner for display
         let best = null, bestProfit = -Infinity;
-        players.forEach(pid => {
+        (g.skinsPlayers||[]).forEach(pid => {
           const pr = res.playerResults[pid];
           if (pr && pr.profit > bestProfit) { best = pid; bestProfit = pr.profit; }
         });
         return h('li',{},`${this.gameLabel(g)}: ${best ? UI.playerName(best) + ' +' + Utils.fmt(bestProfit) : 'No winner yet'}`);
       }
-
       if (g.gameType === 'wolf') {
-        const res = Game.computeWolfResult(g);
-        const players = g.wolfPlayers || [];
-        // Add wolf net $ to player totals (pay-up-the-ladder)
-        players.forEach(pid => {
-          net[pid] += res.playerNet[pid] || 0;
-        });
-        // Calculate junk for Wolf - pay up the ladder
-        const sumJunk = (pid, start, end) => {
-          let tot = 0;
-          const arr = g.junkCounts[pid] || [];
-          for (let h = start; h <= end; h++) tot += (arr[h]||0);
-          return tot;
-        };
-        // Get each player's junk value
-        const junkStandings = players.map(pid => {
-          const frontJunk = sumJunk(pid, 0, 8);
-          const backJunk = sumJunk(pid, 9, 17);
-          const junkVal = frontJunk * (g.junkValue.front||0) + backJunk * (g.junkValue.back||0);
-          return { pid, junkVal };
-        }).sort((a, b) => b.junkVal - a.junkVal);
-        // Pay up the ladder for junk
-        for (let i = 0; i < junkStandings.length; i++) {
-          for (let j = i + 1; j < junkStandings.length; j++) {
-            const diff = junkStandings[i].junkVal - junkStandings[j].junkVal;
-            if (diff > 0) {
-              net[junkStandings[i].pid] += diff;
-              net[junkStandings[j].pid] -= diff;
-            }
-          }
-        }
-        // Find biggest winner for display (including junk)
         let best = null, bestAmt = -Infinity;
-        players.forEach(pid => {
-          if (net[pid] > bestAmt) { best = pid; bestAmt = net[pid]; }
+        (g.wolfPlayers||[]).forEach(pid => {
+          if ((gameNet[pid]||0) > bestAmt) { best = pid; bestAmt = gameNet[pid]||0; }
         });
         return h('li',{},`${this.gameLabel(g)}: ${best && bestAmt > 0 ? UI.playerName(best) + ' +' + Utils.fmt(bestAmt) : 'No winner yet'}`);
       }
-
       if (g.gameType === 'ninepoint') {
-        const res = Game.computeNinePointResult(g);
-        const players = g.ninePointPlayers || [];
-        // Add 9-Point net $ to player totals (pay-up-the-ladder)
-        players.forEach(pid => {
-          net[pid] += res.playerNet[pid] || 0;
-        });
-        // Calculate junk for 9-Point - pay up the ladder
-        const sumJunk = (pid, start, end) => {
-          let tot = 0;
-          const arr = g.junkCounts[pid] || [];
-          for (let h = start; h <= end; h++) tot += (arr[h]||0);
-          return tot;
-        };
-        // Get each player's junk value
-        const junkStandings = players.map(pid => {
-          const frontJunk = sumJunk(pid, 0, 8);
-          const backJunk = sumJunk(pid, 9, 17);
-          const junkVal = frontJunk * (g.junkValue.front||0) + backJunk * (g.junkValue.back||0);
-          return { pid, junkVal };
-        }).sort((a, b) => b.junkVal - a.junkVal);
-        // Pay up the ladder for junk
-        for (let i = 0; i < junkStandings.length; i++) {
-          for (let j = i + 1; j < junkStandings.length; j++) {
-            const diff = junkStandings[i].junkVal - junkStandings[j].junkVal;
-            if (diff > 0) {
-              net[junkStandings[i].pid] += diff;
-              net[junkStandings[j].pid] -= diff;
-            }
-          }
-        }
-        // Find biggest winner for display (including junk)
         let best = null, bestAmt = -Infinity;
-        players.forEach(pid => {
-          if (net[pid] > bestAmt) { best = pid; bestAmt = net[pid]; }
+        (g.ninePointPlayers||[]).forEach(pid => {
+          if ((gameNet[pid]||0) > bestAmt) { best = pid; bestAmt = gameNet[pid]||0; }
         });
         return h('li',{},`${this.gameLabel(g)}: ${best && bestAmt > 0 ? UI.playerName(best) + ' +' + Utils.fmt(bestAmt) : 'No winner yet'}`);
       }
 
+      // Nassau/Vegas — show team total
       let tot;
-      if (g.gameType === 'vegas') {
-        const res = Game.computeVegasResult(g);
-        tot = res.totalValue;
-      } else {
-        const res = Game.computeResult(g);
-        tot = res.teamTotals.total;
-      }
-      const szA = (g.teamA||[]).length || 1;
-      const szB = (g.teamB||[]).length || 1;
-      const aShare = szA ? tot/szA : 0;
-      const bShare = szB ? -tot/szB : 0;
-      (g.teamA||[]).forEach(id => net[id] += aShare);
-      (g.teamB||[]).forEach(id => net[id] += bShare);
+      if (g.gameType === 'vegas') { tot = Game.computeVegasResult(g).totalValue; }
+      else { tot = Game.computeResult(g).teamTotals.total; }
       return h('li',{},`${this.gameLabel(g)}: ${Utils.fmt(tot)} to Team A`);
     });
 
@@ -5942,24 +5930,12 @@ const UI = {
   },
 
   showRoundCompleteModal() {
-    // Build quick summary
+    // Build quick summary using unified helper
     const net = {};
     State.data.players.forEach(p => net[p.id] = 0);
     State.data.games.forEach(g => {
-      let tot;
-      if (g.gameType === 'vegas') {
-        const res = Game.computeVegasResult(g);
-        tot = res.totalValue;
-      } else {
-        const res = Game.computeResult(g);
-        tot = res.teamTotals.total;
-      }
-      const szA = (g.teamA||[]).length || 1;
-      const szB = (g.teamB||[]).length || 1;
-      const aShare = szA ? tot/szA : 0;
-      const bShare = szB ? -tot/szB : 0;
-      (g.teamA||[]).forEach(id => net[id] += aShare);
-      (g.teamB||[]).forEach(id => net[id] += bShare);
+      const gameNet = Game.computeGamePlayerNet(g);
+      Object.keys(gameNet).forEach(pid => { net[pid] = (net[pid]||0) + gameNet[pid]; });
     });
 
     const xfers = this.calcTransfers(net);
@@ -6022,45 +5998,48 @@ const UI = {
       lines.push('');
 
       State.data.games.forEach(g => {
+        lines.push(this.gameLabel(g));
         if (g.gameType === 'vegas') {
           const res = Game.computeVegasResult(g);
-          lines.push(this.gameLabel(g));
           lines.push(`  Front:   ${Utils.fmt(res.frontValue)}`);
           lines.push(`  Back:    ${Utils.fmt(res.backValue)}`);
           lines.push(`  Junk:    ${Utils.fmt(res.junkValue)}`);
           if (res.kpValue !== 0) lines.push(`  KP:      ${Utils.fmt(res.kpValue)}${res.kp.hasSweeps ? ' (Sweeps!)' : ''}${res.kp.hasQuads ? ' (Quads!)' : ''}`);
           lines.push(`  Total:   ${Utils.fmt(res.totalValue)}`);
-          lines.push('');
+        } else if (g.gameType === 'skins') {
+          const res = Game.computeSkinsResult(g);
+          const players = g.skinsPlayers || [];
+          players.forEach(pid => {
+            const pr = res.playerResults[pid];
+            if (pr) lines.push(`  ${UI.playerName(pid)}: ${pr.totalSkins} skins = ${Utils.fmt(pr.profit)}`);
+          });
+        } else if (g.gameType === 'wolf') {
+          const res = Game.computeWolfResult(g);
+          (g.wolfPlayers||[]).forEach(pid => {
+            lines.push(`  ${UI.playerName(pid)}: ${Utils.fmt(res.playerNet[pid]||0)}`);
+          });
+        } else if (g.gameType === 'ninepoint') {
+          const res = Game.computeNinePointResult(g);
+          (g.ninePointPlayers||[]).forEach(pid => {
+            lines.push(`  ${UI.playerName(pid)}: ${Utils.fmt(res.playerNet[pid]||0)}`);
+          });
         } else {
           const res = Game.computeResult(g);
-          lines.push(this.gameLabel(g));
           lines.push(`  Front:   ${Utils.fmt(res.teamTotals.front)}`);
           lines.push(`  Back:    ${Utils.fmt(res.teamTotals.back)}`);
           lines.push(`  Overall: ${Utils.fmt(res.teamTotals.overall)}`);
           lines.push(`  Junk:    ${Utils.fmt(res.teamTotals.junk)}`);
           if (res.teamTotals.kp !== 0) lines.push(`  KP:      ${Utils.fmt(res.teamTotals.kp)}${res.kp.hasSweeps ? ' (Sweeps!)' : ''}${res.kp.hasQuads ? ' (Quads!)' : ''}`);
           lines.push(`  Total:   ${Utils.fmt(res.teamTotals.total)}`);
-          lines.push('');
         }
+        lines.push('');
       });
 
       const net = {};
       State.data.players.forEach(p => net[p.id] = 0);
       State.data.games.forEach(g => {
-        let tot;
-        if (g.gameType === 'vegas') {
-          const res = Game.computeVegasResult(g);
-          tot = res.totalValue;
-        } else {
-          const res = Game.computeResult(g);
-          tot = res.teamTotals.total;
-        }
-        const szA = (g.teamA||[]).length || 1;
-        const szB = (g.teamB||[]).length || 1;
-        const aShare = szA ? tot/szA : 0;
-        const bShare = szB ? -tot/szB : 0;
-        (g.teamA||[]).forEach(id => net[id] += aShare);
-        (g.teamB||[]).forEach(id => net[id] += bShare);
+        const gameNet = Game.computeGamePlayerNet(g);
+        Object.keys(gameNet).forEach(pid => { net[pid] = (net[pid]||0) + gameNet[pid]; });
       });
 
       lines.push('Per-Player Net:');
@@ -6126,7 +6105,7 @@ const UI = {
             return pr && pr.profit > (best?.profit ?? -Infinity) ? {name:this.playerName(pid), profit:pr.profit} : best;
           }, null);
           gameLines.push({ label: this.gameLabel(g), color, values: [
-            `Skins Won: ${res.totalSkinsWon}`, top ? `Leader: ${top.name} ${Utils.fmt(top.profit)}` : ''
+            `Skins Won: ${res.totalGrossSkins + res.totalNetSkins}`, top ? `Leader: ${top.name} ${Utils.fmt(top.profit)}` : ''
           ].filter(Boolean)});
         } else if (g.gameType === 'wolf') {
           const res = Game.computeWolfResult(g);
@@ -6141,33 +6120,13 @@ const UI = {
         }
       });
 
-      // Compute per-player net (same logic as transactions tab)
+      // Compute per-player net using unified helper
       const net = {};
       players.forEach(p => net[p.id] = 0);
       games.forEach(g => {
         if (!Game.hasAnyScores(g)) return;
-        if (g.gameType === 'skins') {
-          const res = Game.computeSkinsResult(g);
-          (g.skinsPlayers||[]).forEach(pid => { const pr = res.playerResults[pid]; if (pr) net[pid] += pr.profit; });
-          return;
-        }
-        if (g.gameType === 'wolf') {
-          const res = Game.computeWolfResult(g);
-          (g.wolfPlayers||[]).forEach(pid => { net[pid] += res.playerNet[pid] || 0; });
-          return;
-        }
-        if (g.gameType === 'ninepoint') {
-          const res = Game.computeNinePointResult(g);
-          (g.ninePointPlayers||[]).forEach(pid => { net[pid] += res.playerNet[pid] || 0; });
-          return;
-        }
-        let tot;
-        if (g.gameType === 'vegas') { tot = Game.computeVegasResult(g).totalValue; }
-        else { tot = Game.computeResult(g).teamTotals.total; }
-        const szA = (g.teamA||[]).length || 1;
-        const szB = (g.teamB||[]).length || 1;
-        (g.teamA||[]).forEach(id => net[id] += (szA ? tot/szA : 0));
-        (g.teamB||[]).forEach(id => net[id] += (szB ? -tot/szB : 0));
+        const gameNet = Game.computeGamePlayerNet(g);
+        Object.keys(gameNet).forEach(pid => { net[pid] = (net[pid]||0) + gameNet[pid]; });
       });
       const xfers = this.calcTransfers(net);
 
@@ -6652,7 +6611,10 @@ document.getElementById('clearBtn').onclick = () => {
       g.gross[p.id] = Utils.make18(null);
       g.junkCounts[p.id] = Utils.make18(0);
     });
+    g.kpData = Utils.make18(null);
+    g.quadsConfirmed = {};
   });
+  State.data._clearedHoles = {};
   State.scheduleSave();
   State.scheduleRender();
   Err.toast('Scores cleared');
