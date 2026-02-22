@@ -860,7 +860,7 @@ const State = {
       this.data.tab = validTabs.includes(obj.tab) ? obj.tab : 'scores';
       this.data.debugStatus = !!obj.debugStatus;
       this.data.scoringHole = obj.scoringHole || 0;
-      this.data.scoringView = ['hole','table','junk'].includes(obj.scoringView) ? obj.scoringView : 'hole';
+      this.data.scoringView = 'hole'; // Always start on hole view
       this.data._clearedHoles = obj._clearedHoles || {};
       return true;
     } catch(e) { 
@@ -3295,7 +3295,25 @@ const UI = {
       if (UI._drumHandlers) {
         const CELL = 52; // px per number cell
         const DRUM_W = 160; // drum visible width
-        const haptic = () => { try { navigator.vibrate(10); } catch(e){} };
+        // Haptic + audio feedback on score change
+        let _audioCtx = null;
+        const haptic = () => {
+          // Android vibration
+          try { if (navigator.vibrate) navigator.vibrate(12); } catch(e){}
+          // Audio click for iOS (no vibrate support) — short tick sound
+          try {
+            if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = _audioCtx.createOscillator();
+            const gain = _audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(_audioCtx.destination);
+            osc.frequency.value = 1800;
+            gain.gain.value = 0.08;
+            gain.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.03);
+            osc.start(_audioCtx.currentTime);
+            osc.stop(_audioCtx.currentTime + 0.03);
+          } catch(e){}
+        };
 
         UI._drumHandlers.forEach(({ drumId, currentScore, setScore, centerIdx }) => {
           const el = document.getElementById(drumId);
@@ -3320,11 +3338,14 @@ const UI = {
             setScore(newScore);
           };
 
-          // Touch events
+          // Touch events — first touch unlocks AudioContext for iOS
           touchEl.ontouchstart = (e) => {
             startX = e.touches[0].clientX;
             dragging = true; dx = 0;
             track.style.transition = 'none';
+            // Unlock AudioContext on first user gesture (iOS requirement)
+            if (!_audioCtx) { try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){} }
+            else if (_audioCtx.state === 'suspended') { try { _audioCtx.resume(); } catch(e){} }
           };
           touchEl.ontouchmove = (e) => {
             if (!dragging) return;
