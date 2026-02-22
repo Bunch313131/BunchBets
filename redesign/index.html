@@ -15,21 +15,61 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 <style>
-/* Theme 1: Classic (current colors preserved) */
-:root, :root[data-theme="classic"] { --bg:#0b0e13; --card:#0f1420; --txt:#ecf0f6; --muted:#a3a9b6; --border:#1e2633; --acc:#3b82f6; --success:#16a34a; --danger:#dc2626; --warning:#d97706; --gold:#c9a96e; color-scheme: dark; }
+/* Theme 1: Classic (current colors preserved — clean, modern, no frills) */
+:root, :root[data-theme="classic"] { --bg:#0b0e13; --card:#0f1420; --txt:#ecf0f6; --muted:#a3a9b6; --border:#1e2633; --acc:#3b82f6; --success:#16a34a; --danger:#dc2626; --warning:#d97706; --gold:#c9a96e; --radius:14px; --font-display:system-ui,-apple-system,Segoe UI,Roboto,Arial; --header-bg:var(--card); color-scheme: dark; }
 :root[data-theme="classic"].light-mode { --bg:#f5f5f7; --card:#ffffff; --txt:#1d1d1f; --muted:#6e6e73; --border:#d2d2d7; --acc:#3b82f6; --success:#16a34a; --danger:#dc2626; --warning:#d97706; --gold:#a07d3f; color-scheme: light; }
 
-/* Theme 2: Clubhouse (dark greens, warm wood tones) */
-:root[data-theme="clubhouse"] { --bg:#0d1210; --card:#151e19; --txt:#e8efe6; --muted:#8fa898; --border:#1e3528; --acc:#3a7d5c; --success:#4ade80; --danger:#ef4444; --warning:#f59e0b; --gold:#c4a265; color-scheme: dark; }
-:root[data-theme="clubhouse"].light-mode { --bg:#f2f4f0; --card:#ffffff; --txt:#1a2e1d; --muted:#5a7a62; --border:#c8d6ca; --acc:#3a7d5c; --success:#16a34a; --danger:#dc2626; --warning:#d97706; --gold:#8b6f3a; color-scheme: light; }
+/* Theme 2: Augusta — Masters inspired, rich greens, gold accents, serif elegance */
+:root[data-theme="augusta"] { --bg:#002b10; --card:#003d16; --txt:#f5f0e1; --muted:#a8c4a0; --border:#1a5c2e; --acc:#c8a951; --success:#6fd08c; --danger:#e74c4c; --warning:#daa520; --gold:#c8a951; --radius:6px; --font-display:Georgia,'Times New Roman',serif; --header-bg:linear-gradient(180deg,#003d16,#002b10); color-scheme: dark; }
+:root[data-theme="augusta"].light-mode { --bg:#f5f0e1; --card:#fffef8; --txt:#1a2e1d; --muted:#5a7a62; --border:#c5d4b8; --acc:#8b6f2e; --success:#16a34a; --danger:#dc2626; --warning:#b8860b; --gold:#8b6f2e; --header-bg:linear-gradient(180deg,#2d6a3f,#1a5c2e); color-scheme: light; }
+/* Augusta structural overrides */
+[data-theme="augusta"] h1, [data-theme="augusta"] h2, [data-theme="augusta"] h3 { font-family:Georgia,'Times New Roman',serif; letter-spacing:0.5px; }
+[data-theme="augusta"] .card { border-radius:var(--radius); box-shadow:0 1px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05); border:1px solid var(--border); }
+[data-theme="augusta"] header { background:var(--header-bg); border-bottom:2px solid var(--gold); }
+[data-theme="augusta"] .btn { border-radius:4px; text-transform:uppercase; letter-spacing:1px; font-size:12px; }
+[data-theme="augusta"] .btn.primary { background:var(--gold); color:#002b10; border-color:var(--gold); }
+[data-theme="augusta"] .hole-scoring-nav { background:var(--gold); color:#002b10; }
+[data-theme="augusta"] .hole-scoring-nav .hole-nav-btn { background:rgba(0,43,16,0.2); color:#002b10; }
+[data-theme="augusta"] .hole-dot.current { background:var(--gold); border-color:var(--gold); color:#002b10; }
+[data-theme="augusta"] .bottom-nav { border-top:2px solid var(--gold); }
+[data-theme="augusta"] .bottom-nav-btn.active { color:var(--gold); }
+[data-theme="augusta"] .wizard-splash { background:linear-gradient(135deg,#002b10,#004d1c,#002b10); }
+[data-theme="augusta"] .pill { border-radius:4px; }
+[data-theme="augusta"] .scoring-toggle-btn.active { background:var(--gold); color:#002b10; }
 
-/* Theme 3: Links (coastal navy, slate, cool tones) */
-:root[data-theme="links"] { --bg:#0b0f14; --card:#111822; --txt:#e2e8f0; --muted:#94a3b8; --border:#1e293b; --acc:#4a90d9; --success:#22c55e; --danger:#f43f5e; --warning:#f59e0b; --gold:#94a3b8; color-scheme: dark; }
-:root[data-theme="links"].light-mode { --bg:#f0f4f8; --card:#ffffff; --txt:#0f172a; --muted:#64748b; --border:#cbd5e1; --acc:#2563eb; --success:#16a34a; --danger:#dc2626; --warning:#d97706; --gold:#64748b; color-scheme: light; }
+/* Theme 3: Midnight — dark luxury, neon accents, glass morphism, futuristic */
+:root[data-theme="midnight"] { --bg:#0a0a0f; --card:rgba(20,20,35,0.85); --txt:#e8e8f0; --muted:#7a7a9a; --border:rgba(100,100,180,0.2); --acc:#7c3aed; --success:#10b981; --danger:#f43f5e; --warning:#f59e0b; --gold:#a78bfa; --radius:20px; --font-display:'SF Pro Display',system-ui,-apple-system,Segoe UI; --header-bg:rgba(10,10,15,0.8); color-scheme: dark; }
+:root[data-theme="midnight"].light-mode { --bg:#f0f0f8; --card:rgba(255,255,255,0.9); --txt:#1a1a2e; --muted:#6a6a8a; --border:rgba(100,100,180,0.15); --acc:#7c3aed; --success:#10b981; --danger:#dc2626; --warning:#d97706; --gold:#7c3aed; --header-bg:rgba(240,240,248,0.8); color-scheme: light; }
+/* Midnight structural overrides — glassmorphism */
+[data-theme="midnight"] .card { border-radius:var(--radius); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid var(--border); box-shadow:0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05); }
+[data-theme="midnight"] header { background:var(--header-bg); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border-bottom:1px solid var(--border); }
+[data-theme="midnight"] .btn { border-radius:999px; }
+[data-theme="midnight"] .btn.primary { background:linear-gradient(135deg,#7c3aed,#a855f7); border:none; box-shadow:0 4px 15px rgba(124,58,237,0.4); }
+[data-theme="midnight"] .hole-scoring-nav { background:linear-gradient(135deg,#7c3aed,#6d28d9); }
+[data-theme="midnight"] .bottom-nav { background:var(--header-bg); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border-top:1px solid var(--border); }
+[data-theme="midnight"] .hole-dot.current { background:linear-gradient(135deg,#7c3aed,#a855f7); border-color:#a855f7; box-shadow:0 0 12px rgba(124,58,237,0.5); }
+[data-theme="midnight"] .wizard-splash { background:linear-gradient(135deg,#0a0a0f,#1a1a3e,#7c3aed); }
+[data-theme="midnight"] .scoring-toggle-btn.active { background:linear-gradient(135deg,#7c3aed,#a855f7); }
+[data-theme="midnight"] .score-drum-frame { border-color:#a855f7; box-shadow:0 0 10px rgba(124,58,237,0.3); }
+[data-theme="midnight"] body { background-image:radial-gradient(ellipse at 50% 0%, rgba(124,58,237,0.08) 0%, transparent 60%); }
 
-/* Theme 4: Tour (high contrast, bold, sports broadcast) */
-:root[data-theme="tour"] { --bg:#000000; --card:#111111; --txt:#f1f1f1; --muted:#888888; --border:#222222; --acc:#e63946; --success:#22c55e; --danger:#ff4444; --warning:#ffb800; --gold:#f1f1f1; color-scheme: dark; }
-:root[data-theme="tour"].light-mode { --bg:#fafafa; --card:#ffffff; --txt:#111111; --muted:#666666; --border:#e0e0e0; --acc:#e63946; --success:#16a34a; --danger:#dc2626; --warning:#d97706; --gold:#333333; color-scheme: light; }
+/* Theme 4: Tour — ESPN/CBS sports broadcast, bold, high-energy */
+:root[data-theme="tour"] { --bg:#0c0c0c; --card:#1a1a1a; --txt:#ffffff; --muted:#999999; --border:#333333; --acc:#ff3b30; --success:#34c759; --danger:#ff3b30; --warning:#ff9500; --gold:#ffcc00; --radius:8px; --font-display:'Helvetica Neue',Helvetica,Arial,sans-serif; --header-bg:#1a1a1a; color-scheme: dark; }
+:root[data-theme="tour"].light-mode { --bg:#f2f2f2; --card:#ffffff; --txt:#000000; --muted:#666666; --border:#dddddd; --acc:#ff3b30; --success:#34c759; --danger:#ff3b30; --warning:#ff9500; --gold:#ff9500; --header-bg:#ffffff; color-scheme: light; }
+/* Tour structural overrides — sharp, bold, athletic */
+[data-theme="tour"] h1, [data-theme="tour"] h2, [data-theme="tour"] h3 { font-weight:900; text-transform:uppercase; letter-spacing:1.5px; }
+[data-theme="tour"] .card { border-radius:var(--radius); border-left:4px solid var(--acc); box-shadow:none; }
+[data-theme="tour"] header { background:var(--header-bg); border-bottom:3px solid var(--acc); }
+[data-theme="tour"] .btn { border-radius:var(--radius); font-weight:800; text-transform:uppercase; letter-spacing:1px; }
+[data-theme="tour"] .btn.primary { background:var(--acc); }
+[data-theme="tour"] .hole-scoring-nav { background:#000; border-bottom:3px solid var(--acc); }
+[data-theme="tour"] .hole-dot.current { background:var(--acc); border-color:var(--acc); }
+[data-theme="tour"] .bottom-nav { border-top:3px solid var(--acc); }
+[data-theme="tour"] .bottom-nav-btn.active { color:var(--acc); }
+[data-theme="tour"] .pill { border-radius:4px; font-weight:800; text-transform:uppercase; }
+[data-theme="tour"] .wizard-splash { background:linear-gradient(135deg,#0c0c0c,#1a1a1a,#ff3b30); }
+[data-theme="tour"] .scoring-toggle-btn.active { background:var(--acc); }
+[data-theme="tour"] .score-drum-frame { border-color:var(--acc); border-width:3px; border-radius:6px; }
 :root.light-mode input[type="text"], :root.light-mode input[type="tel"], :root.light-mode input[type="number"], :root.light-mode select { background:rgba(0,0,0,0.04); }
 :root.light-mode .menu-item:hover { background:rgba(0,0,0,0.05); }
 .theme-switch { position:relative; width:50px; height:26px; display:inline-block; }
@@ -42,12 +82,12 @@
 .theme-swatch.active { border-color: var(--acc) !important; }
 * { box-sizing:border-box; }
 body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; color:var(--txt); background:var(--bg); }
-h1, h2, h3 { font-family: Georgia, 'Times New Roman', serif; }
+h1, h2, h3 { font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial; }
 header { background:var(--card); border-bottom:1px solid var(--border); padding:10px 12px; position:sticky; top:0; z-index:10; background-image:repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.015) 10px, rgba(255,255,255,0.015) 20px); }
 h1 { font-size:18px; margin:0; }
 main { padding:12px; padding-bottom:72px; }
 .row { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-start; }
-.card { background:var(--card); border:1px solid var(--border); border-radius:18px; padding:12px; box-shadow:0 2px 8px rgba(0,0,0,0.12); }
+.card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius, 14px); padding:12px; box-shadow:0 2px 8px rgba(0,0,0,0.12); }
 .btn { background:var(--card); border:1px solid var(--border); border-radius:999px; padding:8px 12px; cursor:pointer; color:var(--txt); transition:all 0.2s; }
 .btn:hover:not(:disabled) { transform:translateY(-1px); }
 .btn:disabled { opacity:0.5; cursor:not-allowed; }
@@ -318,22 +358,19 @@ body:has(.wizard-overlay) { overflow:hidden; }
 /* Game status summary cards below scoring */
 .game-status-card { padding:8px 12px; margin-bottom:6px; }
 
-/* Horizontal score strip */
-.score-strip-wrap { display:flex; align-items:center; gap:6px; flex:1; min-width:0; }
-.score-strip { display:flex; gap:6px; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding:4px 2px; flex:1; min-width:0; }
-.score-strip::-webkit-scrollbar { display:none; }
-.score-strip-num { width:36px; height:36px; flex-shrink:0; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:600; cursor:pointer; scroll-snap-align:center; border:2px solid var(--border); background:var(--card); color:var(--muted); transition:all 0.15s; -webkit-tap-highlight-color:transparent; }
-.score-strip-num:active { transform:scale(0.9); }
-.score-strip-num.par-mark { border-color:var(--muted); color:var(--txt); }
-.score-strip-num.active { background:var(--acc); color:#fff; border-color:var(--acc); transform:scale(1.15); font-size:18px; z-index:1; }
-.score-strip-num.active.eagle { background:var(--success); border-color:var(--success); }
-.score-strip-num.active.birdie { background:var(--success); border-color:var(--success); }
-.score-strip-num.active.bogey { background:var(--danger); border-color:var(--danger); }
-.score-strip-num.active.double-bogey { background:var(--danger); border-color:var(--danger); }
-.score-strip-num.eagle:not(.active) { color:var(--success); border-color:rgba(22,163,74,0.3); }
-.score-strip-num.birdie:not(.active) { color:var(--success); border-color:rgba(22,163,74,0.3); }
-.score-strip-num.bogey:not(.active) { color:var(--danger); border-color:rgba(220,38,38,0.3); }
-.score-strip-num.double-bogey:not(.active) { color:var(--danger); border-color:rgba(220,38,38,0.3); }
+/* Score drum picker — 3 visible numbers, center is selected */
+.score-drum-wrap { display:flex; align-items:center; gap:8px; }
+.score-drum { position:relative; width:140px; height:44px; overflow:hidden; -webkit-mask-image:linear-gradient(to right, transparent 0%, black 30%, black 70%, transparent 100%); mask-image:linear-gradient(to right, transparent 0%, black 30%, black 70%, transparent 100%); }
+.score-drum-track { display:flex; transition:transform 0.2s ease-out; height:100%; align-items:center; }
+.score-drum-num { width:46px; flex-shrink:0; height:36px; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:600; color:var(--muted); }
+.score-drum-num.center { font-size:22px; font-weight:800; color:var(--txt); }
+.score-drum-num.center.eagle, .score-drum-num.center.birdie { color:var(--success); }
+.score-drum-num.center.bogey, .score-drum-num.center.double-bogey { color:var(--danger); }
+.score-drum-frame { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:44px; height:40px; border:2px solid var(--acc); border-radius:10px; pointer-events:none; z-index:2; }
+.score-drum-frame.eagle, .score-drum-frame.birdie { border-color:var(--success); }
+.score-drum-frame.bogey, .score-drum-frame.double-bogey { border-color:var(--danger); }
+.score-drum-touch { position:absolute; inset:0; z-index:3; cursor:grab; }
+.score-drum-touch:active { cursor:grabbing; }
 /* Scorecard double-rule at Front/Back 9 boundary */
 td:nth-child(10), th:nth-child(10) { border-left:3px double var(--muted); }
 .money { color:var(--gold); font-weight:600; font-family:monospace; }
@@ -373,11 +410,11 @@ td:nth-child(10), th:nth-child(10) { border-left:3px double var(--muted); }
   </div>
   <div class="menu-section">
     <div class="menu-section-title">Theme</div>
-    <div style="display:flex;gap:10px;padding:8px 16px;">
-      <button class="theme-swatch" data-theme="classic" style="background:linear-gradient(135deg,#0b0e13,#3b82f6);width:40px;height:40px;border-radius:10px;border:2px solid transparent;cursor:pointer;" title="Classic"></button>
-      <button class="theme-swatch" data-theme="clubhouse" style="background:linear-gradient(135deg,#0d1210,#3a7d5c);width:40px;height:40px;border-radius:10px;border:2px solid transparent;cursor:pointer;" title="Clubhouse"></button>
-      <button class="theme-swatch" data-theme="links" style="background:linear-gradient(135deg,#0b0f14,#4a90d9);width:40px;height:40px;border-radius:10px;border:2px solid transparent;cursor:pointer;" title="Links"></button>
-      <button class="theme-swatch" data-theme="tour" style="background:linear-gradient(135deg,#000000,#e63946);width:40px;height:40px;border-radius:10px;border:2px solid transparent;cursor:pointer;" title="Tour"></button>
+    <div style="display:flex;gap:12px;padding:8px 16px;">
+      <div style="text-align:center;"><button class="theme-swatch" data-theme="classic" style="background:linear-gradient(135deg,#0b0e13,#3b82f6);width:44px;height:44px;border-radius:10px;border:2px solid transparent;cursor:pointer;" title="Classic"></button><div style="font-size:9px;color:var(--muted);margin-top:3px;">Classic</div></div>
+      <div style="text-align:center;"><button class="theme-swatch" data-theme="augusta" style="background:linear-gradient(135deg,#002b10,#c8a951);width:44px;height:44px;border-radius:10px;border:2px solid transparent;cursor:pointer;" title="Augusta"></button><div style="font-size:9px;color:var(--muted);margin-top:3px;">Augusta</div></div>
+      <div style="text-align:center;"><button class="theme-swatch" data-theme="midnight" style="background:linear-gradient(135deg,#0a0a0f,#7c3aed);width:44px;height:44px;border-radius:10px;border:2px solid transparent;cursor:pointer;" title="Midnight"></button><div style="font-size:9px;color:var(--muted);margin-top:3px;">Midnight</div></div>
+      <div style="text-align:center;"><button class="theme-swatch" data-theme="tour" style="background:linear-gradient(135deg,#0c0c0c,#ff3b30);width:44px;height:44px;border-radius:10px;border:2px solid transparent;cursor:pointer;" title="Tour"></button><div style="font-size:9px;color:var(--muted);margin-top:3px;">Tour</div></div>
     </div>
   </div>
   <div class="menu-section">
@@ -3247,14 +3284,40 @@ const UI = {
     }
     // Header always visible now (contains hamburger menu)
     root.appendChild(view);
-    // Auto-scroll score strips to active number
+    // Wire up drum picker swipe handlers
     requestAnimationFrame(() => {
-      document.querySelectorAll('.score-strip').forEach(strip => {
-        const active = strip.querySelector('.score-strip-num.active');
-        if (active) {
-          strip.scrollLeft = active.offsetLeft - strip.offsetWidth / 2 + active.offsetWidth / 2;
-        }
-      });
+      if (UI._drumHandlers) {
+        UI._drumHandlers.forEach(({ drumId, currentScore, setScore }) => {
+          const el = document.getElementById(drumId);
+          if (!el) return;
+          const touch = el.querySelector('.score-drum-touch');
+          if (!touch) return;
+          let startX = 0, startY = 0, swiping = false;
+          touch.ontouchstart = (e) => { startX = e.touches[0].clientX; startY = e.touches[0].clientY; swiping = true; };
+          touch.ontouchend = (e) => {
+            if (!swiping) return;
+            swiping = false;
+            const dx = e.changedTouches[0].clientX - startX;
+            const dy = e.changedTouches[0].clientY - startY;
+            if (Math.abs(dx) > 20 && Math.abs(dx) > Math.abs(dy)) {
+              if (dx < 0 && currentScore < MAX_SCORE) setScore(currentScore + 1);
+              else if (dx > 0 && currentScore > MIN_SCORE) setScore(currentScore - 1);
+            }
+          };
+          // Mouse drag for desktop
+          touch.onmousedown = (e) => { startX = e.clientX; swiping = true; e.preventDefault(); };
+          touch.onmouseup = (e) => {
+            if (!swiping) return;
+            swiping = false;
+            const dx = e.clientX - startX;
+            if (Math.abs(dx) > 20) {
+              if (dx < 0 && currentScore < MAX_SCORE) setScore(currentScore + 1);
+              else if (dx > 0 && currentScore > MIN_SCORE) setScore(currentScore - 1);
+            }
+          };
+        });
+        UI._drumHandlers = [];
+      }
     });
     // Bottom nav bar
     let bottomNav = document.getElementById('bottomNav');
@@ -4041,35 +4104,57 @@ const UI = {
         ]);
       }
 
-      // Build score numbers array (par-3 to par+5 covers most realistic scores)
-      const stripMin = Math.max(MIN_SCORE, par - 3);
-      const stripMax = Math.min(MAX_SCORE, par + 5);
-      const stripNums = [];
-      for (let n = stripMin; n <= stripMax; n++) stripNums.push(n);
+      // Drum picker — shows 3 numbers, center is selected
+      const currentScore = gross != null ? gross : par;
+      const drumNums = [currentScore - 1, currentScore, currentScore + 1]
+        .filter(n => n >= MIN_SCORE && n <= MAX_SCORE);
+      // Pad to always have 3 visible
+      while (drumNums.length < 3) {
+        if (drumNums[0] > MIN_SCORE) drumNums.unshift(drumNums[0] - 1);
+        else if (drumNums[drumNums.length-1] < MAX_SCORE) drumNums.push(drumNums[drumNums.length-1] + 1);
+        else break;
+      }
+      const centerIdx = drumNums.indexOf(currentScore);
+      const centerDiff = currentScore - par;
+      let frameClass = 'score-drum-frame';
+      if (centerDiff <= -2) frameClass += ' eagle';
+      else if (centerDiff === -1) frameClass += ' birdie';
+      else if (centerDiff === 1) frameClass += ' bogey';
+      else if (centerDiff >= 2) frameClass += ' double-bogey';
 
-      const currentScore = gross != null ? gross : null;
+      const drumTrack = h('div',{class:'score-drum-track',style:`transform:translateX(${(1 - centerIdx) * 46 + 1}px);`},
+        drumNums.map((n, i) => {
+          const diff = n - par;
+          let cls = 'score-drum-num';
+          if (i === centerIdx) {
+            cls += ' center';
+            if (diff <= -2) cls += ' eagle';
+            else if (diff === -1) cls += ' birdie';
+            else if (diff === 1) cls += ' bogey';
+            else if (diff >= 2) cls += ' double-bogey';
+          }
+          return h('div',{class:cls},String(n));
+        })
+      );
 
-      const scoreStrip = h('div', {class: 'score-strip-wrap'}, [
-        h('div', {class: 'score-strip', id: `strip-${p.id}`},
-          stripNums.map(n => {
-            const isActive = n === currentScore;
-            const diff = n - par;
-            let numClass = 'score-strip-num';
-            if (isActive) numClass += ' active';
-            if (diff <= -2) numClass += ' eagle';
-            else if (diff === -1) numClass += ' birdie';
-            else if (diff === 0) numClass += ' par-mark';
-            else if (diff === 1) numClass += ' bogey';
-            else if (diff >= 2) numClass += ' double-bogey';
+      // Touch overlay for swipe handling
+      const touchOverlay = h('div',{class:'score-drum-touch'});
+      // Wire up swipe after DOM insertion
+      const drumId = `drum-${p.id}-${hole}`;
+      const drum = h('div',{class:'score-drum',id:drumId},[
+        drumTrack,
+        h('div',{class:frameClass}),
+        touchOverlay
+      ]);
 
-            return h('div', {
-              class: numClass,
-              onclick: () => setScore(n)
-            }, String(n));
-          })
-        ),
+      const scoreDrum = h('div',{class:'score-drum-wrap'},[
+        drum,
         junkInline
       ].filter(Boolean));
+
+      // Store swipe handler data for post-render wiring
+      if (!UI._drumHandlers) UI._drumHandlers = [];
+      UI._drumHandlers.push({ drumId, pid: p.id, currentScore, par, hole, setScore });
 
       return h('div',{class:'hole-player-row'},[
         h('div',{style:'display:flex;align-items:center;justify-content:space-between;'},[
@@ -4082,7 +4167,7 @@ const UI = {
           ]),
           gross != null ? h('span',{style:`font-size:13px;font-weight:700;color:${scoreClass(gross).includes('birdie')||scoreClass(gross).includes('eagle')?'var(--success)':scoreClass(gross).includes('bogey')?'var(--danger)':'var(--muted)'};`},vsPar(gross)) : null
         ].filter(Boolean)),
-        scoreStrip
+        scoreDrum
       ]);
     });
 
