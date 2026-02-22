@@ -2421,10 +2421,11 @@ const Wizard = {
     div.className = 'wizard-screen';
 
     const playersHtml = this.data.players.map((p, i) => `
-      <div class="wizard-player-row">
-        <input type="text" placeholder="Player ${i+1} name" value="${p.name}" data-idx="${i}" data-field="name">
+      <div class="wizard-player-row" style="position:relative;">
+        <input type="text" placeholder="Player ${i+1} name" value="${p.name}" data-idx="${i}" data-field="name" autocomplete="off">
         <input type="number" placeholder="HCP" value="${p.handicap || ''}" data-idx="${i}" data-field="handicap" min="0" max="54">
         ${i >= 2 ? `<button class="delete-btn" data-idx="${i}">&times;</button>` : '<div></div>'}
+        <div class="roster-dropdown" data-idx="${i}" style="display:none;position:absolute;top:100%;left:0;right:72px;z-index:20;background:var(--card);border:1px solid var(--border);border-radius:8px;max-height:150px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.3);"></div>
       </div>
     `).join('');
 
@@ -2449,9 +2450,48 @@ const Wizard = {
     `;
 
     setTimeout(() => {
+      const roster = JSON.parse(localStorage.getItem('bunchbets_roster') || '[]');
+
+      const showRosterDropdown = (input) => {
+        const idx = input.dataset.idx;
+        const dropdown = div.querySelector(`.roster-dropdown[data-idx="${idx}"]`);
+        if (!dropdown || !roster.length) return;
+        const query = input.value.toLowerCase();
+        // Filter roster: show all if empty, or match by prefix
+        const usedNames = this.data.players.map(p => p.name.toLowerCase()).filter(n => n);
+        const matches = roster.filter(r =>
+          (!query || r.name.toLowerCase().includes(query)) &&
+          !usedNames.includes(r.name.toLowerCase())
+        );
+        if (!matches.length) { dropdown.style.display = 'none'; return; }
+        dropdown.innerHTML = matches.map(r =>
+          `<div class="roster-pick" data-name="${r.name}" data-hcp="${r.handicap||0}" style="padding:10px 12px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+            <span>${r.name}</span><span style="color:var(--muted);font-size:12px;">HCP ${r.handicap||0}</span>
+          </div>`
+        ).join('');
+        dropdown.style.display = 'block';
+        dropdown.querySelectorAll('.roster-pick').forEach(pick => {
+          pick.onmousedown = (e) => {
+            e.preventDefault(); // prevent blur
+            const i = parseInt(idx);
+            this.data.players[i].name = pick.dataset.name;
+            this.data.players[i].handicap = parseInt(pick.dataset.hcp) || 0;
+            dropdown.style.display = 'none';
+            this.render();
+          };
+        });
+      };
+
       div.querySelectorAll('input[data-field="name"]').forEach(input => {
         input.oninput = (e) => {
           this.data.players[parseInt(e.target.dataset.idx)].name = e.target.value;
+          showRosterDropdown(input);
+        };
+        input.onfocus = () => showRosterDropdown(input);
+        input.onblur = () => {
+          const idx = input.dataset.idx;
+          const dropdown = div.querySelector(`.roster-dropdown[data-idx="${idx}"]`);
+          if (dropdown) setTimeout(() => dropdown.style.display = 'none', 150);
         };
       });
 
@@ -4055,6 +4095,41 @@ const UI = {
       ]);
     });
 
+    // Saved roster management
+    const roster = JSON.parse(localStorage.getItem('bunchbets_roster') || '[]');
+    const rosterRows = roster.map((entry, i) =>
+      h('div',{style:'display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);'},[
+        h('span',{style:'flex:1;font-size:14px;'},entry.name),
+        h('span',{class:'muted',style:'font-size:12px;width:50px;text-align:center;'},`HCP ${entry.handicap || 0}`),
+        h('button',{style:'background:none;border:none;color:var(--danger);font-size:16px;cursor:pointer;padding:4px 8px;',
+          onclick:() => {
+            roster.splice(i, 1);
+            localStorage.setItem('bunchbets_roster', JSON.stringify(roster));
+            State.scheduleRender();
+          }},'\u00D7')
+      ])
+    );
+
+    const rosterCard = h('div',{class:'card',style:'margin-top:12px;'},[
+      h('div',{class:'pill'},'My Players'),
+      h('div',{class:'muted',style:'font-size:11px;margin:4px 0 8px;'},'Saved on this device. Pick from this list in the wizard.'),
+      h('div',{},rosterRows),
+      h('div',{style:'display:flex;gap:8px;margin-top:8px;'},[
+        h('input',{type:'text',id:'rosterNewName',placeholder:'Name',style:'flex:1;'}),
+        h('input',{type:'tel',id:'rosterNewHcp',placeholder:'HCP',inputmode:'numeric',style:'width:60px;text-align:center;'}),
+        h('button',{class:'btn primary',style:'padding:6px 12px;font-size:12px;',onclick:() => {
+          const nameEl = document.getElementById('rosterNewName');
+          const hcpEl = document.getElementById('rosterNewHcp');
+          const name = (nameEl.value || '').trim();
+          if (!name) return;
+          const handicap = Math.min(54, Math.max(0, parseInt(hcpEl.value) || 0));
+          roster.push({ name, handicap });
+          localStorage.setItem('bunchbets_roster', JSON.stringify(roster));
+          State.scheduleRender();
+        }},'Add')
+      ])
+    ]);
+
     return h('div',{},[
       h('div',{class:'card'},[
         h('div',{class:'pill'},'Players'),
@@ -4065,6 +4140,7 @@ const UI = {
         ]),
         h('div',{},playerInputs)
       ]),
+      rosterCard,
       courseCard,
       h('div',{},[gamesHeader,...gameCards])
     ]);
