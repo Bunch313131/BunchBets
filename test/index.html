@@ -1148,11 +1148,8 @@ const Game = {
       hasSweeps, sweepsTeam,
       hasQuads,
       totalKPValue, sweepsBonus, quadsBonus, grandTotal,
-      // Net value from Team A's perspective
-      netA: sweepsTeam === 'A' ? grandTotal : (sweepsTeam === 'B' ? -grandTotal : (
-        // No sweeps: just sum up per-hole values
-        results.reduce((acc, r) => acc + (r.teamWinner === 'A' ? r.value : (r.teamWinner === 'B' ? -r.value : 0)), 0)
-      ))
+      // Net value from Team A's perspective (face value per hole, no sweeps/quads multiplier)
+      netA: results.reduce((acc, r) => acc + (r.teamWinner === 'A' ? r.value : (r.teamWinner === 'B' ? -r.value : 0)), 0)
     };
   },
 
