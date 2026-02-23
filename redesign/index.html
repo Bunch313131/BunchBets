@@ -4334,9 +4334,15 @@ const UI = {
       if (!UI._drumHandlers) UI._drumHandlers = [];
       UI._drumHandlers.push({ drumId, pid: p.id, currentScore, par, hole, setScore, centerIdx });
 
-      // vs-par label
-      const vsParColor = gross != null ? (scoreClass(gross).includes('birdie')||scoreClass(gross).includes('eagle')?'var(--success)':scoreClass(gross).includes('bogey')?'var(--danger)':'var(--muted)') : 'var(--muted)';
-      const vsParLabel = gross != null ? h('span',{style:`font-size:11px;font-weight:700;color:${vsParColor};`},vsPar(gross)) : null;
+      // Cumulative to-par label (all scored holes)
+      let cumDiff = 0, hasAnyScore = false;
+      for (let i = 0; i <= 17; i++) {
+        const s = g.gross[p.id] && g.gross[p.id][i];
+        if (s != null) { cumDiff += s - (State.data.course.par[i]||4); hasAnyScore = true; }
+      }
+      const cumStr = !hasAnyScore ? '' : cumDiff > 0 ? `+${cumDiff}` : cumDiff < 0 ? String(cumDiff) : 'E';
+      const cumColor = !hasAnyScore ? 'var(--muted)' : cumDiff < 0 ? 'var(--success)' : cumDiff > 0 ? 'var(--danger)' : 'var(--muted)';
+      const vsParLabel = hasAnyScore ? h('span',{style:`font-size:11px;font-weight:700;color:${cumColor};`},cumStr) : null;
 
       return h('div',{class:'hole-player-row'},[
         h('div',{class:'hole-player-info'},[
