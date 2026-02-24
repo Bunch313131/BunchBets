@@ -120,6 +120,12 @@ th.sticky, td.sticky { position:sticky; left:0; background:var(--card); z-index:
 .note { font-size:12px; color:var(--muted); }
 .error { position:fixed; bottom:8px; left:8px; right:8px; background:#fee2e2; color:#991b1b; border:1px solid #fecaca; border-radius:12px; padding:8px 12px; font-size:12px; display:none; z-index:9999; white-space:pre-wrap; }
 .success-toast { position:fixed; top:70px; right:8px; background:var(--success); color:#fff; border-radius:12px; padding:12px 16px; z-index:9999; animation:slideIn 0.3s; box-shadow:0 4px 12px rgba(0,0,0,0.3); }
+.whats-new-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; animation:fadeIn 0.2s; }
+.whats-new-modal { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:20px; max-width:360px; width:100%; max-height:80vh; overflow-y:auto; }
+.whats-new-modal h2 { margin:0 0 4px; font-size:18px; }
+.whats-new-modal .version-tag { font-size:12px; color:var(--acc); font-weight:600; margin-bottom:12px; display:block; }
+.whats-new-modal ul { margin:0; padding:0 0 0 18px; font-size:14px; line-height:1.8; color:var(--txt); }
+.whats-new-modal .btn { width:100%; margin-top:16px; }
 @keyframes slideIn { from { transform:translateX(400px); opacity:0; } to { transform:translateX(0); opacity:1; } }
 .theme-g1 .card { outline:1px solid rgba(22,163,74,.45); background:linear-gradient(0deg,rgba(22,163,74,.08),rgba(22,163,74,.08)) var(--card); }
 .theme-g2 .card { outline:1px solid rgba(220,38,38,.45); background:linear-gradient(0deg,rgba(220,38,38,.08),rgba(220,38,38,.08)) var(--card); }
@@ -397,6 +403,22 @@ td:nth-child(11), th:nth-child(11) { border-left:3px double var(--muted); }
 .bottom-nav-btn.active { color:var(--acc); }
 .bottom-nav-btn svg { width:22px; height:22px; }
 .bottom-nav-dark-toggle { flex:0 0 48px; display:flex; align-items:center; justify-content:center; background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer; padding:16px 0 10px; transition:color 0.2s; }
+/* === INSTALL BANNER — UNCOMMENT WHEN READY TO GO LIVE ===
+.install-banner { display:none; background:linear-gradient(135deg,var(--card),var(--bg)); color:var(--txt); padding:14px 16px; margin:12px; border-radius:14px; border:1px solid var(--border); box-shadow:0 4px 12px rgba(0,0,0,0.3); }
+.install-banner.show { display:block; }
+.install-banner-top { display:flex; align-items:center; gap:12px; }
+.install-banner-icon { width:44px; height:44px; border-radius:10px; object-fit:contain; background:var(--bg); padding:4px; flex-shrink:0; }
+.install-banner-text { flex:1; }
+.install-banner-text strong { display:block; font-size:15px; margin-bottom:2px; }
+.install-banner-text span { font-size:12px; color:var(--muted); }
+.install-banner-close { background:none; border:none; color:var(--muted); font-size:1.3rem; cursor:pointer; padding:4px; line-height:1; flex-shrink:0; }
+.install-banner-close:hover { color:var(--txt); }
+.install-banner-actions { display:flex; gap:8px; margin-top:10px; }
+.install-banner-actions .btn { flex:1; justify-content:center; font-size:13px; padding:8px 12px; }
+.install-ios-steps { margin-top:10px; padding:10px 12px; background:rgba(0,0,0,0.2); border-radius:10px; font-size:13px; line-height:1.6; }
+.install-ios-steps .step-num { display:inline-block; width:20px; height:20px; background:var(--acc); color:#fff; border-radius:50%; text-align:center; line-height:20px; font-size:11px; font-weight:bold; margin-right:6px; }
+.install-ios-steps .share-icon { display:inline-block; width:16px; height:16px; vertical-align:middle; }
+=== END INSTALL BANNER CSS === */
 </style>
 </head>
 <body>
@@ -456,6 +478,9 @@ td:nth-child(11), th:nth-child(11) { border-left:3px double var(--muted); }
   </div>
 </div>
 <div id="liveBanner" class="live-banner" style="display:none;"></div>
+<!-- INSTALL BANNER — UNCOMMENT WHEN READY TO GO LIVE
+<div class="install-banner" id="installBanner"></div>
+-->
 <main>
   <div id="tabs"></div>
   <div id="app"></div>
@@ -470,6 +495,15 @@ td:nth-child(11), th:nth-child(11) { border-left:3px double var(--muted); }
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
+const APP_VERSION = '7.0';
+const VERSION_KEY = 'bunchbets-version';
+const RELEASE_NOTES = {
+  '7.0': [
+    'Fresh interface redesign with color themes and light/dark modes',
+    'KPs now handled outside of junk — prompted automatically on Par 3s',
+    'Geo-located course database — nearby courses auto-detected in wizard',
+  ],
+};
 
 // === COURSE DATABASE (scraped from Greenskeeper.org + existing presets) ===
 const COURSE_DB = [
@@ -7481,6 +7515,158 @@ let joiningViaUrl = false;
 
 UI.render();
 UI.initMenu();
+
+// === WHAT'S NEW / VERSION CHECK ===
+(function() {
+  const storedVersion = localStorage.getItem(VERSION_KEY);
+  if (!storedVersion) {
+    // First launch ever — store version, don't show notes
+    localStorage.setItem(VERSION_KEY, APP_VERSION);
+    return;
+  }
+  if (storedVersion === APP_VERSION) return; // Same version, nothing new
+
+  // New version — show release notes
+  const notes = RELEASE_NOTES[APP_VERSION];
+  if (!notes || !notes.length) {
+    localStorage.setItem(VERSION_KEY, APP_VERSION);
+    return;
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'whats-new-overlay';
+  overlay.innerHTML = `
+    <div class="whats-new-modal">
+      <h2>What's New</h2>
+      <span class="version-tag">Version ${APP_VERSION}</span>
+      <ul>${notes.map(n => `<li>${n}</li>`).join('')}</ul>
+      <button class="btn primary" id="whatsNewClose">Got It</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#whatsNewClose').onclick = () => {
+    localStorage.setItem(VERSION_KEY, APP_VERSION);
+    overlay.remove();
+  };
+  overlay.onclick = (e) => {
+    if (e.target === overlay) {
+      localStorage.setItem(VERSION_KEY, APP_VERSION);
+      overlay.remove();
+    }
+  };
+})();
+
+// === ADD TO HOME SCREEN — UNCOMMENT WHEN READY TO GO LIVE ===
+/*
+const INSTALL_KEY = 'bunchbets-install-dismissed';
+let deferredInstallPrompt = null;
+
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+function isIOS_install() { return /iphone|ipad|ipod/i.test(navigator.userAgent); }
+function isAndroid() { return /android/i.test(navigator.userAgent); }
+function installDismissed() { return localStorage.getItem(INSTALL_KEY) === 'true'; }
+
+function dismissInstall() {
+  localStorage.setItem(INSTALL_KEY, 'true');
+  const b = document.getElementById('installBanner');
+  if (b) b.classList.remove('show');
+}
+
+function confirmInstalled() {
+  localStorage.setItem(INSTALL_KEY, 'installed');
+  const b = document.getElementById('installBanner');
+  if (b) b.classList.remove('show');
+  Err.toast('Launch from your Home Screen anytime!');
+}
+
+const IOS_SHARE_SVG = `<svg class="share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M5 10l7-7 7 7"/><path d="M5 17h14v4H5z" fill="none"/></svg>`;
+
+function showInstallBanner() {
+  const banner = document.getElementById('installBanner');
+  if (!banner) return;
+
+  if (isIOS_install()) {
+    banner.innerHTML = `
+      <div class="install-banner-top">
+        <img src="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/BunchBets180.png" class="install-banner-icon" alt="">
+        <div class="install-banner-text">
+          <strong>Add to Home Screen</strong>
+          <span>Get the full app experience with one tap</span>
+        </div>
+        <button class="install-banner-close" onclick="dismissInstall()" aria-label="Close">&times;</button>
+      </div>
+      <div class="install-ios-steps">
+        <div><span class="step-num">1</span>Tap the <strong>Share</strong> button ${IOS_SHARE_SVG} at the bottom of Safari</div>
+        <div style="margin-top:6px;"><span class="step-num">2</span>Scroll down and tap <strong>Add to Home Screen</strong></div>
+        <div style="margin-top:6px;"><span class="step-num">3</span>Tap <strong>Add</strong> in the top right</div>
+      </div>
+      <div class="install-banner-actions">
+        <button class="btn primary" onclick="confirmInstalled()">Done - I Added It</button>
+        <button class="btn" onclick="dismissInstall()">Not Now</button>
+      </div>`;
+  } else if (deferredInstallPrompt) {
+    banner.innerHTML = `
+      <div class="install-banner-top">
+        <img src="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/BunchBets180.png" class="install-banner-icon" alt="">
+        <div class="install-banner-text">
+          <strong>Add to Home Screen</strong>
+          <span>Quick access from your Home Screen</span>
+        </div>
+        <button class="install-banner-close" onclick="dismissInstall()" aria-label="Close">&times;</button>
+      </div>
+      <div class="install-banner-actions">
+        <button class="btn primary" onclick="triggerNativeInstall()">Add to Home Screen</button>
+        <button class="btn" onclick="dismissInstall()">Not Now</button>
+      </div>`;
+  } else {
+    banner.innerHTML = `
+      <div class="install-banner-top">
+        <img src="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/BunchBets180.png" class="install-banner-icon" alt="">
+        <div class="install-banner-text">
+          <strong>Add to Home Screen</strong>
+          <span>Use your browser menu to add this app</span>
+        </div>
+        <button class="install-banner-close" onclick="dismissInstall()" aria-label="Close">&times;</button>
+      </div>
+      <div class="install-banner-actions">
+        <button class="btn primary" onclick="confirmInstalled()">Done - I Added It</button>
+        <button class="btn" onclick="dismissInstall()">Not Now</button>
+      </div>`;
+  }
+  banner.classList.add('show');
+}
+
+async function triggerNativeInstall() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  const result = await deferredInstallPrompt.userChoice;
+  if (result.outcome === 'accepted') confirmInstalled();
+  deferredInstallPrompt = null;
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  if (!isStandalone() && !installDismissed()) showInstallBanner();
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  confirmInstalled();
+});
+
+function checkInstallBanner() {
+  if (isStandalone()) return;
+  if (installDismissed()) return;
+  if (!isIOS_install() && !isAndroid() && !deferredInstallPrompt) return;
+  setTimeout(() => showInstallBanner(), 3500);
+}
+
+checkInstallBanner();
+*/
+// === END ADD TO HOME SCREEN ===
 
 // Header: date + weather
 (function() {
