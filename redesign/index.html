@@ -2336,14 +2336,8 @@ const Wizard = {
         dbCourses.sort((a, b) => a.name.localeCompare(b.name));
       }
 
-      // "Current Course" card at top
-      const currentCard = document.createElement('div');
-      currentCard.className = 'wizard-course-card selected';
-      currentCard.dataset.course = '__current__';
-      currentCard.innerHTML = `<h3>${State.data.course.name || 'Current Course'}</h3><p>Use existing course configuration</p>`;
-      container.appendChild(currentCard);
-
       // Render helper
+      let firstCard = null;
       const addCard = (c) => {
         const card = document.createElement('div');
         card.className = 'wizard-course-card';
@@ -2352,6 +2346,7 @@ const Wizard = {
         const distHtml = c.distance != null ? `<span class="wizard-course-distance">${c.distance.toFixed(1)} mi</span>` : '';
         card.innerHTML = `<div class="course-head"><h3>${c.name}</h3>${distHtml}</div><p>${c.source === 'preset' ? 'Saved preset' : 'Par ' + c.par.reduce((a,b)=>a+b,0)}</p>`;
         container.appendChild(card);
+        if (!firstCard) firstCard = card;
       };
 
       // Saved presets first
@@ -2378,6 +2373,13 @@ const Wizard = {
       newCard.dataset.course = '__new__';
       newCard.innerHTML = `<h3>+ Set Up New Course</h3><p>Configure par and handicap for each hole</p>`;
       container.appendChild(newCard);
+
+      // Pre-select first course
+      if (firstCard) {
+        firstCard.classList.add('selected');
+        this.data.selectedCourse = firstCard.dataset.course;
+        this.data.selectedSource = firstCard.dataset.source || null;
+      }
 
       // Click handlers
       container.querySelectorAll('.wizard-course-card').forEach(card => {
@@ -2409,7 +2411,7 @@ const Wizard = {
           this.render();
           return;
         }
-        if (this.data.selectedCourse && this.data.selectedCourse !== '__current__') {
+        if (this.data.selectedCourse) {
           // Check DB first, then presets
           const dbCourse = COURSE_DB.find(c => c.name === this.data.selectedCourse);
           if (dbCourse) {
