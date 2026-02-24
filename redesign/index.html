@@ -383,7 +383,7 @@ body:has(.wizard-overlay) { overflow:hidden; }
 .score-drum-touch { position:absolute; inset:0; z-index:5; cursor:grab; }
 .score-drum-touch:active { cursor:grabbing; }
 /* Scorecard double-rule at Front/Back 9 boundary */
-td:nth-child(10), th:nth-child(10) { border-left:3px double var(--muted); }
+td:nth-child(11), th:nth-child(11) { border-left:3px double var(--muted); }
 .money { color:var(--gold); font-weight:600; font-family:monospace; }
 #app { animation:fadeIn 0.15s ease-in; }
 @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
@@ -780,7 +780,7 @@ const State = {
     games: [],
     course: {
       name: 'El Macero',
-      hcp: [7,15,9,1,11,3,17,13,5,4,2,10,8,12,14,18,6,16],
+      hcp: new Date() >= new Date('2026-03-01') ? [15,13,9,1,7,3,17,11,5,8,2,16,6,10,12,18,4,14] : [7,15,9,1,11,3,17,13,5,4,2,10,8,12,14,18,6,16],
       par: [4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5]
     },
     settings: { thTop: 12, thMin: 5 },
@@ -790,7 +790,10 @@ const State = {
     scoringHole: 0,
     scoringView: 'hole'
   },
-  presets: {
+  presets: new Date() >= new Date('2026-03-01') ? {
+    'El Macero': { hcp:[15,13,9,1,7,3,17,11,5,8,2,16,6,10,12,18,4,14], par:[4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5] },
+    'Del Paso': { hcp:[11,17,1,7,15,9,3,5,13,12,10,18,8,16,6,2,14,4], par:[5,3,4,5,3,4,4,4,4,4,4,3,5,3,5,4,3,4] }
+  } : {
     'El Macero': { hcp:[7,15,9,1,11,3,17,13,5,4,2,10,8,12,14,18,6,16], par:[4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5] },
     'El Macero New': { hcp:[15,13,9,1,7,3,17,11,5,8,2,16,6,10,12,18,4,14], par:[4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5] },
     'Del Paso': { hcp:[11,17,1,7,15,9,3,5,13,12,10,18,8,16,6,2,14,4], par:[5,3,4,5,3,4,4,4,4,4,4,3,5,3,5,4,3,4] }
