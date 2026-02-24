@@ -252,6 +252,10 @@ body:has(.wizard-overlay) { overflow:hidden; }
 .wizard-course-card.selected { border-color:var(--acc); background:rgba(59,130,246,0.1); }
 .wizard-course-card h3 { margin:0 0 4px 0; font-size:15px; }
 .wizard-course-card p { margin:0; font-size:12px; color:var(--muted); }
+.wizard-course-card .course-head { display:flex; justify-content:space-between; align-items:center; }
+.wizard-course-distance { font-size:12px; color:var(--acc); font-weight:600; white-space:nowrap; }
+.wizard-course-locating { text-align:center; padding:24px 0; color:var(--muted); font-size:13px; }
+.wizard-course-section-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin:16px 0 6px; font-weight:600; }
 .wizard-section { margin-bottom:20px; }
 .wizard-section-title { font-size:13px; color:var(--muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px; }
 .wizard-option { display:flex; align-items:center; gap:10px; padding:12px; background:var(--card); border:1px solid var(--border); border-radius:10px; margin-bottom:8px; cursor:pointer; }
@@ -466,6 +470,38 @@ td:nth-child(11), th:nth-child(11) { border-left:3px double var(--muted); }
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
+
+// === COURSE DATABASE (scraped from Greenskeeper.org + existing presets) ===
+const COURSE_DB = [
+  {name:"Ancil Hoffman",lat:38.6358,lng:-121.3283,par:[4,5,4,4,3,4,5,4,3,5,4,4,4,3,4,4,3,5],hcp:[13,5,7,11,17,3,1,9,15,12,6,4,10,18,8,2,16,14]},
+  {name:"Antelope Greens",lat:38.7083,lng:-121.3597,par:[4,4,3,3,3,3,3,4,4,3,4,3,3,3,3,3,3,3],hcp:[6,18,2,16,14,10,8,4,12,9,15,7,17,1,13,11,3,5]},
+  {name:"Bartley Cavanaugh",lat:38.4857,lng:-121.5047,par:[4,4,5,5,3,4,4,3,4,4,5,3,4,4,4,4,3,4],hcp:[15,7,17,3,13,5,9,11,1,8,18,10,14,12,2,6,16,4]},
+  {name:"Bing Maloney",lat:38.5063,lng:-121.4930,par:[4,4,3,4,3,5,4,4,5,4,5,4,3,5,4,3,4,4],hcp:[2,6,16,14,18,8,4,12,10,3,5,1,11,15,9,13,17,7]},
+  {name:"Brookside CC",lat:38.5622,lng:-121.4200,par:[4,4,3,5,4,4,5,3,4,5,4,3,4,3,4,5,3,5],hcp:[11,5,15,7,9,13,1,17,3,6,14,18,10,16,8,2,12,4]},
+  {name:"Cherry Island",lat:38.5884,lng:-121.5535,par:[5,4,4,3,4,5,4,3,5,3,4,5,3,5,4,3,4,4],hcp:[15,7,3,17,9,11,1,13,5,16,2,4,18,8,12,14,10,6]},
+  {name:"Cordova",lat:38.5892,lng:-121.2801,par:[4,4,3,3,3,5,4,3,4,4,3,3,3,4,4,3,3,3],hcp:[5,17,3,13,7,11,9,15,1,4,12,8,14,2,18,16,10,6]},
+  {name:"Del Paso CC",lat:38.6139,lng:-121.4458,par:[5,3,4,5,3,4,4,4,4,4,4,3,5,3,5,4,3,4],hcp:[11,17,1,7,15,9,3,5,13,12,10,18,8,16,6,2,14,4]},
+  {name:"Dry Creek Ranch",lat:38.6200,lng:-121.2286,par:[4,4,5,4,3,4,3,5,4,5,3,5,4,4,4,4,3,4],hcp:[4,12,10,16,18,2,8,6,14,9,17,7,5,15,1,13,11,3]},
+  {name:"El Macero CC",lat:38.5467,lng:-121.6917,par:[4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5],hcp:[15,13,9,1,7,3,17,11,5,8,2,16,6,10,12,18,4,14]},
+  {name:"Haggin Oaks (Arcade Creek)",lat:38.6176,lng:-121.4313,par:[4,4,3,5,4,4,4,5,3,4,3,4,5,3,4,4,4,5],hcp:[5,13,3,8,11,1,17,15,7,16,2,12,10,14,18,6,8,4]},
+  {name:"Haggin Oaks (MacKenzie)",lat:38.6176,lng:-121.4313,par:[5,4,3,5,4,3,4,4,4,4,5,3,4,3,4,3,5,5],hcp:[11,1,17,5,15,13,9,7,3,6,2,12,8,14,4,16,10,18]},
+  {name:"Mather",lat:38.5539,lng:-121.2897,par:[4,5,3,4,4,4,3,4,5,4,3,5,4,3,4,5,4,4],hcp:[5,7,13,3,1,9,11,15,17,2,16,18,14,8,12,10,4,6]},
+  {name:"Rancho Murieta CC (North)",lat:38.5039,lng:-121.0942,par:[4,3,5,4,4,3,4,5,4,4,5,3,4,4,5,3,4,4],hcp:[15,17,3,1,7,11,9,13,5,8,16,18,6,10,2,14,12,4]},
+  {name:"Rancho Murieta CC (South)",lat:38.4983,lng:-121.0900,par:[4,4,5,3,4,5,3,4,4,3,4,5,4,5,3,4,4,4],hcp:[7,9,13,17,3,11,15,1,5,12,2,14,4,16,18,10,8,6]},
+  {name:"Teal Bend",lat:38.6167,lng:-121.5250,par:[4,5,4,3,4,4,4,5,3,5,4,3,4,4,4,3,5,4],hcp:[5,7,13,17,11,9,3,1,15,8,6,18,16,2,4,14,12,10]},
+  {name:"Turkey Creek",lat:38.7478,lng:-121.1756,par:[4,4,3,5,4,4,5,3,4,4,3,5,4,3,4,5,4,4],hcp:[17,7,11,9,1,3,13,15,5,2,14,8,10,12,18,16,4,6]},
+  {name:"Whitney Oaks",lat:38.7364,lng:-121.2028,par:[4,4,5,3,4,4,4,3,4,4,5,3,4,4,4,3,4,5],hcp:[11,5,17,15,1,7,3,13,9,12,8,16,2,6,14,18,4,10]},
+  {name:"Winchester CC",lat:38.5861,lng:-121.3786,par:[4,3,5,4,4,4,3,4,5,4,3,4,5,4,3,4,4,5],hcp:[6,16,4,2,14,8,18,10,12,1,5,7,3,11,9,13,15,17]},
+  {name:"Woodcreek",lat:38.7353,lng:-121.2758,par:[4,4,4,3,5,4,4,3,5,5,4,4,4,3,4,5,3,4],hcp:[7,11,9,17,1,3,15,13,5,2,16,14,10,12,4,8,18,6]},
+];
+
+// === GEO HELPERS ===
+function haversineMi(lat1,lon1,lat2,lon2){
+  const R=3958.8,toRad=n=>n*Math.PI/180;
+  const dLat=toRad(lat2-lat1),dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
 
 // === FIREBASE CONFIG ===
 // TEST ENVIRONMENT - Separate Firebase project, does not affect live data
@@ -2244,29 +2280,13 @@ const Wizard = {
     const div = document.createElement('div');
     div.className = 'wizard-screen';
 
-    const presetNames = Object.keys(State.presets || {});
-    const coursesHtml = presetNames.map(name => `
-      <div class="wizard-course-card" data-course="${name}">
-        <h3>${name}</h3>
-        <p>Saved course preset</p>
-      </div>
-    `).join('');
-
     div.innerHTML = `
       <div class="wizard-header">
         <h2>Select Course</h2>
-        <p>Choose a saved course or use current setup</p>
+        <p>Choose a course or use current setup</p>
       </div>
-      <div class="wizard-content">
-        <div class="wizard-course-card selected" data-course="__current__">
-          <h3>Current Course</h3>
-          <p>Use existing course configuration</p>
-        </div>
-        ${coursesHtml}
-        <div class="wizard-course-card" data-course="__new__">
-          <h3>+ Set Up New Course</h3>
-          <p>Configure par and handicap for each hole</p>
-        </div>
+      <div class="wizard-content" id="wizardCourseList">
+        <div class="wizard-course-locating">Finding nearby courses...</div>
       </div>
       <div class="wizard-footer">
         <button class="btn primary" id="wizardCourseNext">Next</button>
@@ -2276,29 +2296,115 @@ const Wizard = {
       </div>
     `;
 
-    // Event handlers
-    setTimeout(() => {
-      div.querySelectorAll('.wizard-course-card').forEach(card => {
+    const buildList = (userLat, userLng) => {
+      const container = div.querySelector('#wizardCourseList');
+      if (!container) return;
+      container.innerHTML = '';
+      const hasLocation = userLat != null;
+
+      // Merge DB courses and user presets into unified list
+      const allCourses = [];
+      const dbNames = new Set(COURSE_DB.map(c => c.name));
+
+      COURSE_DB.forEach(c => {
+        allCourses.push({
+          name: c.name, par: c.par, hcp: c.hcp,
+          distance: hasLocation ? haversineMi(userLat, userLng, c.lat, c.lng) : null,
+          source: 'db'
+        });
+      });
+
+      // Add user presets not already in DB
+      Object.keys(State.presets || {}).forEach(name => {
+        if (!dbNames.has(name)) {
+          allCourses.push({ name, par: State.presets[name].par, hcp: State.presets[name].hcp, distance: null, source: 'preset' });
+        }
+      });
+
+      // Sort by distance if available, otherwise alphabetical
+      if (hasLocation) {
+        allCourses.sort((a, b) => (a.distance ?? 999) - (b.distance ?? 999));
+      } else {
+        allCourses.sort((a, b) => a.name.localeCompare(b.name));
+      }
+
+      // "Current Course" card at top
+      const currentCard = document.createElement('div');
+      currentCard.className = 'wizard-course-card selected';
+      currentCard.dataset.course = '__current__';
+      currentCard.innerHTML = `<h3>${State.data.course.name || 'Current Course'}</h3><p>Use existing course configuration</p>`;
+      container.appendChild(currentCard);
+
+      // Section label
+      if (hasLocation) {
+        const label = document.createElement('div');
+        label.className = 'wizard-course-section-label';
+        label.textContent = 'Nearby Courses';
+        container.appendChild(label);
+      }
+
+      // Course cards
+      allCourses.forEach(c => {
+        const card = document.createElement('div');
+        card.className = 'wizard-course-card';
+        card.dataset.course = c.name;
+        card.dataset.source = c.source;
+        const distHtml = c.distance != null ? `<span class="wizard-course-distance">${c.distance.toFixed(1)} mi</span>` : '';
+        card.innerHTML = `<div class="course-head"><h3>${c.name}</h3>${distHtml}</div><p>${c.source === 'preset' ? 'Saved preset' : 'Par ' + c.par.reduce((a,b)=>a+b,0)}</p>`;
+        container.appendChild(card);
+      });
+
+      // "Set Up New Course" card at bottom
+      const newCard = document.createElement('div');
+      newCard.className = 'wizard-course-card';
+      newCard.dataset.course = '__new__';
+      newCard.innerHTML = `<h3>+ Set Up New Course</h3><p>Configure par and handicap for each hole</p>`;
+      container.appendChild(newCard);
+
+      // Click handlers
+      container.querySelectorAll('.wizard-course-card').forEach(card => {
         card.onclick = () => {
-          div.querySelectorAll('.wizard-course-card').forEach(c => c.classList.remove('selected'));
+          container.querySelectorAll('.wizard-course-card').forEach(c => c.classList.remove('selected'));
           card.classList.add('selected');
           this.data.selectedCourse = card.dataset.course;
+          this.data.selectedSource = card.dataset.source || null;
         };
       });
+    };
+
+    // Event handlers
+    setTimeout(() => {
+      // Request geolocation, then build the list
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          pos => buildList(pos.coords.latitude, pos.coords.longitude),
+          () => buildList(null, null),
+          { timeout: 5000 }
+        );
+      } else {
+        buildList(null, null);
+      }
 
       document.getElementById('wizardCourseNext').onclick = () => {
         if (this.data.selectedCourse === '__new__') {
-          // Go to course setup screen
           this.step = 'courseSetup';
           this.render();
           return;
         }
         if (this.data.selectedCourse && this.data.selectedCourse !== '__current__') {
-          // Load preset
-          const preset = State.presets[this.data.selectedCourse];
-          if (preset) {
-            State.data.course.par = [...preset.par];
-            State.data.course.hcp = [...preset.hcp];
+          // Check DB first, then presets
+          const dbCourse = COURSE_DB.find(c => c.name === this.data.selectedCourse);
+          if (dbCourse) {
+            State.data.course.par = [...dbCourse.par];
+            State.data.course.hcp = [...dbCourse.hcp];
+            State.data.course.name = dbCourse.name;
+          } else {
+            const preset = State.presets[this.data.selectedCourse];
+            if (preset) {
+              State.data.course.par = [...preset.par];
+              State.data.course.hcp = [...preset.hcp];
+              State.data.course.name = this.data.selectedCourse;
+            }
           }
         }
         this.step = 'players';
@@ -3617,18 +3723,37 @@ const UI = {
     // Course
     const presetSel = h('select', {
       onchange:(e) => {
-        const pr = State.presets[e.target.value];
-        if (pr) {
-          State.data.course.hcp = [...pr.hcp];
-          State.data.course.par = [...pr.par];
-          State.data.course.name = e.target.value;
+        const val = e.target.value;
+        // Check DB first, then presets
+        const dbCourse = COURSE_DB.find(c => c.name === val);
+        if (dbCourse) {
+          State.data.course.hcp = [...dbCourse.hcp];
+          State.data.course.par = [...dbCourse.par];
+          State.data.course.name = dbCourse.name;
           State.scheduleSave();
           State.scheduleRender();
+        } else {
+          const pr = State.presets[val];
+          if (pr) {
+            State.data.course.hcp = [...pr.hcp];
+            State.data.course.par = [...pr.par];
+            State.data.course.name = val;
+            State.scheduleSave();
+            State.scheduleRender();
+          }
         }
       }
     });
+    // Add DB courses, then user presets (skip duplicates)
+    const addedNames = new Set();
+    COURSE_DB.forEach(c => {
+      presetSel.appendChild(h('option', {value:c.name, selected:c.name===State.data.course.name}, c.name));
+      addedNames.add(c.name);
+    });
     Object.keys(State.presets).forEach(nm => {
-      presetSel.appendChild(h('option', {value:nm, selected:nm===State.data.course.name}, nm));
+      if (!addedNames.has(nm)) {
+        presetSel.appendChild(h('option', {value:nm, selected:nm===State.data.course.name}, nm));
+      }
     });
 
     const hcpHead = [h('th',{class:'sticky'},'HOLE')];
