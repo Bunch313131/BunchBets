@@ -2302,30 +2302,38 @@ const Wizard = {
       container.innerHTML = '';
       const hasLocation = userLat != null;
 
-      // Merge DB courses and user presets into unified list
-      const allCourses = [];
+      // Build separate lists: user presets first, then DB courses
+      const presetCourses = [];
+      const dbCourses = [];
       const dbNames = new Set(COURSE_DB.map(c => c.name));
 
-      COURSE_DB.forEach(c => {
-        allCourses.push({
-          name: c.name, par: c.par, hcp: c.hcp,
-          distance: hasLocation ? haversineMi(userLat, userLng, c.lat, c.lng) : null,
-          source: 'db'
+      // User presets (shown at top)
+      Object.keys(State.presets || {}).forEach(name => {
+        const dbMatch = COURSE_DB.find(c => c.name === name);
+        presetCourses.push({
+          name, par: State.presets[name].par, hcp: State.presets[name].hcp,
+          distance: (hasLocation && dbMatch) ? haversineMi(userLat, userLng, dbMatch.lat, dbMatch.lng) : null,
+          source: 'preset'
         });
       });
 
-      // Add user presets not already in DB
-      Object.keys(State.presets || {}).forEach(name => {
-        if (!dbNames.has(name)) {
-          allCourses.push({ name, par: State.presets[name].par, hcp: State.presets[name].hcp, distance: null, source: 'preset' });
+      // DB courses not already in presets
+      const presetNames = new Set(Object.keys(State.presets || {}));
+      COURSE_DB.forEach(c => {
+        if (!presetNames.has(c.name)) {
+          dbCourses.push({
+            name: c.name, par: c.par, hcp: c.hcp,
+            distance: hasLocation ? haversineMi(userLat, userLng, c.lat, c.lng) : null,
+            source: 'db'
+          });
         }
       });
 
-      // Sort by distance if available, otherwise alphabetical
+      // Sort DB courses by distance or alphabetically
       if (hasLocation) {
-        allCourses.sort((a, b) => (a.distance ?? 999) - (b.distance ?? 999));
+        dbCourses.sort((a, b) => (a.distance ?? 999) - (b.distance ?? 999));
       } else {
-        allCourses.sort((a, b) => a.name.localeCompare(b.name));
+        dbCourses.sort((a, b) => a.name.localeCompare(b.name));
       }
 
       // "Current Course" card at top
@@ -2335,16 +2343,8 @@ const Wizard = {
       currentCard.innerHTML = `<h3>${State.data.course.name || 'Current Course'}</h3><p>Use existing course configuration</p>`;
       container.appendChild(currentCard);
 
-      // Section label
-      if (hasLocation) {
-        const label = document.createElement('div');
-        label.className = 'wizard-course-section-label';
-        label.textContent = 'Nearby Courses';
-        container.appendChild(label);
-      }
-
-      // Course cards
-      allCourses.forEach(c => {
+      // Render helper
+      const addCard = (c) => {
         const card = document.createElement('div');
         card.className = 'wizard-course-card';
         card.dataset.course = c.name;
@@ -2352,7 +2352,25 @@ const Wizard = {
         const distHtml = c.distance != null ? `<span class="wizard-course-distance">${c.distance.toFixed(1)} mi</span>` : '';
         card.innerHTML = `<div class="course-head"><h3>${c.name}</h3>${distHtml}</div><p>${c.source === 'preset' ? 'Saved preset' : 'Par ' + c.par.reduce((a,b)=>a+b,0)}</p>`;
         container.appendChild(card);
-      });
+      };
+
+      // Saved presets first
+      if (presetCourses.length) {
+        const label = document.createElement('div');
+        label.className = 'wizard-course-section-label';
+        label.textContent = 'Your Courses';
+        container.appendChild(label);
+        presetCourses.forEach(addCard);
+      }
+
+      // Then DB courses
+      if (dbCourses.length) {
+        const label = document.createElement('div');
+        label.className = 'wizard-course-section-label';
+        label.textContent = hasLocation ? 'Nearby Courses' : 'Course Database';
+        container.appendChild(label);
+        dbCourses.forEach(addCard);
+      }
 
       // "Set Up New Course" card at bottom
       const newCard = document.createElement('div');
