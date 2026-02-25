@@ -247,9 +247,10 @@ body:has(.wizard-overlay) { overflow:hidden; }
   justify-content:center;
   position:relative;
   overflow:hidden;
-  transition:transform 0.8s cubic-bezier(0.4,0,0.2,1);
+  transition:transform 1.4s cubic-bezier(0.4,0,0.2,1), box-shadow 0.3s ease;
+  box-shadow:0 8px 40px rgba(0,0,0,0.6), 0 2px 12px rgba(0,0,0,0.4);
 }
-.wizard-splash.curtain-up { transform:translateY(-100%); }
+.wizard-splash.curtain-up { transform:translateY(-100%); box-shadow:0 20px 60px rgba(0,0,0,0.8), 0 8px 24px rgba(0,0,0,0.5); }
 .wizard-splash canvas.splash-particles { position:absolute; inset:0; width:100%; height:100%; z-index:0; }
 .splash-center { position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; gap:10px; }
 .splash-glow { position:absolute; width:400px; height:400px; border-radius:50%; background:radial-gradient(circle, rgba(22,163,74,0.5) 0%, transparent 65%); filter:blur(50px); opacity:0; animation:splashGlowIn 2.2s ease-out 0.2s forwards; z-index:0; }
@@ -2136,7 +2137,7 @@ const Wizard = {
       const splash = document.querySelector('.wizard-splash');
       if (splash) {
         splash.classList.add('curtain-up');
-        setTimeout(() => { this.step = 'course'; this.render(); }, 800);
+        setTimeout(() => { this.step = 'course'; this.render(); }, 1400);
       } else {
         this.step = 'course'; this.render();
       }
