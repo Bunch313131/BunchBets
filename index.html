@@ -4,13 +4,27 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="icon" type="image/png" sizes="32x32" href="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/favicon-32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/favicon-16.png">
-<link rel="icon" href="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/favicon.ico">
-<link rel="apple-touch-icon" sizes="180x180" href="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/BunchBets180.png">
-<link rel="mask-icon" href="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/safari-pinned-tab.svg" color="#2563eb">
-<link rel="manifest" href="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/manifest.webmanifest" crossorigin="anonymous">
-<title>Bunch Bets V6.0 Final - Nassau + Vegas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="BunchBets180.png">
+<title>Bunch Bets V6.0</title>
+<!-- Google Analytics (GA4) — skipped on localhost and ?dev=1 -->
+<script>
+window._bbDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1' || new URLSearchParams(location.search).has('dev');
+if (!window._bbDev) {
+  var s = document.createElement('script');
+  s.async = true;
+  s.src = 'https://www.googletagmanager.com/gtag/js?id=G-GEN79NGT8W';
+  document.head.appendChild(s);
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-GEN79NGT8W');
+} else {
+  function gtag(){}
+}
+</script>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
@@ -20,7 +34,7 @@
 :root[data-theme="classic"].light-mode { --bg:#f5f5f7; --card:#ffffff; --txt:#1d1d1f; --muted:#6e6e73; --border:#d2d2d7; --acc:#3b82f6; --success:#16a34a; --danger:#dc2626; --warning:#d97706; --gold:#a07d3f; color-scheme: light; }
 
 /* Theme 2: Augusta — Masters inspired, rich greens, gold accents, serif elegance */
-:root[data-theme="augusta"] { --bg:#002b10; --card:#003d16; --txt:#f5f0e1; --muted:#a8c4a0; --border:#1a5c2e; --acc:#c8a951; --success:#6fd08c; --danger:#e74c4c; --warning:#daa520; --gold:#c8a951; --radius:6px; --font-display:Georgia,'Times New Roman',serif; --header-bg:linear-gradient(180deg,#003d16,#002b10); color-scheme: dark; }
+:root[data-theme="augusta"] { --bg:#0a3d1c; --card:#0f4d26; --txt:#f5f0e1; --muted:#a8c4a0; --border:#1e6e38; --acc:#c8a951; --success:#6fd08c; --danger:#e74c4c; --warning:#daa520; --gold:#c8a951; --radius:6px; --font-display:Georgia,'Times New Roman',serif; --header-bg:linear-gradient(180deg,#0f4d26,#0a3d1c); color-scheme: dark; }
 :root[data-theme="augusta"].light-mode { --bg:#f5f0e1; --card:#fffef8; --txt:#1a2e1d; --muted:#5a7a62; --border:#c5d4b8; --acc:#8b6f2e; --success:#16a34a; --danger:#dc2626; --warning:#b8860b; --gold:#8b6f2e; --header-bg:linear-gradient(180deg,#2d6a3f,#1a5c2e); color-scheme: light; }
 /* Augusta structural overrides */
 [data-theme="augusta"] main h2, [data-theme="augusta"] main h3, [data-theme="augusta"] .card h2, [data-theme="augusta"] .card h3 { font-family:Georgia,'Times New Roman',serif; letter-spacing:0.5px; }
@@ -30,17 +44,20 @@
 [data-theme="augusta"] .header-info .header-weather { color:#a8c4a0; }
 [data-theme="augusta"] .hamburger { color:#f5f0e1; }
 [data-theme="augusta"] .btn { border-radius:4px; text-transform:uppercase; letter-spacing:1px; font-size:12px; }
-[data-theme="augusta"] .btn.primary { background:var(--gold); color:#002b10; border-color:var(--gold); }
-[data-theme="augusta"] .hole-scoring-nav { background:var(--gold); color:#002b10; }
-[data-theme="augusta"] .hole-scoring-nav .hole-nav-btn { background:rgba(0,43,16,0.2); color:#002b10; }
-[data-theme="augusta"] .hole-dot.current { background:var(--gold); border-color:var(--gold); color:#002b10; }
+[data-theme="augusta"] .btn.primary { background:var(--gold); color:#0a3d1c; border-color:var(--gold); }
+[data-theme="augusta"] .hole-scoring-nav { background:var(--gold); color:#0a3d1c; }
+[data-theme="augusta"] .hole-scoring-nav .hole-nav-btn { background:rgba(10,61,28,0.2); color:#0a3d1c; }
+[data-theme="augusta"] .hole-dot.current { background:var(--gold); border-color:var(--gold); color:#0a3d1c; }
 [data-theme="augusta"] .bottom-nav { border-top:2px solid var(--gold); }
 [data-theme="augusta"] .bottom-nav-btn.active { color:var(--gold); }
-[data-theme="augusta"] .wizard-splash { background:linear-gradient(135deg,#002b10,#004d1c,#002b10); }
 [data-theme="augusta"] .pill { border-radius:4px; }
-[data-theme="augusta"] .scoring-toggle-btn.active { background:var(--gold); color:#002b10; }
+[data-theme="augusta"] .scoring-toggle-btn.active { background:var(--gold); color:#0a3d1c; }
 [data-theme="augusta"] .score-drum { border-radius:6px; background:linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(200,169,81,0.06) 40%, rgba(200,169,81,0.06) 60%, rgba(0,0,0,0.4) 100%); box-shadow:inset 0 2px 6px rgba(0,0,0,0.5), inset 0 -2px 6px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.4); border-color:rgba(200,169,81,0.25); }
 [data-theme="augusta"] .score-drum-frame { border-color:var(--gold); border-radius:4px; box-shadow:0 0 8px rgba(200,169,81,0.3), inset 0 0 6px rgba(200,169,81,0.1); background:rgba(200,169,81,0.04); }
+[data-theme="augusta"] .theme-g1 .card { outline-color:rgba(22,163,74,.6); background:linear-gradient(0deg,rgba(22,163,74,.15),rgba(22,163,74,.15)) var(--card); }
+[data-theme="augusta"] .theme-g2 .card { outline-color:rgba(220,38,38,.6); background:linear-gradient(0deg,rgba(220,38,38,.15),rgba(220,38,38,.15)) var(--card); }
+[data-theme="augusta"] .theme-g3 .card { outline-color:rgba(217,119,6,.6); background:linear-gradient(0deg,rgba(217,119,6,.15),rgba(217,119,6,.15)) var(--card); }
+[data-theme="augusta"] .theme-g4 .card { outline-color:rgba(99,102,241,.6); background:linear-gradient(0deg,rgba(99,102,241,.15),rgba(99,102,241,.15)) var(--card); }
 
 /* Theme 3: Midnight — dark luxury, neon accents, glass morphism, futuristic */
 :root[data-theme="midnight"] { --bg:#0a0a0f; --card:rgba(20,20,35,0.85); --txt:#e8e8f0; --muted:#7a7a9a; --border:rgba(100,100,180,0.2); --acc:#7c3aed; --success:#10b981; --danger:#f43f5e; --warning:#f59e0b; --gold:#a78bfa; --radius:20px; --font-display:'SF Pro Display',system-ui,-apple-system,Segoe UI; --header-bg:rgba(10,10,15,0.8); color-scheme: dark; }
@@ -53,7 +70,6 @@
 [data-theme="midnight"] .hole-scoring-nav { background:linear-gradient(135deg,#7c3aed,#6d28d9); }
 [data-theme="midnight"] .bottom-nav { background:var(--header-bg); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border-top:1px solid var(--border); }
 [data-theme="midnight"] .hole-dot.current { background:linear-gradient(135deg,#7c3aed,#a855f7); border-color:#a855f7; box-shadow:0 0 12px rgba(124,58,237,0.5); }
-[data-theme="midnight"] .wizard-splash { background:linear-gradient(135deg,#0a0a0f,#1a1a3e,#7c3aed); }
 [data-theme="midnight"] .scoring-toggle-btn.active { background:linear-gradient(135deg,#7c3aed,#a855f7); }
 [data-theme="midnight"] .score-drum { background:linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(124,58,237,0.05) 40%, rgba(124,58,237,0.05) 60%, rgba(0,0,0,0.5) 100%); box-shadow:inset 0 3px 8px rgba(0,0,0,0.6), inset 0 -3px 8px rgba(0,0,0,0.6), 0 0 20px rgba(124,58,237,0.15), 0 2px 4px rgba(0,0,0,0.4); border-color:rgba(124,58,237,0.3); }
 [data-theme="midnight"] .score-drum-frame { border-color:#a855f7; box-shadow:0 0 16px rgba(124,58,237,0.4), inset 0 0 10px rgba(124,58,237,0.15); background:rgba(124,58,237,0.06); }
@@ -73,7 +89,6 @@
 [data-theme="tour"] .bottom-nav { border-top:3px solid var(--acc); }
 [data-theme="tour"] .bottom-nav-btn.active { color:var(--acc); }
 [data-theme="tour"] .pill { border-radius:4px; font-weight:800; text-transform:uppercase; }
-[data-theme="tour"] .wizard-splash { background:linear-gradient(135deg,#0c0c0c,#1a1a1a,#ff3b30); }
 [data-theme="tour"] .scoring-toggle-btn.active { background:var(--acc); }
 [data-theme="tour"] .score-drum { border-radius:8px; background:linear-gradient(180deg, rgba(0,0,0,0.6) 0%, rgba(255,59,48,0.03) 40%, rgba(255,59,48,0.03) 60%, rgba(0,0,0,0.6) 100%); box-shadow:inset 0 3px 8px rgba(0,0,0,0.7), inset 0 -3px 8px rgba(0,0,0,0.7), 0 2px 4px rgba(0,0,0,0.5); border-color:rgba(255,59,48,0.2); }
 [data-theme="tour"] .score-drum-frame { border-color:var(--acc); border-width:3px; border-radius:6px; box-shadow:0 0 10px rgba(255,59,48,0.3); }
@@ -120,6 +135,12 @@ th.sticky, td.sticky { position:sticky; left:0; background:var(--card); z-index:
 .note { font-size:12px; color:var(--muted); }
 .error { position:fixed; bottom:8px; left:8px; right:8px; background:#fee2e2; color:#991b1b; border:1px solid #fecaca; border-radius:12px; padding:8px 12px; font-size:12px; display:none; z-index:9999; white-space:pre-wrap; }
 .success-toast { position:fixed; top:70px; right:8px; background:var(--success); color:#fff; border-radius:12px; padding:12px 16px; z-index:9999; animation:slideIn 0.3s; box-shadow:0 4px 12px rgba(0,0,0,0.3); }
+.whats-new-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; animation:fadeIn 0.2s; }
+.whats-new-modal { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:20px; max-width:360px; width:100%; max-height:80vh; overflow-y:auto; }
+.whats-new-modal h2 { margin:0 0 4px; font-size:18px; }
+.whats-new-modal .version-tag { font-size:12px; color:var(--acc); font-weight:600; margin-bottom:12px; display:block; }
+.whats-new-modal ul { margin:0; padding:0 0 0 18px; font-size:14px; line-height:1.8; color:var(--txt); }
+.whats-new-modal .btn { width:100%; margin-top:16px; }
 @keyframes slideIn { from { transform:translateX(400px); opacity:0; } to { transform:translateX(0); opacity:1; } }
 .theme-g1 .card { outline:1px solid rgba(22,163,74,.45); background:linear-gradient(0deg,rgba(22,163,74,.08),rgba(22,163,74,.08)) var(--card); }
 .theme-g2 .card { outline:1px solid rgba(220,38,38,.45); background:linear-gradient(0deg,rgba(220,38,38,.08),rgba(220,38,38,.08)) var(--card); }
@@ -165,11 +186,23 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .press-row.theme-g5 { background:rgba(20,184,166,0.15); }
 .press-row.theme-g6 { background:rgba(219,39,119,0.15); }
 /* Scores/Junk Toggle Bar */
-.scoring-toggle { display:flex; background:var(--card); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:10px; }
-.scoring-toggle-btn { flex:1; padding:9px 14px; text-align:center; font-size:13px; font-weight:500; cursor:pointer; transition:all 0.2s; border:none; background:transparent; color:var(--muted); }
+.scoring-toggle { display:flex; background:var(--card); border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-bottom:6px; }
+.scoring-toggle-btn { flex:1; padding:5px 10px; text-align:center; font-size:12px; font-weight:500; cursor:pointer; transition:all 0.2s; border:none; background:transparent; color:var(--muted); }
 .scoring-toggle-btn.active { background:var(--acc); color:#fff; }
 .scoring-toggle-btn:not(.active):hover { background:rgba(255,255,255,0.05); }
 .press-label { font-weight:600; font-size:12px; }
+.hole-press-section { padding:6px 12px 2px; }
+.hole-press-row { display:flex; align-items:center; justify-content:space-between; padding:6px 10px; border-radius:8px; margin-bottom:4px; }
+.hole-press-row.theme-g1 { background:rgba(22,163,74,0.15); }
+.hole-press-row.theme-g2 { background:rgba(220,38,38,0.15); }
+.hole-press-row.theme-g3 { background:rgba(217,119,6,0.15); }
+.hole-press-row.theme-g4 { background:rgba(99,102,241,0.15); }
+.hole-press-row.theme-g5 { background:rgba(20,184,166,0.15); }
+.hole-press-row.theme-g6 { background:rgba(219,39,119,0.15); }
+.hole-press-label { font-weight:600; font-size:12px; }
+.hole-press-btns { display:flex; gap:0; border-radius:6px; overflow:hidden; border:1px solid var(--border); }
+.hole-press-btn { padding:5px 12px; font-size:12px; font-weight:500; border:none; background:transparent; color:var(--muted); cursor:pointer; }
+.hole-press-btn.active { background:var(--acc); color:#fff; }
 .digits-display { font-size:20px; font-weight:700; font-family:monospace; color:var(--acc); }
 .points-positive { color:var(--success); font-weight:600; }
 .points-negative { color:var(--danger); font-weight:600; }
@@ -220,14 +253,37 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .wizard-overlay { position:fixed; inset:0; z-index:200; display:flex; flex-direction:column; overflow:hidden; }
 body:has(.wizard-overlay) { overflow:hidden; }
 .wizard-splash {
-  background: linear-gradient(135deg, var(--acc) 0%, color-mix(in srgb, var(--acc), #000 30%) 50%, color-mix(in srgb, var(--acc), #000 50%) 100%);
+  background: linear-gradient(135deg, #0a2e14 0%, #061a0b 50%, #000 100%);
   flex:1;
   display:flex;
   align-items:center;
   justify-content:center;
+  position:relative;
+  overflow:hidden;
+  transition:transform 1.4s cubic-bezier(0.4,0,0.2,1), box-shadow 0.3s ease;
+  box-shadow:0 8px 40px rgba(0,0,0,0.6), 0 2px 12px rgba(0,0,0,0.4);
 }
-.wizard-splash img { width:45%; max-width:280px; height:auto; border-radius:24px; box-shadow:0 8px 32px rgba(0,0,0,0.3); opacity:0; animation: wizardFadeIn 1.5s ease-out forwards; }
-@keyframes wizardFadeIn { from { opacity:0; } to { opacity:1; } }
+.wizard-splash.curtain-up { transform:translateY(-100%); box-shadow:0 20px 60px rgba(0,0,0,0.8), 0 8px 24px rgba(0,0,0,0.5); }
+.wizard-splash canvas.splash-particles { position:absolute; inset:0; width:100%; height:100%; z-index:0; }
+.splash-center { position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; gap:10px; }
+.splash-glow { position:absolute; width:400px; height:400px; border-radius:50%; background:radial-gradient(circle, rgba(22,163,74,0.5) 0%, transparent 65%); filter:blur(50px); opacity:0; animation:splashGlowIn 2.2s ease-out 0.2s forwards; z-index:0; }
+.splash-shimmer { position:absolute; inset:0; z-index:1; pointer-events:none; background:linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.06) 40%, rgba(255,255,255,0.14) 48%, rgba(255,255,255,0.06) 56%, transparent 66%); opacity:0; animation:splashShimmerFull 1.6s ease-in-out 3.4s forwards; }
+@keyframes splashShimmerFull { 0%{opacity:1;transform:translateX(-100%);} 100%{opacity:1;transform:translateX(100%);} }
+.splash-logo { position:relative; z-index:1; opacity:0; transform:scale(0.7); filter:blur(12px); animation:splashLogoIn 2s cubic-bezier(0.16,1,0.3,1) 0.3s forwards; }
+.splash-logo svg { width:200px; height:200px; filter:drop-shadow(0 10px 40px rgba(0,0,0,0.6)) drop-shadow(0 0 60px rgba(22,163,74,0.5)); }
+.splash-title { font-family:'Inter',system-ui,sans-serif; font-size:36px; font-weight:900; letter-spacing:4px; padding-left:4px; text-transform:uppercase; color:#fff; opacity:0; transform:translateY(16px) scale(0.95); animation:splashTextIn 1.2s ease-out 1.4s forwards; text-shadow:0 2px 30px rgba(0,0,0,0.6), 0 0 60px rgba(22,163,74,0.3); display:flex; align-items:center; }
+.splash-s { position:relative; display:inline-block; }
+.splash-s .s-line { position:absolute; left:calc(50% - 2px); top:4px; bottom:4px; width:2.5px; margin-left:-1.25px; background:#fff; transform-origin:center top; transform:scaleY(0); border-radius:2px; }
+.splash-s.morph .s-line { animation:drawLine 0.5s ease-out forwards; background:#ffdd00; box-shadow:0 0 8px rgba(255,221,0,0.5); }
+.splash-s.morph { animation:turnGold 0.4s ease-out 0.45s forwards; }
+@keyframes drawLine { 0%{transform:scaleY(0);} 100%{transform:scaleY(1);} }
+@keyframes turnGold { 0%{color:#fff;filter:brightness(1);text-shadow:none;} 50%{filter:brightness(1.5);} 100%{color:#ffdd00;filter:brightness(1);text-shadow:0 0 20px rgba(255,221,0,0.6), 0 0 40px rgba(255,221,0,0.3);} }
+.splash-line { width:60px; height:2px; background:linear-gradient(90deg, transparent, #ffdd00, transparent); opacity:0; animation:splashLineIn 1.5s ease-out 1.1s forwards; }
+.splash-subtitle { font-size:12px; font-weight:500; letter-spacing:3px; padding-left:3px; text-transform:uppercase; color:rgba(255,255,255,0.5); opacity:0; transform:translateY(8px); animation:splashTextIn 1s ease-out 2s forwards; }
+@keyframes splashGlowIn { 0%{opacity:0;transform:scale(0.3);} 100%{opacity:0.85;transform:scale(1);} }
+@keyframes splashLogoIn { 0%{opacity:0;transform:scale(0.7);filter:blur(12px);} 45%{filter:blur(0);} 100%{opacity:1;transform:scale(1);filter:blur(0);} }
+@keyframes splashTextIn { 0%{opacity:0;transform:translateY(16px) scale(0.95);} 100%{opacity:1;transform:translateY(0) scale(1);} }
+@keyframes splashLineIn { 0%{opacity:0;width:0;} 100%{opacity:1;width:60px;} }
 .wizard-screen { background:var(--bg); flex:1; display:flex; flex-direction:column; overflow:hidden; }
 .wizard-header { padding:20px 16px 12px; text-align:center; }
 .wizard-header h2 { margin:0 0 4px 0; font-size:22px; }
@@ -252,6 +308,10 @@ body:has(.wizard-overlay) { overflow:hidden; }
 .wizard-course-card.selected { border-color:var(--acc); background:rgba(59,130,246,0.1); }
 .wizard-course-card h3 { margin:0 0 4px 0; font-size:15px; }
 .wizard-course-card p { margin:0; font-size:12px; color:var(--muted); }
+.wizard-course-card .course-head { display:flex; justify-content:space-between; align-items:center; }
+.wizard-course-distance { font-size:12px; color:var(--acc); font-weight:600; white-space:nowrap; }
+.wizard-course-locating { text-align:center; padding:24px 0; color:var(--muted); font-size:13px; }
+.wizard-course-section-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin:16px 0 6px; font-weight:600; }
 .wizard-section { margin-bottom:20px; }
 .wizard-section-title { font-size:13px; color:var(--muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px; }
 .wizard-option { display:flex; align-items:center; gap:10px; padding:12px; background:var(--card); border:1px solid var(--border); border-radius:10px; margin-bottom:8px; cursor:pointer; }
@@ -365,7 +425,8 @@ body:has(.wizard-overlay) { overflow:hidden; }
 .hole-dot.par3.has-scores { border-color:var(--success); border-style:solid; }
 
 /* Game status summary cards below scoring */
-.game-status-card { padding:6px 12px; margin-bottom:4px; }
+.game-status-card { padding:2px 8px; margin-bottom:2px; }
+.game-status-card .card { padding:5px 8px !important; }
 
 /* Score drum picker — 3D wheel effect */
 .score-drum-wrap { display:flex; align-items:center; gap:8px; margin-left:auto; }
@@ -393,13 +454,29 @@ td:nth-child(11), th:nth-child(11) { border-left:3px double var(--muted); }
 .bottom-nav-btn.active { color:var(--acc); }
 .bottom-nav-btn svg { width:22px; height:22px; }
 .bottom-nav-dark-toggle { flex:0 0 48px; display:flex; align-items:center; justify-content:center; background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer; padding:16px 0 10px; transition:color 0.2s; }
+/* === INSTALL BANNER — UNCOMMENT WHEN READY TO GO LIVE ===
+.install-banner { display:none; background:linear-gradient(135deg,var(--card),var(--bg)); color:var(--txt); padding:14px 16px; margin:12px; border-radius:14px; border:1px solid var(--border); box-shadow:0 4px 12px rgba(0,0,0,0.3); }
+.install-banner.show { display:block; }
+.install-banner-top { display:flex; align-items:center; gap:12px; }
+.install-banner-icon { width:44px; height:44px; border-radius:10px; object-fit:contain; background:var(--bg); padding:4px; flex-shrink:0; }
+.install-banner-text { flex:1; }
+.install-banner-text strong { display:block; font-size:15px; margin-bottom:2px; }
+.install-banner-text span { font-size:12px; color:var(--muted); }
+.install-banner-close { background:none; border:none; color:var(--muted); font-size:1.3rem; cursor:pointer; padding:4px; line-height:1; flex-shrink:0; }
+.install-banner-close:hover { color:var(--txt); }
+.install-banner-actions { display:flex; gap:8px; margin-top:10px; }
+.install-banner-actions .btn { flex:1; justify-content:center; font-size:13px; padding:8px 12px; }
+.install-ios-steps { margin-top:10px; padding:10px 12px; background:rgba(0,0,0,0.2); border-radius:10px; font-size:13px; line-height:1.6; }
+.install-ios-steps .step-num { display:inline-block; width:20px; height:20px; background:var(--acc); color:#fff; border-radius:50%; text-align:center; line-height:20px; font-size:11px; font-weight:bold; margin-right:6px; }
+.install-ios-steps .share-icon { display:inline-block; width:16px; height:16px; vertical-align:middle; }
+=== END INSTALL BANNER CSS === */
 </style>
 </head>
 <body>
 <header>
   <div class="row" style="align-items:center; justify-content:space-between;">
     <div class="header-brand">
-      <img src="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/BunchBets180.png" alt="Bunch Bets">
+      <img src="BunchBets180.png" alt="Bunch Bets">
       <div class="header-info">
         <div class="header-date" id="headerDate"></div>
         <div class="header-weather" id="headerWeather"></div>
@@ -450,8 +527,14 @@ td:nth-child(11), th:nth-child(11) { border-left:3px double var(--muted); }
     <button class="menu-item" id="clearBtn">Clear Scores</button>
     <button class="menu-item danger" id="factoryBtn">Factory Reset</button>
   </div>
+  <div class="menu-section">
+    <a class="menu-item" href="https://docs.google.com/forms/d/e/1FAIpQLSd42m1QbKIdydDACKVW5JHOlTDWbRMbloKPMlkW36_8Pzy_6g/viewform" target="_blank" rel="noopener" style="text-decoration:none;">Feedback & Corrections</a>
+  </div>
 </div>
 <div id="liveBanner" class="live-banner" style="display:none;"></div>
+<!-- INSTALL BANNER — UNCOMMENT WHEN READY TO GO LIVE
+<div class="install-banner" id="installBanner"></div>
+-->
 <main>
   <div id="tabs"></div>
   <div id="app"></div>
@@ -466,6 +549,55 @@ td:nth-child(11), th:nth-child(11) { border-left:3px double var(--muted); }
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
+const APP_VERSION = '7.0';
+const VERSION_KEY = 'bunchbets-version';
+const RELEASE_NOTES = {
+  '7.0': [
+    'Fresh interface redesign with color themes and light/dark modes',
+    'KPs now handled outside of junk — prompted automatically on Par 3s',
+    'Geo-located course database — nearby courses auto-detected in wizard',
+  ],
+};
+
+// === COURSE DATABASE (scraped from Greenskeeper.org + existing presets) ===
+const COURSE_DB = [
+  {name:"Ancil Hoffman",lat:38.6358,lng:-121.3283,par:[4,5,4,4,3,4,5,4,3,5,4,4,4,3,4,4,3,5],hcp:[13,5,7,11,17,3,1,9,15,12,6,4,10,18,8,2,16,14]},
+  {name:"Antelope Greens",lat:38.7083,lng:-121.3597,par:[4,4,3,3,3,3,3,4,4,3,4,3,3,3,3,3,3,3],hcp:[6,18,2,16,14,10,8,4,12,9,15,7,17,1,13,11,3,5]},
+  {name:"Bartley Cavanaugh",lat:38.4857,lng:-121.5047,par:[4,4,5,5,3,4,4,3,4,4,5,3,4,4,4,4,3,4],hcp:[15,7,17,3,13,5,9,11,1,8,18,10,14,12,2,6,16,4]},
+  {name:"Bing Maloney",lat:38.5063,lng:-121.4930,par:[4,4,3,4,3,5,4,4,5,4,5,4,3,5,4,3,4,4],hcp:[2,6,16,14,18,8,4,12,10,3,5,1,11,15,9,13,17,7]},
+  {name:"Brookside CC",lat:38.5622,lng:-121.4200,par:[4,4,3,5,4,4,5,3,4,5,4,3,4,3,4,5,3,5],hcp:[11,5,15,7,9,13,1,17,3,6,14,18,10,16,8,2,12,4]},
+  {name:"Catta Verdera CC",lat:38.8642,lng:-121.2942,par:[4,4,4,3,4,3,4,5,4,4,5,4,3,4,5,4,3,4],hcp:[7,11,1,17,9,15,13,5,3,10,12,14,18,6,8,2,16,4]},
+  {name:"Cherry Island",lat:38.5884,lng:-121.5535,par:[5,4,4,3,4,5,4,3,5,3,4,5,3,5,4,3,4,4],hcp:[15,7,3,17,9,11,1,13,5,16,2,4,18,8,12,14,10,6]},
+  {name:"Cordova",lat:38.5892,lng:-121.2801,par:[4,4,3,3,3,5,4,3,4,4,3,3,3,4,4,3,3,3],hcp:[5,17,3,13,7,11,9,15,1,4,12,8,14,2,18,16,10,6]},
+  {name:"Davis Municipal",lat:38.5560,lng:-121.7378,par:[4,4,3,4,3,4,3,4,4,4,3,4,5,3,4,3,4,4],hcp:[4,6,10,8,12,2,16,14,18,13,7,15,3,5,17,11,9,1]},
+  {name:"Del Paso CC",lat:38.6139,lng:-121.4458,par:[5,3,4,5,3,4,4,4,4,4,4,3,5,3,5,4,3,4],hcp:[11,17,1,7,15,9,3,5,13,12,10,18,8,16,6,2,14,4]},
+  {name:"Dry Creek Ranch",lat:38.6200,lng:-121.2286,par:[4,4,5,4,3,4,3,5,4,5,3,5,4,4,4,4,3,4],hcp:[4,12,10,16,18,2,8,6,14,9,17,7,5,15,1,13,11,3]},
+  {name:"El Macero CC",lat:38.5467,lng:-121.6917,par:[4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5],hcp:[15,13,9,1,7,3,17,11,5,8,2,16,6,10,12,18,4,14]},
+  {name:"Granite Bay Golf Club",lat:38.7631,lng:-121.1639,par:[4,4,3,5,4,4,3,4,4,4,3,5,4,3,5,4,4,4],hcp:[8,4,16,2,10,12,18,6,14,11,17,3,5,15,13,1,7,9]},
+  {name:"Haggin Oaks (Arcade Creek)",lat:38.6176,lng:-121.4313,par:[4,4,3,5,4,4,4,5,3,4,3,4,5,3,4,4,4,5],hcp:[5,13,3,8,11,1,17,15,7,16,2,12,10,14,18,6,9,4]},
+  {name:"Haggin Oaks (MacKenzie)",lat:38.6176,lng:-121.4313,par:[5,4,3,5,4,3,4,4,4,4,5,3,4,3,4,3,5,5],hcp:[11,1,17,5,15,13,9,7,3,6,2,12,8,14,4,16,10,18]},
+  {name:"Mather",lat:38.5539,lng:-121.2897,par:[4,5,3,4,4,4,3,4,5,4,3,5,4,3,4,5,4,4],hcp:[5,7,13,3,1,9,11,15,17,2,16,18,14,8,12,10,4,6]},
+  {name:"Rancho Murieta CC (North)",lat:38.5039,lng:-121.0942,par:[4,3,5,4,4,3,4,5,4,4,5,3,4,4,5,3,4,4],hcp:[15,17,3,1,7,11,9,13,5,8,16,18,6,10,2,14,12,4]},
+  {name:"Rancho Murieta CC (South)",lat:38.4983,lng:-121.0900,par:[4,4,5,3,4,5,3,4,4,3,4,5,4,5,3,4,4,4],hcp:[7,9,13,17,3,11,15,1,5,12,2,14,4,16,18,10,8,6]},
+  {name:"Sierra View CC",lat:38.7522,lng:-121.2889,par:[5,4,4,5,3,4,4,3,4,5,4,3,4,4,4,4,3,5],hcp:[11,7,1,15,17,9,3,13,5,18,2,14,6,10,16,8,12,4]},
+  {name:"Teal Bend",lat:38.6167,lng:-121.5250,par:[4,5,4,3,4,4,4,5,3,5,4,3,4,4,4,3,5,4],hcp:[5,7,13,17,11,9,3,1,15,8,6,18,16,2,4,14,12,10]},
+  {name:"Turkey Creek",lat:38.7478,lng:-121.1756,par:[4,4,3,5,4,4,5,3,4,4,3,5,4,3,4,5,4,4],hcp:[17,7,11,9,1,3,13,15,5,2,14,8,10,12,18,16,4,6]},
+  {name:"Valley Hi CC",lat:38.4088,lng:-121.4465,par:[4,4,4,5,3,4,3,5,4,4,4,4,5,3,4,3,4,5],hcp:[11,1,5,13,17,3,15,9,7,8,2,12,10,18,4,16,14,6]},
+  {name:"Whitney Oaks",lat:38.7364,lng:-121.2028,par:[4,4,5,3,4,4,4,3,4,4,5,3,4,4,4,3,4,5],hcp:[11,5,17,15,1,7,3,13,9,12,8,16,2,6,14,18,4,10]},
+  {name:"Wildhorse",lat:38.5575,lng:-121.6897,par:[4,4,4,3,5,3,5,4,4,4,4,3,5,3,4,4,5,4],hcp:[9,15,1,7,3,17,11,5,13,18,16,10,8,14,4,12,6,2]},
+  {name:"Winchester CC",lat:38.5861,lng:-121.3786,par:[4,3,5,4,4,4,3,4,5,4,3,4,5,4,3,4,4,5],hcp:[6,16,4,2,14,8,18,10,12,1,5,7,3,11,9,13,15,17]},
+  {name:"Woodcreek",lat:38.7353,lng:-121.2758,par:[4,4,4,3,5,4,4,3,5,5,4,4,4,3,4,5,3,4],hcp:[7,11,9,17,1,3,15,13,5,2,16,14,10,12,4,8,18,6]},
+  {name:"Yocha Dehe",lat:38.7975,lng:-122.1528,par:[4,5,4,3,4,5,3,4,4,5,4,4,3,4,4,3,5,4],hcp:[5,7,1,15,13,3,11,17,9,6,14,16,10,8,12,18,4,2]},
+  {name:"Yolo Fliers Club",lat:38.6714,lng:-121.7590,par:[5,4,4,3,4,5,3,4,4,4,5,3,4,4,3,4,5,4],hcp:[11,7,15,5,1,9,17,3,13,4,14,16,12,2,18,10,8,6]},
+];
+
+// === GEO HELPERS ===
+function haversineMi(lat1,lon1,lat2,lon2){
+  const R=3958.8,toRad=n=>n*Math.PI/180;
+  const dLat=toRad(lat2-lat1),dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
 
 // === FIREBASE CONFIG ===
 // TEST ENVIRONMENT - Separate Firebase project, does not affect live data
@@ -494,7 +626,7 @@ window.LiveSync = {
       return false;
     }
     try {
-      firebase.initializeApp(FIREBASE_CONFIG);
+      if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
       this.db = firebase.database();
       return true;
     } catch (e) {
@@ -519,6 +651,7 @@ window.LiveSync = {
     this.shareCode = this.generateCode();
     this.isHost = true;
     this.isViewer = false;
+    gtag('event', 'live_sync', { action: 'host' });
     this.gameRef = this.db.ref('games/' + this.shareCode);
 
     try {
@@ -945,7 +1078,7 @@ const Game = {
     g.junkValue = g.junkValue || {front:1,back:2};
     ['front','back'].forEach(k => g.junkValue[k] = Math.max(0, parseInt(g.junkValue[k])||0));
     g.pointValue = g.pointValue || {front:1,back:1};
-    ['front','back'].forEach(k => g.pointValue[k] = Math.max(0, parseFloat(g.pointValue[k])||1));
+    ['front','back'].forEach(k => { const v = parseFloat(g.pointValue[k]); g.pointValue[k] = isNaN(v) ? 1 : Math.max(0, v); });
     // Skins-specific
     g.skinsMode = ['net','gross','both'].includes(g.skinsMode) ? g.skinsMode : 'net';
     g.skinsPlayers = Array.isArray(g.skinsPlayers) ? g.skinsPlayers : [];
@@ -1257,10 +1390,9 @@ const Game = {
     return (entry && entry.ranking) ? entry.ranking : [];
   },
 
-  // Set KP ranking for a hole (propagated to team-based games only)
+  // Set KP ranking for a hole (propagated to all games)
   setKPRanking(hole, ranking) {
     State.data.games.forEach(gm => {
-      if (gm.gameType !== 'nassau' && gm.gameType !== 'vegas') return;
       if (!gm.kpData) gm.kpData = Utils.make18(null);
       gm.kpData[hole] = ranking.length > 0 ? { ranking } : null;
     });
@@ -1301,11 +1433,17 @@ const Game = {
     if (junk.netA > 0) junkTeam = junk.netA * szB;
     else if (junk.netA < 0) junkTeam = junk.netA * szA;
 
-    // KP values (match-specific closest-to-pin bets)
+    // KP values (match-specific closest-to-pin bets, including sweeps/quads)
     const kp = g.withJunk ? this.computeKP(g) : {netA:0, grandTotal:0, results:[], hasSweeps:false, hasQuads:false};
     let kpTeam = 0;
-    if (kp.netA > 0) kpTeam = kp.netA * szB;
-    else if (kp.netA < 0) kpTeam = kp.netA * szA;
+    if (kp.hasSweeps || kp.hasQuads) {
+      // Sweeps/quads: winning team gets grandTotal (already includes multipliers)
+      const signA = kp.sweepsTeam === 'A' ? 1 : -1;
+      kpTeam = signA * kp.grandTotal * (kp.sweepsTeam === 'A' ? szB : szA);
+    } else {
+      if (kp.netA > 0) kpTeam = kp.netA * szB;
+      else if (kp.netA < 0) kpTeam = kp.netA * szA;
+    }
 
     const total = front.teamPayA + back.teamPayA + overall.teamPayA + junkTeam + kpTeam;
 
@@ -2018,13 +2156,34 @@ const Wizard = {
     this.currentGameIndex = 0;
     this.data.games.push(this.createGameData());
     this.render();
-    // Auto-advance from splash after 4 seconds
-    this._splashTimer = setTimeout(() => {
-      if (this.step === 'splash') {
-        this.step = 'course';
-        this.render();
+    // Auto-advance from splash with curtain-raise transition
+    const advanceSplash = () => {
+      if (this.step !== 'splash') return;
+      const splash = document.querySelector('.wizard-splash');
+      if (splash) {
+        splash.classList.add('curtain-up');
+        setTimeout(() => {
+          this.step = 'course';
+          splash.remove();
+          // Reset course content positioning
+          const overlay = document.getElementById('wizardOverlay');
+          if (overlay) {
+            const courseEl = overlay.querySelector('.wizard-screen');
+            if (courseEl) { courseEl.style.position = ''; courseEl.style.inset = ''; courseEl.style.zIndex = ''; }
+          }
+        }, 1400);
+      } else {
+        this.step = 'course'; this.render();
       }
-    }, 4000);
+    };
+    this._splashTimer = setTimeout(advanceSplash, 8500);
+    setTimeout(() => {
+      const splash = document.querySelector('.wizard-splash');
+      if (splash) splash.addEventListener('click', () => {
+        clearTimeout(this._splashTimer);
+        advanceSplash();
+      }, {once: true});
+    }, 0);
   },
 
   getCurrentGame() {
@@ -2067,7 +2226,8 @@ const Wizard = {
       handicapMode: 'full', // full, off_low, team_delta
       stakes: {front:2, back:5, overall:2},
       junkValue: {front:1, back:2},
-      pointValue: {front:1, back:1}
+      pointValue: {front:1, back:1},
+      autoPress: {front:true, back:true, overall:false}
     };
   },
 
@@ -2099,6 +2259,7 @@ const Wizard = {
       g.withJunk = wg.withJunk;
       g.junkValue = wg.withJunk ? {...wg.junkValue} : {front:0, back:0};
       g.pointValue = {...wg.pointValue};
+      g.autoPress = {...wg.autoPress};
       // Skins-specific
       g.skinsMode = wg.skinsMode || 'net';
       g.skinsPlayers = wg.skinsPlayers || [];
@@ -2127,6 +2288,18 @@ const Wizard = {
     State.scheduleSave();
     State.scheduleRender();
     Err.toast('Game ready! Enter scores.');
+    // Analytics
+    const gameTypes = State.data.games.map(g => g.gameType);
+    const features = [];
+    if (State.data.games.some(g => g.withJunk)) features.push('junk');
+    if (State.data.games.some(g => g.autoPress && (g.autoPress.front || g.autoPress.back || g.autoPress.overall))) features.push('auto_press');
+    gtag('event', 'round_started', {
+      player_count: State.data.players.length,
+      game_count: State.data.games.length,
+      game_types: gameTypes.join(','),
+      course: State.data.course.name || 'custom',
+      features: features.join(',') || 'none'
+    });
   },
 
   removeOverlay() {
@@ -2223,6 +2396,17 @@ const Wizard = {
       default: content = document.createElement('div');
     }
 
+    // During splash, pre-render course step behind it so curtain reveals it
+    if (this.step === 'splash') {
+      const courseContent = this.renderCourse();
+      courseContent.style.position = 'absolute';
+      courseContent.style.inset = '0';
+      courseContent.style.zIndex = '0';
+      overlay.appendChild(courseContent);
+      content.style.position = 'relative';
+      content.style.zIndex = '1';
+    }
+
     overlay.appendChild(content);
     document.body.appendChild(overlay);
 
@@ -2236,7 +2420,109 @@ const Wizard = {
   renderSplash() {
     const div = document.createElement('div');
     div.className = 'wizard-splash';
-    div.innerHTML = `<img src="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/BunchBets180.png" alt="Bunch Bets">`;
+    div.innerHTML = `
+      <canvas class="splash-particles"></canvas>
+      <div class="splash-shimmer"></div>
+      <div class="splash-center">
+        <div class="splash-glow"></div>
+        <div class="splash-logo">
+          <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+            <rect x="8" y="8" width="184" height="184" rx="42" fill="#16a34a" opacity="0.2"/>
+            <rect x="8" y="8" width="184" height="184" rx="42" fill="none" stroke="#16a34a" stroke-width="2.5" opacity="0.5"/>
+            <rect x="8" y="8" width="184" height="184" rx="42" fill="url(#splashInnerGlow)" opacity="0.3"/>
+            <ellipse cx="100" cy="150" rx="58" ry="14" fill="#16a34a" opacity="0.35"/>
+            <ellipse cx="100" cy="150" rx="40" ry="9" fill="#16a34a" opacity="0.25"/>
+            <ellipse cx="100" cy="150" rx="7" ry="3" fill="#000" opacity="0.7"/>
+            <line x1="100" y1="150" x2="100" y2="36" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/>
+            <path d="M100,36 L100,74 Q122,60 150,53 Q122,44 100,36Z" fill="#ffdd00"/>
+            <path d="M100,36 L100,74 Q122,60 150,53 Q122,44 100,36Z" fill="url(#splashFlagShine)" opacity="0.5"/>
+            <path d="M100,36 Q122,44 150,53" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>
+            <circle cx="124" cy="140" r="18" fill="#f5f5f5"/>
+            <circle cx="124" cy="140" r="18" fill="url(#splashBallGrad)"/>
+            <circle cx="116" cy="134" r="1.5" fill="rgba(0,0,0,0.1)"/><circle cx="121" cy="131" r="1.5" fill="rgba(0,0,0,0.1)"/>
+            <circle cx="126" cy="133" r="1.5" fill="rgba(0,0,0,0.1)"/><circle cx="131" cy="135" r="1.5" fill="rgba(0,0,0,0.1)"/>
+            <circle cx="118" cy="139" r="1.5" fill="rgba(0,0,0,0.1)"/><circle cx="123" cy="137" r="1.5" fill="rgba(0,0,0,0.1)"/>
+            <circle cx="128" cy="139" r="1.5" fill="rgba(0,0,0,0.1)"/><circle cx="115" cy="143" r="1.5" fill="rgba(0,0,0,0.08)"/>
+            <circle cx="120" cy="142" r="1.5" fill="rgba(0,0,0,0.08)"/><circle cx="125" cy="143" r="1.5" fill="rgba(0,0,0,0.08)"/>
+            <circle cx="130" cy="142" r="1.5" fill="rgba(0,0,0,0.08)"/><circle cx="119" cy="147" r="1.5" fill="rgba(0,0,0,0.06)"/>
+            <circle cx="124" cy="148" r="1.5" fill="rgba(0,0,0,0.06)"/><circle cx="129" cy="146" r="1.5" fill="rgba(0,0,0,0.06)"/>
+            <text x="124" y="145" text-anchor="middle" font-size="16" font-weight="800" fill="#16a34a" opacity="0.8">$</text>
+            <circle cx="118" cy="132" r="5" fill="rgba(255,255,255,0.2)"/>
+            <defs>
+              <linearGradient id="splashFlagShine" x1="100" y1="36" x2="150" y2="74" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="#fff" stop-opacity="0"/></linearGradient>
+              <radialGradient id="splashBallGrad" cx="118" cy="132" r="18" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="rgba(255,255,255,0.5)"/><stop offset="50%" stop-color="rgba(255,255,255,0)"/><stop offset="100%" stop-color="rgba(0,0,0,0.2)"/></radialGradient>
+              <radialGradient id="splashInnerGlow" cx="100" cy="90" r="90" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#16a34a"/><stop offset="100%" stop-color="#16a34a" stop-opacity="0"/></radialGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="splash-line"></div>
+        <div class="splash-title">BUNCH BET<span class="splash-s" id="splashS">S<span class="s-line"></span></span></div>
+        <div class="splash-subtitle">Settle it on the course</div>
+      </div>
+    `;
+
+    // S → $ morph timer (after shimmer completes at ~5.0s)
+    setTimeout(() => {
+      const s = document.getElementById('splashS');
+      if (s) s.classList.add('morph');
+    }, 5200);
+
+    // Bokeh particle system
+    requestAnimationFrame(() => {
+      const canvas = div.querySelector('canvas.splash-particles');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = canvas.offsetWidth * dpr;
+      canvas.height = canvas.offsetHeight * dpr;
+      ctx.scale(dpr, dpr);
+
+      const particles = [];
+      const pickColor = () => { const r = Math.random(); return r < 0.45 ? 'green' : r < 0.75 ? 'white' : 'yellow'; };
+      for (let i = 0; i < 100; i++) {
+        particles.push({ x:Math.random()*canvas.offsetWidth, y:Math.random()*canvas.offsetHeight, r:Math.random()*3+0.8, vx:(Math.random()-0.5)*0.5, vy:(Math.random()-0.5)*0.4-0.2, alpha:Math.random()*0.5+0.15, pulse:Math.random()*Math.PI*2, pulseSpeed:0.015+Math.random()*0.02, isOrb:false, color:pickColor() });
+      }
+      for (let i = 0; i < 20; i++) {
+        particles.push({ x:Math.random()*canvas.offsetWidth, y:Math.random()*canvas.offsetHeight, r:Math.random()*5+3, vx:(Math.random()-0.5)*0.3, vy:(Math.random()-0.5)*0.2-0.12, alpha:Math.random()*0.2+0.08, pulse:Math.random()*Math.PI*2, pulseSpeed:0.01+Math.random()*0.015, isOrb:true, color:pickColor() });
+      }
+      for (let i = 0; i < 12; i++) {
+        particles.push({ x:Math.random()*canvas.offsetWidth, y:Math.random()*canvas.offsetHeight, r:Math.random()*12+8, vx:(Math.random()-0.5)*0.12, vy:(Math.random()-0.5)*0.08-0.06, alpha:Math.random()*0.1+0.04, pulse:Math.random()*Math.PI*2, pulseSpeed:0.006+Math.random()*0.008, isOrb:true, color:pickColor() });
+      }
+
+      const colorMap = { green:'#16a34a', yellow:'#ffdd00', white:null };
+      let animId;
+      const draw = () => {
+        const w = canvas.offsetWidth, h = canvas.offsetHeight;
+        ctx.clearRect(0, 0, w, h);
+        particles.forEach(p => {
+          p.x += p.vx; p.y += p.vy; p.pulse += p.pulseSpeed;
+          if (p.x < -20) p.x = w + 20; if (p.x > w + 20) p.x = -20;
+          if (p.y < -20) p.y = h + 20; if (p.y > h + 20) p.y = -20;
+          const a = p.alpha * (0.5 + 0.5 * Math.sin(p.pulse));
+          let fillColor;
+          if (p.color === 'white') fillColor = `rgba(255,255,255,${p.isOrb ? a*0.5 : a*0.8})`;
+          else fillColor = colorMap[p.color];
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fillStyle = fillColor;
+          ctx.globalAlpha = p.color === 'white' ? 1 : a;
+          ctx.shadowBlur = p.isOrb ? p.r * 4 : p.r * 6;
+          ctx.shadowColor = fillColor;
+          ctx.fill(); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+        });
+        animId = requestAnimationFrame(draw);
+      };
+      draw();
+
+      // Cleanup when splash is removed
+      const observer = new MutationObserver(() => {
+        if (!document.contains(canvas)) {
+          cancelAnimationFrame(animId);
+          observer.disconnect();
+        }
+      });
+      observer.observe(document.body, {childList: true, subtree: true});
+    });
+
     return div;
   },
 
@@ -2244,29 +2530,12 @@ const Wizard = {
     const div = document.createElement('div');
     div.className = 'wizard-screen';
 
-    const presetNames = Object.keys(State.presets || {});
-    const coursesHtml = presetNames.map(name => `
-      <div class="wizard-course-card" data-course="${name}">
-        <h3>${name}</h3>
-        <p>Saved course preset</p>
-      </div>
-    `).join('');
-
     div.innerHTML = `
       <div class="wizard-header">
         <h2>Select Course</h2>
-        <p>Choose a saved course or use current setup</p>
       </div>
-      <div class="wizard-content">
-        <div class="wizard-course-card selected" data-course="__current__">
-          <h3>Current Course</h3>
-          <p>Use existing course configuration</p>
-        </div>
-        ${coursesHtml}
-        <div class="wizard-course-card" data-course="__new__">
-          <h3>+ Set Up New Course</h3>
-          <p>Configure par and handicap for each hole</p>
-        </div>
+      <div class="wizard-content" id="wizardCourseList">
+        <div class="wizard-course-locating">Loading courses...</div>
       </div>
       <div class="wizard-footer">
         <button class="btn primary" id="wizardCourseNext">Next</button>
@@ -2276,29 +2545,154 @@ const Wizard = {
       </div>
     `;
 
-    // Event handlers
-    setTimeout(() => {
-      div.querySelectorAll('.wizard-course-card').forEach(card => {
+    const buildList = (userLat, userLng) => {
+      const container = div.querySelector('#wizardCourseList');
+      if (!container) return;
+      container.innerHTML = '';
+      const hasLocation = userLat != null;
+
+      // Build separate lists: user presets first, then DB courses
+      const presetCourses = [];
+      const dbCourses = [];
+      const dbNames = new Set(COURSE_DB.map(c => c.name));
+
+      // User presets (shown at top)
+      Object.keys(State.presets || {}).forEach(name => {
+        const dbMatch = COURSE_DB.find(c => c.name === name);
+        presetCourses.push({
+          name, par: State.presets[name].par, hcp: State.presets[name].hcp,
+          distance: (hasLocation && dbMatch) ? haversineMi(userLat, userLng, dbMatch.lat, dbMatch.lng) : null,
+          source: 'preset'
+        });
+      });
+
+      // DB courses not already in presets
+      const presetNames = new Set(Object.keys(State.presets || {}));
+      COURSE_DB.forEach(c => {
+        if (!presetNames.has(c.name)) {
+          dbCourses.push({
+            name: c.name, par: c.par, hcp: c.hcp,
+            distance: hasLocation ? haversineMi(userLat, userLng, c.lat, c.lng) : null,
+            source: 'db'
+          });
+        }
+      });
+
+      // Sort DB courses by distance or alphabetically
+      if (hasLocation) {
+        dbCourses.sort((a, b) => (a.distance ?? 999) - (b.distance ?? 999));
+      } else {
+        dbCourses.sort((a, b) => a.name.localeCompare(b.name));
+      }
+
+      // Render helper
+      let firstCard = null;
+      const addCard = (c) => {
+        const card = document.createElement('div');
+        card.className = 'wizard-course-card';
+        card.dataset.course = c.name;
+        card.dataset.source = c.source;
+        const distHtml = c.distance != null ? `<span class="wizard-course-distance">${c.distance.toFixed(1)} mi</span>` : '';
+        card.innerHTML = `<div class="course-head"><h3>${c.name}</h3>${distHtml}</div><p>${c.source === 'preset' ? 'Saved preset' : 'Par ' + c.par.reduce((a,b)=>a+b,0)}</p>`;
+        container.appendChild(card);
+        if (!firstCard) firstCard = card;
+      };
+
+      // Saved presets first
+      if (presetCourses.length) {
+        const label = document.createElement('div');
+        label.className = 'wizard-course-section-label';
+        label.textContent = 'Your Courses';
+        container.appendChild(label);
+        presetCourses.forEach(addCard);
+      }
+
+      // "Find Nearby Courses" button (only if no location yet)
+      if (!hasLocation && navigator.geolocation) {
+        const nearbyBtn = document.createElement('button');
+        nearbyBtn.className = 'btn primary';
+        nearbyBtn.style.cssText = 'width:100%;margin:8px 0;font-size:13px;';
+        nearbyBtn.textContent = '📍 Find Nearby Courses';
+        nearbyBtn.onclick = () => {
+          nearbyBtn.textContent = 'Locating...';
+          nearbyBtn.disabled = true;
+          navigator.geolocation.getCurrentPosition(
+            pos => buildList(pos.coords.latitude, pos.coords.longitude),
+            () => { nearbyBtn.textContent = 'Location unavailable'; setTimeout(() => nearbyBtn.remove(), 2000); },
+            { timeout: 8000 }
+          );
+        };
+        container.appendChild(nearbyBtn);
+      }
+
+      // Then DB courses
+      if (dbCourses.length) {
+        const label = document.createElement('div');
+        label.className = 'wizard-course-section-label';
+        label.textContent = hasLocation ? 'Nearby Courses' : 'Course Database';
+        container.appendChild(label);
+        dbCourses.forEach(addCard);
+      }
+
+      // "Set Up New Course" card at bottom
+      const newCard = document.createElement('div');
+      newCard.className = 'wizard-course-card';
+      newCard.dataset.course = '__new__';
+      newCard.innerHTML = `<h3>+ Set Up New Course</h3><p>Configure par and handicap for each hole</p>`;
+      container.appendChild(newCard);
+
+      // Feedback link
+      const feedbackLink = document.createElement('a');
+      feedbackLink.href = 'https://docs.google.com/forms/d/e/1FAIpQLSd42m1QbKIdydDACKVW5JHOlTDWbRMbloKPMlkW36_8Pzy_6g/viewform';
+      feedbackLink.target = '_blank';
+      feedbackLink.rel = 'noopener';
+      feedbackLink.style.cssText = 'display:block;text-align:center;margin:12px 0;font-size:12px;color:var(--muted);text-decoration:none;';
+      feedbackLink.textContent = "Don\u2019t see your course? Request it here";
+      container.appendChild(feedbackLink);
+
+      // Pre-select first course
+      if (firstCard) {
+        firstCard.classList.add('selected');
+        this.data.selectedCourse = firstCard.dataset.course;
+        this.data.selectedSource = firstCard.dataset.source || null;
+      }
+
+      // Click handlers
+      container.querySelectorAll('.wizard-course-card').forEach(card => {
         card.onclick = () => {
-          div.querySelectorAll('.wizard-course-card').forEach(c => c.classList.remove('selected'));
+          container.querySelectorAll('.wizard-course-card').forEach(c => c.classList.remove('selected'));
           card.classList.add('selected');
           this.data.selectedCourse = card.dataset.course;
+          this.data.selectedSource = card.dataset.source || null;
         };
       });
+    };
+
+    // Event handlers
+    setTimeout(() => {
+      // Build list immediately with presets + alphabetical DB — no geolocation
+      buildList(null, null);
 
       document.getElementById('wizardCourseNext').onclick = () => {
         if (this.data.selectedCourse === '__new__') {
-          // Go to course setup screen
           this.step = 'courseSetup';
           this.render();
           return;
         }
-        if (this.data.selectedCourse && this.data.selectedCourse !== '__current__') {
-          // Load preset
-          const preset = State.presets[this.data.selectedCourse];
-          if (preset) {
-            State.data.course.par = [...preset.par];
-            State.data.course.hcp = [...preset.hcp];
+        if (this.data.selectedCourse) {
+          // Check DB first, then presets
+          const dbCourse = COURSE_DB.find(c => c.name === this.data.selectedCourse);
+          if (dbCourse) {
+            State.data.course.par = [...dbCourse.par];
+            State.data.course.hcp = [...dbCourse.hcp];
+            State.data.course.name = dbCourse.name;
+          } else {
+            const preset = State.presets[this.data.selectedCourse];
+            if (preset) {
+              State.data.course.par = [...preset.par];
+              State.data.course.hcp = [...preset.hcp];
+              State.data.course.name = this.data.selectedCourse;
+            }
           }
         }
         this.step = 'players';
@@ -2574,9 +2968,9 @@ const Wizard = {
     const gameTabsHtml = this.data.games.map((game, idx) => {
       const isActive = idx === this.currentGameIndex;
       const canDelete = this.data.games.length > 1;
-      const gameLabel = game.gameType === 'vegas' ? 'Vegas' : game.gameType === 'skins' ? 'Skins' : 'Nassau';
+      const gameLabel = game.gameType === 'vegas' ? 'Vegas' : game.gameType === 'skins' ? 'Skins' : game.gameType === 'wolf' ? 'Wolf' : game.gameType === 'ninepoint' ? '9-Point' : 'Nassau';
       return `<span class="wizard-game-tab ${isActive ? 'active' : ''}" data-game-idx="${idx}">
-        Game ${idx + 1}${canDelete && isActive ? '<span class="delete-game" data-delete-idx="' + idx + '">&times;</span>' : ''}
+        Game ${idx + 1} – <b>${gameLabel}</b>${canDelete && isActive ? '<span class="delete-game" data-delete-idx="' + idx + '">&times;</span>' : ''}
       </span>`;
     }).join('');
 
@@ -2811,6 +3205,26 @@ const Wizard = {
           </div>
         </div>
         `}
+
+        ${g.gameType==='nassau'?`
+        <div class="wizard-section">
+          <div class="wizard-section-title">Auto-Press (2 Down)</div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+              <input type="checkbox" id="wizardAutoPressFront" ${g.autoPress.front?'checked':''}>
+              Front 9
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+              <input type="checkbox" id="wizardAutoPressBack" ${g.autoPress.back?'checked':''}>
+              Back 9
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+              <input type="checkbox" id="wizardAutoPressOverall" ${g.autoPress.overall?'checked':''}>
+              Overall
+            </label>
+          </div>
+        </div>
+        `:''}
 
         <div class="wizard-section" id="wizardJunkStakes" style="${g.withJunk && g.gameType !== 'skins'?'':'display:none;'}">
           <div class="wizard-section-title">Junk $/point</div>
@@ -3193,6 +3607,14 @@ const Wizard = {
           g.stakes.overall = parseFloat(e.target.value) || 0;
         };
       }
+      // Auto-press checkboxes
+      const apFront = document.getElementById('wizardAutoPressFront');
+      if (apFront) apFront.onchange = (e) => { g.autoPress.front = e.target.checked; };
+      const apBack = document.getElementById('wizardAutoPressBack');
+      if (apBack) apBack.onchange = (e) => { g.autoPress.back = e.target.checked; };
+      const apOverall = document.getElementById('wizardAutoPressOverall');
+      if (apOverall) apOverall.onchange = (e) => { g.autoPress.overall = e.target.checked; };
+
       const junkFront = document.getElementById('wizardJunkFront');
       if (junkFront) {
         junkFront.onchange = (e) => {
@@ -3567,6 +3989,7 @@ const UI = {
         const theme = swatch.dataset.theme;
         document.documentElement.dataset.theme = theme;
         localStorage.setItem('bunchbets_theme', theme);
+        gtag('event', 'theme_selected', { theme });
         updateSwatchHighlight(theme);
       };
     });
@@ -3617,18 +4040,37 @@ const UI = {
     // Course
     const presetSel = h('select', {
       onchange:(e) => {
-        const pr = State.presets[e.target.value];
-        if (pr) {
-          State.data.course.hcp = [...pr.hcp];
-          State.data.course.par = [...pr.par];
-          State.data.course.name = e.target.value;
+        const val = e.target.value;
+        // Check DB first, then presets
+        const dbCourse = COURSE_DB.find(c => c.name === val);
+        if (dbCourse) {
+          State.data.course.hcp = [...dbCourse.hcp];
+          State.data.course.par = [...dbCourse.par];
+          State.data.course.name = dbCourse.name;
           State.scheduleSave();
           State.scheduleRender();
+        } else {
+          const pr = State.presets[val];
+          if (pr) {
+            State.data.course.hcp = [...pr.hcp];
+            State.data.course.par = [...pr.par];
+            State.data.course.name = val;
+            State.scheduleSave();
+            State.scheduleRender();
+          }
         }
       }
     });
+    // Add DB courses, then user presets (skip duplicates)
+    const addedNames = new Set();
+    COURSE_DB.forEach(c => {
+      presetSel.appendChild(h('option', {value:c.name, selected:c.name===State.data.course.name}, c.name));
+      addedNames.add(c.name);
+    });
     Object.keys(State.presets).forEach(nm => {
-      presetSel.appendChild(h('option', {value:nm, selected:nm===State.data.course.name}, nm));
+      if (!addedNames.has(nm)) {
+        presetSel.appendChild(h('option', {value:nm, selected:nm===State.data.course.name}, nm));
+      }
     });
 
     const hcpHead = [h('th',{class:'sticky'},'HOLE')];
@@ -3715,6 +4157,7 @@ const UI = {
               const i = team.indexOf(p.id);
               if (i>=0) team.splice(i,1);
               else if (team.length < g.teamSize) team.push(p.id);
+              Game.applyHandicapMode(g);
               State.scheduleSave();
               State.scheduleRender();
             }
@@ -3729,7 +4172,7 @@ const UI = {
         h('div',{class:'row',style:'margin-top:6px;flex-wrap:wrap;gap:8px;'},[
           h('label',{class:'nowrap'},[
             h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='nassau',
-              onchange:()=>{g.gameType='nassau';State.scheduleSave();State.scheduleRender();}}),
+              onchange:()=>{g.gameType='nassau';Game.sanitizeGame(g);State.scheduleSave();State.scheduleRender();}}),
             ' Nassau'
           ]),
           h('label',{class:'nowrap'},[
@@ -3745,17 +4188,17 @@ const UI = {
           ]),
           h('label',{class:'nowrap'},[
             h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='skins',
-              onchange:()=>{g.gameType='skins';State.scheduleSave();State.scheduleRender();}}),
+              onchange:()=>{g.gameType='skins';g.withJunk=false;Game.sanitizeGame(g);State.scheduleSave();State.scheduleRender();}}),
             ' Skins'
           ]),
           h('label',{class:'nowrap'},[
             h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='wolf',
-              onchange:()=>{g.gameType='wolf';State.scheduleSave();State.scheduleRender();}}),
+              onchange:()=>{g.gameType='wolf';g.withJunk=false;Game.sanitizeGame(g);State.scheduleSave();State.scheduleRender();}}),
             ' Wolf'
           ]),
           h('label',{class:'nowrap'},[
             h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='ninepoint',
-              onchange:()=>{g.gameType='ninepoint';State.scheduleSave();State.scheduleRender();}}),
+              onchange:()=>{g.gameType='ninepoint';g.withJunk=false;Game.sanitizeGame(g);State.scheduleSave();State.scheduleRender();}}),
             ' 9-Point'
           ])
         ])
@@ -3881,9 +4324,9 @@ const UI = {
             h('div',{},[h('div',{class:'muted'},'Overall $'),h('input',{type:'tel',inputmode:'numeric',value:g.stakes.overall,onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.stakes.overall=parseInt(e.target.value)||0;e.target.value=String(g.stakes.overall);State.end();}})]),
           ]),
           h('div',{class:'grid grid-3'},[
-            h('label',{},[h('input',{type:'checkbox',checked:g.autoPress.front,onclick:(e)=>{g.autoPress.front=e.target.checked;State.scheduleSave();State.scheduleRender();}}),' Auto-Press 2DN']),
-            h('label',{},[h('input',{type:'checkbox',checked:g.autoPress.back,onclick:(e)=>{g.autoPress.back=e.target.checked;State.scheduleSave();State.scheduleRender();}}),' Auto-Press 2DN']),
-            h('label',{},[h('input',{type:'checkbox',checked:g.autoPress.overall,onclick:(e)=>{g.autoPress.overall=e.target.checked;State.scheduleSave();State.scheduleRender();}}),' Auto-Press 2DN'])
+            h('label',{},[h('input',{type:'checkbox',checked:g.autoPress.front,onclick:(e)=>{g.autoPress.front=e.target.checked;State.scheduleSave();State.scheduleRender();}}),' Auto 2DN Front']),
+            h('label',{},[h('input',{type:'checkbox',checked:g.autoPress.back,onclick:(e)=>{g.autoPress.back=e.target.checked;State.scheduleSave();State.scheduleRender();}}),' Auto 2DN Back']),
+            h('label',{},[h('input',{type:'checkbox',checked:g.autoPress.overall,onclick:(e)=>{g.autoPress.overall=e.target.checked;State.scheduleSave();State.scheduleRender();}}),' Auto 2DN Overall'])
           ]),
           h('label',{style:'display:flex;align-items:center;gap:8px;margin:8px 0;cursor:pointer;'},[
             h('input',{type:'checkbox',checked:g.withJunk,onclick:(e)=>{g.withJunk=e.target.checked;State.scheduleSave();State.scheduleRender();}}),
@@ -4266,7 +4709,8 @@ const UI = {
 
       // Inline junk controls for this player
       let junkInline = null;
-      if (g.withJunk) {
+      const hasAnyJunk = State.data.games.some(gm => gm.withJunk);
+      if (hasAnyJunk) {
         if (!g.junkCounts[p.id]) g.junkCounts[p.id] = Utils.make18(0);
         const junkCount = g.junkCounts[p.id][hole] || 0;
         const adjustJunk = (delta) => {
@@ -4429,12 +4873,13 @@ const UI = {
         // Build lines
         const lines = [];
 
-        // Line 1: Team names + total (bold)
+        // Line 1: Game type + team names + total (bold)
+        const typeLabel = isNassau ? 'Nassau' : 'Vegas';
         const aN = (game.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
         const bN = (game.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
         const totStr = perPlayer !== 0 ? (perPlayer > 0 ? '+' : '') + Utils.fmt(perPlayer) + '/ea' : 'Even';
         lines.push(h('div',{style:'display:flex;justify-content:space-between;font-weight:700;font-size:12px;'},[
-          h('span',{},`${aN} vs ${bN}`),
+          h('span',{},[h('b',{},typeLabel), `: ${aN} vs ${bN}`]),
           h('span',{},totStr)
         ]));
 
@@ -4503,9 +4948,33 @@ const UI = {
       // Wolf / 9-Point: simple single-line
       let statusText = '';
       if (game.gameType === 'wolf') {
-        statusText = 'Wolf';
+        const res = Game.computeWolfResult(game);
+        const players = game.wolfPlayers || [];
+        const playerLines = players.map(pid => {
+          const val = res.playerNet[pid] || 0;
+          return h('span',{style:'font-size:11px;' + (val > 0 ? 'color:var(--success);' : val < 0 ? 'color:var(--danger);' : '')},
+            `${UI.playerName(pid)}: ${val > 0 ? '+' : ''}${Utils.fmt(val)}`);
+        });
+        return h('div',{class:`${theme} game-status-card`,style:'margin-bottom:4px;'},[
+          h('div',{class:'card',style:'padding:6px 10px;'},[
+            h('div',{style:'font-weight:700;font-size:12px;margin-bottom:4px;'},UI.gameLabel(game)),
+            h('div',{style:'display:flex;flex-wrap:wrap;gap:6px 12px;'},playerLines)
+          ])
+        ]);
       } else if (game.gameType === 'ninepoint') {
-        statusText = '9-Point';
+        const res = Game.computeNinePointResult(game);
+        const players = game.ninePointPlayers || [];
+        const playerLines = players.map(pid => {
+          const val = res.playerNet[pid] || 0;
+          return h('span',{style:'font-size:11px;' + (val > 0 ? 'color:var(--success);' : val < 0 ? 'color:var(--danger);' : '')},
+            `${UI.playerName(pid)}: ${val > 0 ? '+' : ''}${Utils.fmt(val)}`);
+        });
+        return h('div',{class:`${theme} game-status-card`,style:'margin-bottom:4px;'},[
+          h('div',{class:'card',style:'padding:6px 10px;'},[
+            h('div',{style:'font-weight:700;font-size:12px;margin-bottom:4px;'},UI.gameLabel(game)),
+            h('div',{style:'display:flex;flex-wrap:wrap;gap:6px 12px;'},playerLines)
+          ])
+        ]);
       }
       return h('div',{class:`${theme} game-status-card`,style:'margin-bottom:4px;'},[
         h('div',{class:'card',style:'padding:6px 10px;'},[
@@ -4544,12 +5013,64 @@ const UI = {
       h('button',{class:'hole-clear-btn',onclick:clearHole},'Clear Hole')
     ]);
 
+    // Wolf partner selection for current hole
+    const wolfGames = State.data.games.filter(gm => gm.gameType === 'wolf');
+    const wolfSection = wolfGames.length ? h('div',{class:'hole-press-section'},wolfGames.map(game => {
+      const actualIdx = State.data.games.indexOf(game);
+      const theme = `theme-g${(actualIdx%6)+1}`;
+      const wolfPlayers = game.wolfPlayers || [];
+      if (wolfPlayers.length < 4) return null;
+      const wolfResult = Game.computeWolfResult(game);
+      const detail = wolfResult.holeDetails[hole] || {};
+      const wolfPid = detail.wolf || wolfPlayers[hole % wolfPlayers.length];
+      const wolfName = UI.playerName(wolfPid) || '?';
+      const currentSel = game.wolfSelections[hole] || '';
+      const otherPlayers = wolfPlayers.filter(p => p !== wolfPid);
+      const setSel = (val) => { game.wolfSelections[hole] = val; State.scheduleSave(); State.scheduleRender(); };
+      return h('div',{class:`hole-press-row ${theme}`},[
+        h('span',{class:'hole-press-label'},`Wolf: ${wolfName}`),
+        h('div',{class:'hole-press-btns'},[
+          h('button',{class:`hole-press-btn${currentSel===''?' active':''}`,onclick:()=>setSel('')},'?'),
+          ...otherPlayers.map(pid => {
+            const name = UI.playerName(pid) || '?';
+            const abbr = name.length <= 4 ? name : name.slice(0,3);
+            return h('button',{class:`hole-press-btn${currentSel===pid?' active':''}`,onclick:()=>setSel(pid)},abbr);
+          }),
+          h('button',{class:`hole-press-btn${currentSel==='wolf'?' active':''}`,onclick:()=>setSel('wolf')},'W'),
+          h('button',{class:`hole-press-btn${currentSel==='blind'?' active':''}`,onclick:()=>setSel('blind')},'BW')
+        ])
+      ]);
+    }).filter(Boolean)) : null;
+
+    // Vegas press controls for current hole
+    const vegasGames = State.data.games.filter(gm => gm.gameType === 'vegas');
+    const pressSection = vegasGames.length ? h('div',{class:'hole-press-section'},vegasGames.map((game, gi) => {
+      const actualIdx = State.data.games.indexOf(game);
+      const theme = `theme-g${(actualIdx%6)+1}`;
+      const currentPress = game.presses[hole] || '';
+      const setPress = (val) => {
+        game.presses[hole] = val;
+        State.scheduleSave();
+        State.scheduleRender();
+      };
+      return h('div',{class:`hole-press-row ${theme}`},[
+        h('span',{class:'hole-press-label'},UI.gameLabel(game)),
+        h('div',{class:'hole-press-btns'},[
+          h('button',{class:`hole-press-btn${currentPress===''?' active':''}`,onclick:()=>setPress('')},'—'),
+          h('button',{class:`hole-press-btn${currentPress==='press'?' active':''}`,onclick:()=>setPress('press')},'Press'),
+          h('button',{class:`hole-press-btn${currentPress==='blind'?' active':''}`,onclick:()=>setPress('blind')},'Blind')
+        ])
+      ]);
+    })) : null;
+
     // Scoring card
     const scoringCard = h('div',{class:'hole-scoring'},[
       navBar,
       colHeader,
       ...playerRows,
       kpSection,
+      wolfSection,
+      pressSection,
       clearBtn
     ].filter(Boolean));
 
@@ -4695,9 +5216,54 @@ const UI = {
       document.body.appendChild(overlay);
     };
 
-    // Start wizard with all nassau games as unresolved
-    const nassauGames = State.data.games.filter(gm => gm.gameType === 'nassau' || gm.gameType === 'vegas');
-    buildStep([], nassauGames);
+    // Check if we have team games (nassau/vegas) — use full wizard with ranking
+    const teamGames = State.data.games.filter(gm => gm.gameType === 'nassau' || gm.gameType === 'vegas');
+    if (teamGames.length > 0) {
+      buildStep([], teamGames);
+    } else {
+      // Non-team games only: simple "who is closest?" — one pick, done
+      const existing = document.querySelector('.kp-modal');
+      if (existing) existing.remove();
+      const allPids = new Set();
+      State.data.games.forEach(gm => {
+        [...(gm.skinsPlayers||[]),...(gm.wolfPlayers||[]),...(gm.ninePointPlayers||[])].forEach(pid => allPids.add(pid));
+      });
+      const eligible = allPlayers.filter(p => allPids.has(p.id));
+      const overlay = document.createElement('div');
+      overlay.className = 'kp-modal';
+      const content = document.createElement('div');
+      content.className = 'kp-modal-content';
+      const titleEl = document.createElement('h3');
+      titleEl.textContent = 'Who was closest to the pin?';
+      content.appendChild(titleEl);
+      const subEl = document.createElement('div');
+      subEl.className = 'subtitle';
+      subEl.textContent = `Hole ${hole+1} \u2022 Par ${par}`;
+      content.appendChild(subEl);
+      eligible.forEach(p => {
+        const btn = document.createElement('button');
+        btn.className = 'kp-player-btn';
+        btn.textContent = p.name;
+        btn.onclick = () => { overlay.remove(); Game.setKPRanking(hole, [p.id]); State.scheduleSave(); State.scheduleRender(); };
+        content.appendChild(btn);
+      });
+      const noOneBtn = document.createElement('button');
+      noOneBtn.className = 'kp-player-btn no-one';
+      noOneBtn.textContent = 'No one';
+      noOneBtn.onclick = () => { overlay.remove(); Game.setKPRanking(hole, []); State.scheduleSave(); State.scheduleRender(); };
+      content.appendChild(noOneBtn);
+      if (existingRanking.length > 0) {
+        const clearBtn = document.createElement('button');
+        clearBtn.className = 'kp-player-btn';
+        clearBtn.style.cssText = 'color:var(--danger);border-color:var(--danger);margin-top:8px;';
+        clearBtn.textContent = 'Clear KP';
+        clearBtn.onclick = () => { overlay.remove(); Game.setKPRanking(hole, []); State.scheduleSave(); State.scheduleRender(); };
+        content.appendChild(clearBtn);
+      }
+      overlay.appendChild(content);
+      overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+      document.body.appendChild(overlay);
+    }
   },
 
   // Check for sweeps after last par 3 KP entry, then ask quads question
@@ -4814,9 +5380,12 @@ const UI = {
       const dots = [];
       for (let gi = 0; gi < Math.min(6, State.data.games.length); gi++) {
         const gm = State.data.games[gi];
-        const inA = (gm.teamA||[]).indexOf(pid)>=0;
-        const inB = (gm.teamB||[]).indexOf(pid)>=0;
-        if (!inA && !inB) continue;
+        const inA = (gm.teamA||[]).includes(pid);
+        const inB = (gm.teamB||[]).includes(pid);
+        const inSkins = (gm.skinsPlayers||[]).includes(pid);
+        const inWolf = (gm.wolfPlayers||[]).includes(pid);
+        const inNP = (gm.ninePointPlayers||[]).includes(pid);
+        if (!inA && !inB && !inSkins && !inWolf && !inNP) continue;
         const s = Game.strokes(gm, pid, hole);
         if (s > 0) dots.push(h('span',{class:`dot g${gi+1}`}));
       }
@@ -5221,6 +5790,7 @@ const UI = {
         }
 
         const perPlayer = isNassau ? result.teamTotals.total / sz : result.totalValue / sz;
+        const typeLabel = isNassau ? 'Nassau' : 'Vegas';
         const aN = (game.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
         const bN = (game.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
         const totStr = perPlayer !== 0 ? (perPlayer > 0 ? '+' : '') + Utils.fmt(perPlayer) + '/ea' : 'Even';
@@ -5238,7 +5808,7 @@ const UI = {
 
         const lines = [];
         lines.push(h('div',{style:'display:flex;justify-content:space-between;font-weight:700;font-size:12px;'},[
-          h('span',{},`${aN} vs ${bN}`),
+          h('span',{},[h('b',{},typeLabel), `: ${aN} vs ${bN}`]),
           h('span',{},totStr)
         ]));
 
@@ -5492,15 +6062,15 @@ const UI = {
         });
 
         const carry = mode === 'gross' ? result.grossCarry :
-                      mode === 'net' ? result.netCarry :
-                      (result.grossCarry + result.netCarry);
+                      mode === 'net' ? result.netCarry : null;
+        const carryBoth = mode === 'both';
 
         return h('div',{class:theme},[
           h('div',{class:'card'},[
             h('div',{class:'pill'},UI.gameLabel(g)),
             h('div',{class:'note',style:'margin-top:6px;'},`Mode: ${mode} | Buy-in: ${Utils.fmt(buyIn)} | Pot: ${Utils.fmt(result.totalPot)}`),
             h('div',{style:'margin-top:12px;'},playerRows),
-            carry > 0 ? h('div',{class:'muted',style:'margin-top:8px;'},`Carryover: ${carry} skin${carry>1?'s':''}`) : '',
+            carryBoth ? ((result.grossCarry > 0 || result.netCarry > 0) ? h('div',{class:'muted',style:'margin-top:8px;'},`Carryover: G:${result.grossCarry} / N:${result.netCarry}`) : '') : (carry > 0 ? h('div',{class:'muted',style:'margin-top:8px;'},`Carryover: ${carry} skin${carry>1?'s':''}`) : ''),
             h('div',{style:'margin-top:8px;font-weight:700;'},`$/Skin: ${Utils.fmt(mode === 'gross' ? result.grossSkinValue : result.netSkinValue)}`)
           ])
         ]);
@@ -6682,7 +7252,7 @@ const UI = {
           const players = g.skinsPlayers || [];
           players.forEach(pid => {
             const pr = res.playerResults[pid];
-            if (pr) lines.push(`  ${UI.playerName(pid)}: ${pr.totalSkins} skins = ${Utils.fmt(pr.profit)}`);
+            if (pr) lines.push(`  ${UI.playerName(pid)}: ${(pr.grossSkins||0)+(pr.netSkins||0)} skins = ${Utils.fmt(pr.profit)}`);
           });
         } else if (g.gameType === 'wolf') {
           const res = Game.computeWolfResult(g);
@@ -6725,6 +7295,7 @@ const UI = {
       }
 
       const txt = lines.join('\n');
+      gtag('event', 'share_results', { method: 'text', player_count: State.data.players.length });
 
       if (navigator.share) {
         navigator.share({text:txt}).catch(() => alert(txt));
@@ -7072,6 +7643,7 @@ const UI = {
       ctx.fillText('Generated by Bunch Bets', W/2, H - 12);
 
       // --- Share or download the image ---
+      gtag('event', 'share_results', { method: 'image', player_count: State.data.players.length });
       canvas.toBlob(async (blob) => {
         if (!blob) { Err.show('Failed to generate image'); return; }
         const file = new File([blob], 'bunch-bets-scorecard.png', { type: 'image/png' });
@@ -7142,6 +7714,15 @@ const UI = {
       games.forEach(g => {
         if (g.gameType === 'vegas') {
           tot += Game.computeVegasResult(g).totalValue;
+        } else if (g.gameType === 'skins') {
+          const res = Game.computeSkinsResult(g);
+          Object.values(res.playerResults).forEach(pr => { if (pr.profit > 0) tot += pr.profit; });
+        } else if (g.gameType === 'wolf') {
+          const res = Game.computeWolfResult(g);
+          Object.values(res.playerNet||{}).forEach(v => { if (v > 0) tot += v; });
+        } else if (g.gameType === 'ninepoint') {
+          const res = Game.computeNinePointResult(g);
+          Object.values(res.playerNet||{}).forEach(v => { if (v > 0) tot += v; });
         } else {
           tot += Game.computeResult(g).teamTotals.total;
         }
@@ -7337,6 +7918,158 @@ let joiningViaUrl = false;
 UI.render();
 UI.initMenu();
 
+// === WHAT'S NEW / VERSION CHECK ===
+(function() {
+  const storedVersion = localStorage.getItem(VERSION_KEY);
+  if (!storedVersion) {
+    // First launch ever — store version, don't show notes
+    localStorage.setItem(VERSION_KEY, APP_VERSION);
+    return;
+  }
+  if (storedVersion === APP_VERSION) return; // Same version, nothing new
+
+  // New version — show release notes
+  const notes = RELEASE_NOTES[APP_VERSION];
+  if (!notes || !notes.length) {
+    localStorage.setItem(VERSION_KEY, APP_VERSION);
+    return;
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'whats-new-overlay';
+  overlay.innerHTML = `
+    <div class="whats-new-modal">
+      <h2>What's New</h2>
+      <span class="version-tag">Version ${APP_VERSION}</span>
+      <ul>${notes.map(n => `<li>${n}</li>`).join('')}</ul>
+      <button class="btn primary" id="whatsNewClose">Got It</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#whatsNewClose').onclick = () => {
+    localStorage.setItem(VERSION_KEY, APP_VERSION);
+    overlay.remove();
+  };
+  overlay.onclick = (e) => {
+    if (e.target === overlay) {
+      localStorage.setItem(VERSION_KEY, APP_VERSION);
+      overlay.remove();
+    }
+  };
+})();
+
+// === ADD TO HOME SCREEN — UNCOMMENT WHEN READY TO GO LIVE ===
+/*
+const INSTALL_KEY = 'bunchbets-install-dismissed';
+let deferredInstallPrompt = null;
+
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+function isIOS_install() { return /iphone|ipad|ipod/i.test(navigator.userAgent); }
+function isAndroid() { return /android/i.test(navigator.userAgent); }
+function installDismissed() { return localStorage.getItem(INSTALL_KEY) === 'true'; }
+
+function dismissInstall() {
+  localStorage.setItem(INSTALL_KEY, 'true');
+  const b = document.getElementById('installBanner');
+  if (b) b.classList.remove('show');
+}
+
+function confirmInstalled() {
+  localStorage.setItem(INSTALL_KEY, 'installed');
+  const b = document.getElementById('installBanner');
+  if (b) b.classList.remove('show');
+  Err.toast('Launch from your Home Screen anytime!');
+}
+
+const IOS_SHARE_SVG = `<svg class="share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M5 10l7-7 7 7"/><path d="M5 17h14v4H5z" fill="none"/></svg>`;
+
+function showInstallBanner() {
+  const banner = document.getElementById('installBanner');
+  if (!banner) return;
+
+  if (isIOS_install()) {
+    banner.innerHTML = `
+      <div class="install-banner-top">
+        <img src="BunchBets180.png" class="install-banner-icon" alt="">
+        <div class="install-banner-text">
+          <strong>Add to Home Screen</strong>
+          <span>Get the full app experience with one tap</span>
+        </div>
+        <button class="install-banner-close" onclick="dismissInstall()" aria-label="Close">&times;</button>
+      </div>
+      <div class="install-ios-steps">
+        <div><span class="step-num">1</span>Tap the <strong>Share</strong> button ${IOS_SHARE_SVG} at the bottom of Safari</div>
+        <div style="margin-top:6px;"><span class="step-num">2</span>Scroll down and tap <strong>Add to Home Screen</strong></div>
+        <div style="margin-top:6px;"><span class="step-num">3</span>Tap <strong>Add</strong> in the top right</div>
+      </div>
+      <div class="install-banner-actions">
+        <button class="btn primary" onclick="confirmInstalled()">Done - I Added It</button>
+        <button class="btn" onclick="dismissInstall()">Not Now</button>
+      </div>`;
+  } else if (deferredInstallPrompt) {
+    banner.innerHTML = `
+      <div class="install-banner-top">
+        <img src="BunchBets180.png" class="install-banner-icon" alt="">
+        <div class="install-banner-text">
+          <strong>Add to Home Screen</strong>
+          <span>Quick access from your Home Screen</span>
+        </div>
+        <button class="install-banner-close" onclick="dismissInstall()" aria-label="Close">&times;</button>
+      </div>
+      <div class="install-banner-actions">
+        <button class="btn primary" onclick="triggerNativeInstall()">Add to Home Screen</button>
+        <button class="btn" onclick="dismissInstall()">Not Now</button>
+      </div>`;
+  } else {
+    banner.innerHTML = `
+      <div class="install-banner-top">
+        <img src="BunchBets180.png" class="install-banner-icon" alt="">
+        <div class="install-banner-text">
+          <strong>Add to Home Screen</strong>
+          <span>Use your browser menu to add this app</span>
+        </div>
+        <button class="install-banner-close" onclick="dismissInstall()" aria-label="Close">&times;</button>
+      </div>
+      <div class="install-banner-actions">
+        <button class="btn primary" onclick="confirmInstalled()">Done - I Added It</button>
+        <button class="btn" onclick="dismissInstall()">Not Now</button>
+      </div>`;
+  }
+  banner.classList.add('show');
+}
+
+async function triggerNativeInstall() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  const result = await deferredInstallPrompt.userChoice;
+  if (result.outcome === 'accepted') confirmInstalled();
+  deferredInstallPrompt = null;
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  if (!isStandalone() && !installDismissed()) showInstallBanner();
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  confirmInstalled();
+});
+
+function checkInstallBanner() {
+  if (isStandalone()) return;
+  if (installDismissed()) return;
+  if (!isIOS_install() && !isAndroid() && !deferredInstallPrompt) return;
+  setTimeout(() => showInstallBanner(), 3500);
+}
+
+checkInstallBanner();
+*/
+// === END ADD TO HOME SCREEN ===
+
 // Header: date + weather
 (function() {
   const dateEl = document.getElementById('headerDate');
@@ -7347,32 +8080,33 @@ UI.initMenu();
     dateEl.textContent = now.toLocaleDateString('en-US', opts);
   }
   if (weatherEl) {
-    weatherEl.textContent = 'Loading weather...';
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude: lat, longitude: lon } = pos.coords;
-        fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`)
-          .then(r => r.json())
-          .then(data => {
-            const c = data.current;
-            const temp = Math.round(c.temperature_2m);
-            const wind = Math.round(c.wind_speed_10m);
-            const codes = {0:['☀️','Clear'],1:['🌤','Mostly Clear'],2:['⛅','Partly Cloudy'],3:['☁️','Overcast'],45:['🌫','Foggy'],48:['🌫','Foggy'],51:['🌦','Light Drizzle'],53:['🌦','Drizzle'],55:['🌧','Heavy Drizzle'],61:['🌧','Light Rain'],63:['🌧','Rain'],65:['🌧️','Heavy Rain'],71:['🌨','Light Snow'],73:['❄️','Snow'],75:['❄️','Heavy Snow'],80:['🌦','Showers'],81:['🌧','Showers'],82:['⛈','Heavy Showers'],95:['⛈','Thunderstorm'],96:['⛈','Thunderstorm'],99:['⛈','Thunderstorm']};
-            const [emoji, desc] = codes[c.weather_code] || ['☀️','Clear'];
-            const windEmoji = wind >= 15 ? '💨' : '🍃';
-            weatherEl.textContent = `${emoji} ${temp}°F ${desc}  ${windEmoji} ${wind}mph`;
-          })
-          .catch(() => { weatherEl.textContent = ''; });
-      },
-      () => { weatherEl.textContent = ''; },
-      { timeout: 5000 }
-    );
+    weatherEl.textContent = '';
+    // Use IP-based location for weather — no permission popup needed
+    fetch('https://ipapi.co/json/')
+      .then(r => r.json())
+      .then(loc => {
+        if (!loc.latitude || !loc.longitude) { weatherEl.textContent = ''; return; }
+        return fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&current=temperature_2m,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`);
+      })
+      .then(r => r ? r.json() : null)
+      .then(data => {
+        if (!data || !data.current) return;
+        const c = data.current;
+        const temp = Math.round(c.temperature_2m);
+        const wind = Math.round(c.wind_speed_10m);
+        const codes = {0:['☀️','Clear'],1:['🌤','Mostly Clear'],2:['⛅','Partly Cloudy'],3:['☁️','Overcast'],45:['🌫','Foggy'],48:['🌫','Foggy'],51:['🌦','Light Drizzle'],53:['🌦','Drizzle'],55:['🌧','Heavy Drizzle'],61:['🌧','Light Rain'],63:['🌧','Rain'],65:['🌧️','Heavy Rain'],71:['🌨','Light Snow'],73:['❄️','Snow'],75:['❄️','Heavy Snow'],80:['🌦','Showers'],81:['🌧','Showers'],82:['⛈','Heavy Showers'],95:['⛈','Thunderstorm'],96:['⛈','Thunderstorm'],99:['⛈','Thunderstorm']};
+        const [emoji, desc] = codes[c.weather_code] || ['☀️','Clear'];
+        const windEmoji = wind >= 15 ? '💨' : '🍃';
+        weatherEl.textContent = `${emoji} ${temp}°F ${desc}  ${windEmoji} ${wind}mph`;
+      })
+      .catch(() => { weatherEl.textContent = ''; });
   }
 })();
 
 
 // Intelligent launch detection
 (function() {
+  gtag('event', 'app_open', { theme: localStorage.getItem('bunchbets_theme') || 'classic' });
   const today = new Date().toDateString();
   const lastActive = State.data.lastActiveDate;
 
@@ -7398,7 +8132,7 @@ UI.initMenu();
     Wizard.start();
   } else if (hasActiveGame()) {
     // Same day with active game - go to scores tab
-    State.data.tab = 'live';
+    State.data.tab = 'scores';
     State.scheduleRender();
     Err.toast('Welcome back');
   } else {
