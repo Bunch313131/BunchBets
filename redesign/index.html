@@ -2616,6 +2616,15 @@ const Wizard = {
       newCard.innerHTML = `<h3>+ Set Up New Course</h3><p>Configure par and handicap for each hole</p>`;
       container.appendChild(newCard);
 
+      // Feedback link
+      const feedbackLink = document.createElement('a');
+      feedbackLink.href = 'https://docs.google.com/forms/d/e/1FAIpQLSd42m1QbKIdydDACKVW5JHOlTDWbRMbloKPMlkW36_8Pzy_6g/viewform';
+      feedbackLink.target = '_blank';
+      feedbackLink.rel = 'noopener';
+      feedbackLink.style.cssText = 'display:block;text-align:center;margin:12px 0;font-size:12px;color:var(--muted);text-decoration:none;';
+      feedbackLink.textContent = "Don\u2019t see your course? Request it here";
+      container.appendChild(feedbackLink);
+
       // Pre-select first course
       if (firstCard) {
         firstCard.classList.add('selected');
