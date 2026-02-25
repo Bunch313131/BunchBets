@@ -243,7 +243,9 @@ body:has(.wizard-overlay) { overflow:hidden; }
   justify-content:center;
   position:relative;
   overflow:hidden;
+  transition:transform 0.8s cubic-bezier(0.4,0,0.2,1);
 }
+.wizard-splash.curtain-up { transform:translateY(-100%); }
 .wizard-splash canvas.splash-particles { position:absolute; inset:0; width:100%; height:100%; z-index:0; }
 .splash-center { position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; gap:10px; }
 .splash-glow { position:absolute; width:400px; height:400px; border-radius:50%; background:radial-gradient(circle, rgba(22,163,74,0.5) 0%, transparent 65%); filter:blur(50px); opacity:0; animation:splashGlowIn 2.2s ease-out 0.2s forwards; z-index:0; }
@@ -2119,11 +2121,15 @@ const Wizard = {
     this.currentGameIndex = 0;
     this.data.games.push(this.createGameData());
     this.render();
-    // Auto-advance from splash after 5 seconds (tap to skip)
+    // Auto-advance from splash with curtain-raise transition
     const advanceSplash = () => {
-      if (this.step === 'splash') {
-        this.step = 'course';
-        this.render();
+      if (this.step !== 'splash') return;
+      const splash = document.querySelector('.wizard-splash');
+      if (splash) {
+        splash.classList.add('curtain-up');
+        setTimeout(() => { this.step = 'course'; this.render(); }, 800);
+      } else {
+        this.step = 'course'; this.render();
       }
     };
     this._splashTimer = setTimeout(advanceSplash, 7500);
@@ -7841,6 +7847,9 @@ checkInstallBanner();
     dateEl.textContent = now.toLocaleDateString('en-US', opts);
   }
   if (weatherEl) {
+    weatherEl.textContent = '';
+    // Delay geolocation until after splash to avoid permission popup over animations
+    setTimeout(() => {
     weatherEl.textContent = 'Loading weather...';
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -7861,6 +7870,7 @@ checkInstallBanner();
       () => { weatherEl.textContent = ''; },
       { timeout: 5000 }
     );
+    }, 9000);
   }
 })();
 
