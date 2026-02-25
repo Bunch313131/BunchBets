@@ -21,7 +21,7 @@
 :root[data-theme="classic"].light-mode { --bg:#f5f5f7; --card:#ffffff; --txt:#1d1d1f; --muted:#6e6e73; --border:#d2d2d7; --acc:#3b82f6; --success:#16a34a; --danger:#dc2626; --warning:#d97706; --gold:#a07d3f; color-scheme: light; }
 
 /* Theme 2: Augusta — Masters inspired, rich greens, gold accents, serif elegance */
-:root[data-theme="augusta"] { --bg:#002b10; --card:#003d16; --txt:#f5f0e1; --muted:#a8c4a0; --border:#1a5c2e; --acc:#c8a951; --success:#6fd08c; --danger:#e74c4c; --warning:#daa520; --gold:#c8a951; --radius:6px; --font-display:Georgia,'Times New Roman',serif; --header-bg:linear-gradient(180deg,#003d16,#002b10); color-scheme: dark; }
+:root[data-theme="augusta"] { --bg:#0a3d1c; --card:#0f4d26; --txt:#f5f0e1; --muted:#a8c4a0; --border:#1e6e38; --acc:#c8a951; --success:#6fd08c; --danger:#e74c4c; --warning:#daa520; --gold:#c8a951; --radius:6px; --font-display:Georgia,'Times New Roman',serif; --header-bg:linear-gradient(180deg,#0f4d26,#0a3d1c); color-scheme: dark; }
 :root[data-theme="augusta"].light-mode { --bg:#f5f0e1; --card:#fffef8; --txt:#1a2e1d; --muted:#5a7a62; --border:#c5d4b8; --acc:#8b6f2e; --success:#16a34a; --danger:#dc2626; --warning:#b8860b; --gold:#8b6f2e; --header-bg:linear-gradient(180deg,#2d6a3f,#1a5c2e); color-scheme: light; }
 /* Augusta structural overrides */
 [data-theme="augusta"] main h2, [data-theme="augusta"] main h3, [data-theme="augusta"] .card h2, [data-theme="augusta"] .card h3 { font-family:Georgia,'Times New Roman',serif; letter-spacing:0.5px; }
@@ -31,16 +31,20 @@
 [data-theme="augusta"] .header-info .header-weather { color:#a8c4a0; }
 [data-theme="augusta"] .hamburger { color:#f5f0e1; }
 [data-theme="augusta"] .btn { border-radius:4px; text-transform:uppercase; letter-spacing:1px; font-size:12px; }
-[data-theme="augusta"] .btn.primary { background:var(--gold); color:#002b10; border-color:var(--gold); }
-[data-theme="augusta"] .hole-scoring-nav { background:var(--gold); color:#002b10; }
-[data-theme="augusta"] .hole-scoring-nav .hole-nav-btn { background:rgba(0,43,16,0.2); color:#002b10; }
-[data-theme="augusta"] .hole-dot.current { background:var(--gold); border-color:var(--gold); color:#002b10; }
+[data-theme="augusta"] .btn.primary { background:var(--gold); color:#0a3d1c; border-color:var(--gold); }
+[data-theme="augusta"] .hole-scoring-nav { background:var(--gold); color:#0a3d1c; }
+[data-theme="augusta"] .hole-scoring-nav .hole-nav-btn { background:rgba(10,61,28,0.2); color:#0a3d1c; }
+[data-theme="augusta"] .hole-dot.current { background:var(--gold); border-color:var(--gold); color:#0a3d1c; }
 [data-theme="augusta"] .bottom-nav { border-top:2px solid var(--gold); }
 [data-theme="augusta"] .bottom-nav-btn.active { color:var(--gold); }
 [data-theme="augusta"] .pill { border-radius:4px; }
-[data-theme="augusta"] .scoring-toggle-btn.active { background:var(--gold); color:#002b10; }
+[data-theme="augusta"] .scoring-toggle-btn.active { background:var(--gold); color:#0a3d1c; }
 [data-theme="augusta"] .score-drum { border-radius:6px; background:linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(200,169,81,0.06) 40%, rgba(200,169,81,0.06) 60%, rgba(0,0,0,0.4) 100%); box-shadow:inset 0 2px 6px rgba(0,0,0,0.5), inset 0 -2px 6px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.4); border-color:rgba(200,169,81,0.25); }
 [data-theme="augusta"] .score-drum-frame { border-color:var(--gold); border-radius:4px; box-shadow:0 0 8px rgba(200,169,81,0.3), inset 0 0 6px rgba(200,169,81,0.1); background:rgba(200,169,81,0.04); }
+[data-theme="augusta"] .theme-g1 .card { outline-color:rgba(22,163,74,.6); background:linear-gradient(0deg,rgba(22,163,74,.15),rgba(22,163,74,.15)) var(--card); }
+[data-theme="augusta"] .theme-g2 .card { outline-color:rgba(220,38,38,.6); background:linear-gradient(0deg,rgba(220,38,38,.15),rgba(220,38,38,.15)) var(--card); }
+[data-theme="augusta"] .theme-g3 .card { outline-color:rgba(217,119,6,.6); background:linear-gradient(0deg,rgba(217,119,6,.15),rgba(217,119,6,.15)) var(--card); }
+[data-theme="augusta"] .theme-g4 .card { outline-color:rgba(99,102,241,.6); background:linear-gradient(0deg,rgba(99,102,241,.15),rgba(99,102,241,.15)) var(--card); }
 
 /* Theme 3: Midnight — dark luxury, neon accents, glass morphism, futuristic */
 :root[data-theme="midnight"] { --bg:#0a0a0f; --card:rgba(20,20,35,0.85); --txt:#e8e8f0; --muted:#7a7a9a; --border:rgba(100,100,180,0.2); --acc:#7c3aed; --success:#10b981; --danger:#f43f5e; --warning:#f59e0b; --gold:#a78bfa; --radius:20px; --font-display:'SF Pro Display',system-ui,-apple-system,Segoe UI; --header-bg:rgba(10,10,15,0.8); color-scheme: dark; }
