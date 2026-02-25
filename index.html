@@ -2300,6 +2300,8 @@ const Wizard = {
       course: State.data.course.name || 'custom',
       features: features.join(',') || 'none'
     });
+    // Refresh weather for the selected course
+    if (window._updateWeather) window._updateWeather();
   },
 
   removeOverlay() {
@@ -8056,9 +8058,10 @@ window.addEventListener('appinstalled', () => {
     const opts = { weekday: 'long', month: 'long', day: 'numeric' };
     dateEl.textContent = now.toLocaleDateString('en-US', opts);
   }
-  if (weatherEl) {
+  // Weather — callable function so it can refresh when course changes
+  window._updateWeather = function() {
+    if (!weatherEl) return;
     weatherEl.textContent = '';
-    // Get weather from selected course coordinates, fall back to IP location
     function fetchWeather(lat, lng) {
       fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`)
         .then(r => r.json())
@@ -8074,18 +8077,25 @@ window.addEventListener('appinstalled', () => {
         })
         .catch(() => { weatherEl.textContent = ''; });
     }
+    // Match course name to COURSE_DB — fuzzy: "El Macero" matches "El Macero CC"
     const courseName = State.data && State.data.course && State.data.course.name;
-    const dbCourse = courseName && typeof COURSE_DB !== 'undefined' ? COURSE_DB.find(c => c.name === courseName) : null;
+    let dbCourse = null;
+    if (courseName && typeof COURSE_DB !== 'undefined') {
+      const lower = courseName.toLowerCase();
+      dbCourse = COURSE_DB.find(c => c.name.toLowerCase() === lower)
+        || COURSE_DB.find(c => c.name.toLowerCase().startsWith(lower))
+        || COURSE_DB.find(c => lower.startsWith(c.name.toLowerCase().replace(/ cc$| gc$| golf club$/,'')));
+    }
     if (dbCourse && dbCourse.lat && dbCourse.lng) {
       fetchWeather(dbCourse.lat, dbCourse.lng);
     } else {
-      // Fallback: IP-based location
       fetch('https://ipapi.co/json/')
         .then(r => r.json())
         .then(loc => { if (loc.latitude && loc.longitude) fetchWeather(loc.latitude, loc.longitude); })
         .catch(() => {});
     }
-  }
+  };
+  window._updateWeather();
 })();
 
 
