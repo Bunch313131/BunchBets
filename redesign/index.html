@@ -7986,9 +7986,7 @@ function showInstallGate() {
 
   if (isIOS_install()) {
     gate.innerHTML = `
-      <div class="install-gate-icon">${INSTALL_ICON_SVG}</div>
       <div class="install-gate-title">Bunch Bets</div>
-      <div class="install-gate-subtitle">Settle it on the course</div>
       <div class="install-gate-card">
         <h3>Add to Home Screen</h3>
         <div class="install-gate-steps">
@@ -7997,14 +7995,10 @@ function showInstallGate() {
           <div class="step"><span class="step-num">3</span><span>Tap <strong>Add</strong> in the top right</span></div>
         </div>
       </div>
-      <div class="install-gate-actions">
-        <button class="btn primary" onclick="confirmInstalled()">Done - I Added It</button>
-      </div>`;
+      <div style="margin-top:20px;font-size:12px;color:rgba(255,255,255,0.35);max-width:340px;line-height:1.5;">For the best experience, add Bunch Bets to your Home Screen and launch it from there.</div>`;
   } else if (deferredInstallPrompt) {
     gate.innerHTML = `
-      <div class="install-gate-icon">${INSTALL_ICON_SVG}</div>
       <div class="install-gate-title">Bunch Bets</div>
-      <div class="install-gate-subtitle">Settle it on the course</div>
       <div class="install-gate-card">
         <h3>Install the App</h3>
         <div class="install-gate-steps">
@@ -8016,9 +8010,7 @@ function showInstallGate() {
       </div>`;
   } else {
     gate.innerHTML = `
-      <div class="install-gate-icon">${INSTALL_ICON_SVG}</div>
       <div class="install-gate-title">Bunch Bets</div>
-      <div class="install-gate-subtitle">Settle it on the course</div>
       <div class="install-gate-card">
         <h3>Add to Home Screen</h3>
         <div class="install-gate-steps">
@@ -8026,9 +8018,7 @@ function showInstallGate() {
           <div class="step"><span class="step-num">2</span><span>Tap <strong>Add to Home Screen</strong></span></div>
         </div>
       </div>
-      <div class="install-gate-actions">
-        <button class="btn primary" onclick="confirmInstalled()">Done - I Added It</button>
-      </div>`;
+      <div style="margin-top:20px;font-size:12px;color:rgba(255,255,255,0.35);max-width:340px;line-height:1.5;">For the best experience, add Bunch Bets to your Home Screen and launch it from there.</div>`;
   }
   gate.classList.add('show');
 }
