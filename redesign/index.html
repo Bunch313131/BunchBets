@@ -245,7 +245,7 @@ body:has(.wizard-overlay) { overflow:hidden; }
   overflow:hidden;
 }
 .wizard-splash canvas.splash-particles { position:absolute; inset:0; width:100%; height:100%; z-index:0; }
-.splash-center { position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; gap:18px; }
+.splash-center { position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; gap:10px; }
 .splash-glow { position:absolute; width:400px; height:400px; border-radius:50%; background:radial-gradient(circle, rgba(22,163,74,0.5) 0%, transparent 65%); filter:blur(50px); opacity:0; animation:splashGlowIn 2.2s ease-out 0.2s forwards; z-index:0; }
 .splash-shimmer { position:absolute; inset:0; z-index:1; pointer-events:none; background:linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.06) 40%, rgba(255,255,255,0.14) 48%, rgba(255,255,255,0.06) 56%, transparent 66%); opacity:0; animation:splashShimmerFull 1.6s ease-in-out 1.6s forwards; }
 @keyframes splashShimmerFull { 0%{opacity:1;transform:translateX(-100%);} 100%{opacity:1;transform:translateX(100%);} }
@@ -253,7 +253,7 @@ body:has(.wizard-overlay) { overflow:hidden; }
 .splash-logo svg { width:200px; height:200px; filter:drop-shadow(0 10px 40px rgba(0,0,0,0.6)) drop-shadow(0 0 60px rgba(22,163,74,0.5)); }
 .splash-title { font-family:'Inter',system-ui,sans-serif; font-size:36px; font-weight:900; letter-spacing:4px; text-transform:uppercase; color:#fff; opacity:0; transform:translateY(16px) scale(0.95); animation:splashTextIn 1.2s ease-out 1.4s forwards; text-shadow:0 2px 30px rgba(0,0,0,0.6), 0 0 60px rgba(22,163,74,0.3); display:flex; align-items:center; }
 .splash-s { position:relative; display:inline-block; }
-.splash-s .s-line { position:absolute; left:calc(50% - 4px); top:4px; bottom:4px; width:2.5px; margin-left:-1.25px; background:#fff; transform-origin:center top; transform:scaleY(0); border-radius:2px; }
+.splash-s .s-line { position:absolute; left:calc(50% - 2px); top:4px; bottom:4px; width:2.5px; margin-left:-1.25px; background:#fff; transform-origin:center top; transform:scaleY(0); border-radius:2px; }
 .splash-s.morph .s-line { animation:drawLine 0.5s ease-out forwards; background:#ffdd00; box-shadow:0 0 8px rgba(255,221,0,0.5); }
 .splash-s.morph { animation:turnGold 0.4s ease-out 0.45s forwards; }
 @keyframes drawLine { 0%{transform:scaleY(0);} 100%{transform:scaleY(1);} }
@@ -2126,7 +2126,7 @@ const Wizard = {
         this.render();
       }
     };
-    this._splashTimer = setTimeout(advanceSplash, 6000);
+    this._splashTimer = setTimeout(advanceSplash, 7500);
     setTimeout(() => {
       const splash = document.querySelector('.wizard-splash');
       if (splash) splash.addEventListener('click', () => {
