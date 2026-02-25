@@ -550,7 +550,7 @@ const COURSE_DB = [
   {name:"Del Paso CC",lat:38.6139,lng:-121.4458,par:[5,3,4,5,3,4,4,4,4,4,4,3,5,3,5,4,3,4],hcp:[11,17,1,7,15,9,3,5,13,12,10,18,8,16,6,2,14,4]},
   {name:"Dry Creek Ranch",lat:38.6200,lng:-121.2286,par:[4,4,5,4,3,4,3,5,4,5,3,5,4,4,4,4,3,4],hcp:[4,12,10,16,18,2,8,6,14,9,17,7,5,15,1,13,11,3]},
   {name:"El Macero CC",lat:38.5467,lng:-121.6917,par:[4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5],hcp:[15,13,9,1,7,3,17,11,5,8,2,16,6,10,12,18,4,14]},
-  {name:"Haggin Oaks (Arcade Creek)",lat:38.6176,lng:-121.4313,par:[4,4,3,5,4,4,4,5,3,4,3,4,5,3,4,4,4,5],hcp:[5,13,3,8,11,1,17,15,7,16,2,12,10,14,18,6,9,4]},
+  {name:"Haggin Oaks (Arcade Creek)",lat:38.6176,lng:-121.4313,par:[4,4,3,5,4,4,4,5,3,4,3,4,5,3,4,4,4,5],hcp:[5,13,3,8,11,1,17,15,7,16,2,12,10,14,18,6,8,4]},
   {name:"Haggin Oaks (MacKenzie)",lat:38.6176,lng:-121.4313,par:[5,4,3,5,4,3,4,4,4,4,5,3,4,3,4,3,5,5],hcp:[11,1,17,5,15,13,9,7,3,6,2,12,8,14,4,16,10,18]},
   {name:"Mather",lat:38.5539,lng:-121.2897,par:[4,5,3,4,4,4,3,4,5,4,3,5,4,3,4,5,4,4],hcp:[5,7,13,3,1,9,11,15,17,2,16,18,14,8,12,10,4,6]},
   {name:"Rancho Murieta CC (North)",lat:38.5039,lng:-121.0942,par:[4,3,5,4,4,3,4,5,4,4,5,3,4,4,5,3,4,4],hcp:[15,17,3,1,7,11,9,13,5,8,16,18,6,10,2,14,12,4]},
@@ -597,7 +597,7 @@ window.LiveSync = {
       return false;
     }
     try {
-      if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+      firebase.initializeApp(FIREBASE_CONFIG);
       this.db = firebase.database();
       return true;
     } catch (e) {
@@ -1048,7 +1048,7 @@ const Game = {
     g.junkValue = g.junkValue || {front:1,back:2};
     ['front','back'].forEach(k => g.junkValue[k] = Math.max(0, parseInt(g.junkValue[k])||0));
     g.pointValue = g.pointValue || {front:1,back:1};
-    ['front','back'].forEach(k => { const v = parseFloat(g.pointValue[k]); g.pointValue[k] = isNaN(v) ? 1 : Math.max(0, v); });
+    ['front','back'].forEach(k => g.pointValue[k] = Math.max(0, parseFloat(g.pointValue[k])||1));
     // Skins-specific
     g.skinsMode = ['net','gross','both'].includes(g.skinsMode) ? g.skinsMode : 'net';
     g.skinsPlayers = Array.isArray(g.skinsPlayers) ? g.skinsPlayers : [];
@@ -1360,9 +1360,10 @@ const Game = {
     return (entry && entry.ranking) ? entry.ranking : [];
   },
 
-  // Set KP ranking for a hole (propagated to all games)
+  // Set KP ranking for a hole (propagated to team-based games only)
   setKPRanking(hole, ranking) {
     State.data.games.forEach(gm => {
+      if (gm.gameType !== 'nassau' && gm.gameType !== 'vegas') return;
       if (!gm.kpData) gm.kpData = Utils.make18(null);
       gm.kpData[hole] = ranking.length > 0 ? { ranking } : null;
     });
@@ -1403,17 +1404,11 @@ const Game = {
     if (junk.netA > 0) junkTeam = junk.netA * szB;
     else if (junk.netA < 0) junkTeam = junk.netA * szA;
 
-    // KP values (match-specific closest-to-pin bets, including sweeps/quads)
+    // KP values (match-specific closest-to-pin bets)
     const kp = g.withJunk ? this.computeKP(g) : {netA:0, grandTotal:0, results:[], hasSweeps:false, hasQuads:false};
     let kpTeam = 0;
-    if (kp.hasSweeps || kp.hasQuads) {
-      // Sweeps/quads: winning team gets grandTotal (already includes multipliers)
-      const signA = kp.sweepsTeam === 'A' ? 1 : -1;
-      kpTeam = signA * kp.grandTotal * (kp.sweepsTeam === 'A' ? szB : szA);
-    } else {
-      if (kp.netA > 0) kpTeam = kp.netA * szB;
-      else if (kp.netA < 0) kpTeam = kp.netA * szA;
-    }
+    if (kp.netA > 0) kpTeam = kp.netA * szB;
+    else if (kp.netA < 0) kpTeam = kp.netA * szA;
 
     const total = front.teamPayA + back.teamPayA + overall.teamPayA + junkTeam + kpTeam;
 
@@ -2886,7 +2881,7 @@ const Wizard = {
     const gameTabsHtml = this.data.games.map((game, idx) => {
       const isActive = idx === this.currentGameIndex;
       const canDelete = this.data.games.length > 1;
-      const gameLabel = game.gameType === 'vegas' ? 'Vegas' : game.gameType === 'skins' ? 'Skins' : game.gameType === 'wolf' ? 'Wolf' : game.gameType === 'ninepoint' ? '9-Point' : 'Nassau';
+      const gameLabel = game.gameType === 'vegas' ? 'Vegas' : game.gameType === 'skins' ? 'Skins' : 'Nassau';
       return `<span class="wizard-game-tab ${isActive ? 'active' : ''}" data-game-idx="${idx}">
         Game ${idx + 1}${canDelete && isActive ? '<span class="delete-game" data-delete-idx="' + idx + '">&times;</span>' : ''}
       </span>`;
@@ -3124,27 +3119,7 @@ const Wizard = {
         </div>
         `}
 
-        ${g.gameType==='nassau'?`
-        <div class="wizard-section">
-          <div class="wizard-section-title">Auto-Press (2 Down)</div>
-          <div style="display:flex;gap:16px;flex-wrap:wrap;">
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
-              <input type="checkbox" id="wizardAutoPressFront" ${g.autoPress.front?'checked':''}>
-              Front 9
-            </label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
-              <input type="checkbox" id="wizardAutoPressBack" ${g.autoPress.back?'checked':''}>
-              Back 9
-            </label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
-              <input type="checkbox" id="wizardAutoPressOverall" ${g.autoPress.overall?'checked':''}>
-              Overall
-            </label>
-          </div>
-        </div>
-        `:''}
-
-        <div class="wizard-section" id="wizardJunkStakes" style="${g.withJunk && g.gameType !== 'skins'?'':'display:none;'}">`
+        <div class="wizard-section" id="wizardJunkStakes" style="${g.withJunk && g.gameType !== 'skins'?'':'display:none;'}">
           <div class="wizard-section-title">Junk $/point</div>
           <div class="grid grid-2" style="gap:8px;">
             <div>
@@ -3525,14 +3500,6 @@ const Wizard = {
           g.stakes.overall = parseFloat(e.target.value) || 0;
         };
       }
-      // Auto-press checkboxes
-      const apFront = document.getElementById('wizardAutoPressFront');
-      if (apFront) apFront.onchange = (e) => { g.autoPress.front = e.target.checked; };
-      const apBack = document.getElementById('wizardAutoPressBack');
-      if (apBack) apBack.onchange = (e) => { g.autoPress.back = e.target.checked; };
-      const apOverall = document.getElementById('wizardAutoPressOverall');
-      if (apOverall) apOverall.onchange = (e) => { g.autoPress.overall = e.target.checked; };
-
       const junkFront = document.getElementById('wizardJunkFront');
       if (junkFront) {
         junkFront.onchange = (e) => {
@@ -4074,7 +4041,6 @@ const UI = {
               const i = team.indexOf(p.id);
               if (i>=0) team.splice(i,1);
               else if (team.length < g.teamSize) team.push(p.id);
-              Game.applyHandicapMode(g);
               State.scheduleSave();
               State.scheduleRender();
             }
@@ -4089,7 +4055,7 @@ const UI = {
         h('div',{class:'row',style:'margin-top:6px;flex-wrap:wrap;gap:8px;'},[
           h('label',{class:'nowrap'},[
             h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='nassau',
-              onchange:()=>{g.gameType='nassau';Game.sanitizeGame(g);State.scheduleSave();State.scheduleRender();}}),
+              onchange:()=>{g.gameType='nassau';State.scheduleSave();State.scheduleRender();}}),
             ' Nassau'
           ]),
           h('label',{class:'nowrap'},[
@@ -4105,17 +4071,17 @@ const UI = {
           ]),
           h('label',{class:'nowrap'},[
             h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='skins',
-              onchange:()=>{g.gameType='skins';g.withJunk=false;Game.sanitizeGame(g);State.scheduleSave();State.scheduleRender();}}),
+              onchange:()=>{g.gameType='skins';State.scheduleSave();State.scheduleRender();}}),
             ' Skins'
           ]),
           h('label',{class:'nowrap'},[
             h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='wolf',
-              onchange:()=>{g.gameType='wolf';g.withJunk=false;Game.sanitizeGame(g);State.scheduleSave();State.scheduleRender();}}),
+              onchange:()=>{g.gameType='wolf';State.scheduleSave();State.scheduleRender();}}),
             ' Wolf'
           ]),
           h('label',{class:'nowrap'},[
             h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='ninepoint',
-              onchange:()=>{g.gameType='ninepoint';g.withJunk=false;Game.sanitizeGame(g);State.scheduleSave();State.scheduleRender();}}),
+              onchange:()=>{g.gameType='ninepoint';State.scheduleSave();State.scheduleRender();}}),
             ' 9-Point'
           ])
         ])
@@ -4241,9 +4207,9 @@ const UI = {
             h('div',{},[h('div',{class:'muted'},'Overall $'),h('input',{type:'tel',inputmode:'numeric',value:g.stakes.overall,onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.stakes.overall=parseInt(e.target.value)||0;e.target.value=String(g.stakes.overall);State.end();}})]),
           ]),
           h('div',{class:'grid grid-3'},[
-            h('label',{},[h('input',{type:'checkbox',checked:g.autoPress.front,onclick:(e)=>{g.autoPress.front=e.target.checked;State.scheduleSave();State.scheduleRender();}}),' Auto 2DN Front']),
-            h('label',{},[h('input',{type:'checkbox',checked:g.autoPress.back,onclick:(e)=>{g.autoPress.back=e.target.checked;State.scheduleSave();State.scheduleRender();}}),' Auto 2DN Back']),
-            h('label',{},[h('input',{type:'checkbox',checked:g.autoPress.overall,onclick:(e)=>{g.autoPress.overall=e.target.checked;State.scheduleSave();State.scheduleRender();}}),' Auto 2DN Overall'])
+            h('label',{},[h('input',{type:'checkbox',checked:g.autoPress.front,onclick:(e)=>{g.autoPress.front=e.target.checked;State.scheduleSave();State.scheduleRender();}}),' Auto-Press 2DN']),
+            h('label',{},[h('input',{type:'checkbox',checked:g.autoPress.back,onclick:(e)=>{g.autoPress.back=e.target.checked;State.scheduleSave();State.scheduleRender();}}),' Auto-Press 2DN']),
+            h('label',{},[h('input',{type:'checkbox',checked:g.autoPress.overall,onclick:(e)=>{g.autoPress.overall=e.target.checked;State.scheduleSave();State.scheduleRender();}}),' Auto-Press 2DN'])
           ]),
           h('label',{style:'display:flex;align-items:center;gap:8px;margin:8px 0;cursor:pointer;'},[
             h('input',{type:'checkbox',checked:g.withJunk,onclick:(e)=>{g.withJunk=e.target.checked;State.scheduleSave();State.scheduleRender();}}),
@@ -4626,8 +4592,7 @@ const UI = {
 
       // Inline junk controls for this player
       let junkInline = null;
-      const hasAnyJunk = State.data.games.some(gm => gm.withJunk);
-      if (hasAnyJunk) {
+      if (g.withJunk) {
         if (!g.junkCounts[p.id]) g.junkCounts[p.id] = Utils.make18(0);
         const junkCount = g.junkCounts[p.id][hole] || 0;
         const adjustJunk = (delta) => {
@@ -4864,33 +4829,9 @@ const UI = {
       // Wolf / 9-Point: simple single-line
       let statusText = '';
       if (game.gameType === 'wolf') {
-        const res = Game.computeWolfResult(game);
-        const players = game.wolfPlayers || [];
-        const playerLines = players.map(pid => {
-          const val = res.playerNet[pid] || 0;
-          return h('span',{style:'font-size:11px;' + (val > 0 ? 'color:var(--success);' : val < 0 ? 'color:var(--danger);' : '')},
-            `${UI.playerName(pid)}: ${val > 0 ? '+' : ''}${Utils.fmt(val)}`);
-        });
-        return h('div',{class:`${theme} game-status-card`,style:'margin-bottom:4px;'},[
-          h('div',{class:'card',style:'padding:6px 10px;'},[
-            h('div',{style:'font-size:11px;margin-bottom:4px;'},UI.gameLabel(game)),
-            h('div',{style:'display:flex;flex-wrap:wrap;gap:6px 12px;'},playerLines)
-          ])
-        ]);
+        statusText = 'Wolf';
       } else if (game.gameType === 'ninepoint') {
-        const res = Game.computeNinePointResult(game);
-        const players = game.ninePointPlayers || [];
-        const playerLines = players.map(pid => {
-          const val = res.playerNet[pid] || 0;
-          return h('span',{style:'font-size:11px;' + (val > 0 ? 'color:var(--success);' : val < 0 ? 'color:var(--danger);' : '')},
-            `${UI.playerName(pid)}: ${val > 0 ? '+' : ''}${Utils.fmt(val)}`);
-        });
-        return h('div',{class:`${theme} game-status-card`,style:'margin-bottom:4px;'},[
-          h('div',{class:'card',style:'padding:6px 10px;'},[
-            h('div',{style:'font-size:11px;margin-bottom:4px;'},UI.gameLabel(game)),
-            h('div',{style:'display:flex;flex-wrap:wrap;gap:6px 12px;'},playerLines)
-          ])
-        ]);
+        statusText = '9-Point';
       }
       return h('div',{class:`${theme} game-status-card`,style:'margin-bottom:4px;'},[
         h('div',{class:'card',style:'padding:6px 10px;'},[
@@ -4929,35 +4870,6 @@ const UI = {
       h('button',{class:'hole-clear-btn',onclick:clearHole},'Clear Hole')
     ]);
 
-    // Wolf partner selection for current hole
-    const wolfGames = State.data.games.filter(gm => gm.gameType === 'wolf');
-    const wolfSection = wolfGames.length ? h('div',{class:'hole-press-section'},wolfGames.map(game => {
-      const actualIdx = State.data.games.indexOf(game);
-      const theme = `theme-g${(actualIdx%6)+1}`;
-      const wolfPlayers = game.wolfPlayers || [];
-      if (wolfPlayers.length < 4) return null;
-      const wolfResult = Game.computeWolfResult(game);
-      const detail = wolfResult.holeDetails[hole] || {};
-      const wolfPid = detail.wolf || wolfPlayers[hole % wolfPlayers.length];
-      const wolfName = UI.playerName(wolfPid) || '?';
-      const currentSel = game.wolfSelections[hole] || '';
-      const otherPlayers = wolfPlayers.filter(p => p !== wolfPid);
-      const setSel = (val) => { game.wolfSelections[hole] = val; State.scheduleSave(); State.scheduleRender(); };
-      return h('div',{class:`hole-press-row ${theme}`},[
-        h('span',{class:'hole-press-label'},`Wolf: ${wolfName}`),
-        h('div',{class:'hole-press-btns'},[
-          h('button',{class:`hole-press-btn${currentSel===''?' active':''}`,onclick:()=>setSel('')},'?'),
-          ...otherPlayers.map(pid => {
-            const name = UI.playerName(pid) || '?';
-            const abbr = name.length <= 4 ? name : name.slice(0,3);
-            return h('button',{class:`hole-press-btn${currentSel===pid?' active':''}`,onclick:()=>setSel(pid)},abbr);
-          }),
-          h('button',{class:`hole-press-btn${currentSel==='wolf'?' active':''}`,onclick:()=>setSel('wolf')},'W'),
-          h('button',{class:`hole-press-btn${currentSel==='blind'?' active':''}`,onclick:()=>setSel('blind')},'BW')
-        ])
-      ]);
-    }).filter(Boolean)) : null;
-
     // Vegas press controls for current hole
     const vegasGames = State.data.games.filter(gm => gm.gameType === 'vegas');
     const pressSection = vegasGames.length ? h('div',{class:'hole-press-section'},vegasGames.map((game, gi) => {
@@ -4985,7 +4897,6 @@ const UI = {
       colHeader,
       ...playerRows,
       kpSection,
-      wolfSection,
       pressSection,
       clearBtn
     ].filter(Boolean));
@@ -5132,54 +5043,9 @@ const UI = {
       document.body.appendChild(overlay);
     };
 
-    // Check if we have team games (nassau/vegas) — use full wizard with ranking
-    const teamGames = State.data.games.filter(gm => gm.gameType === 'nassau' || gm.gameType === 'vegas');
-    if (teamGames.length > 0) {
-      buildStep([], teamGames);
-    } else {
-      // Non-team games only: simple "who is closest?" — one pick, done
-      const existing = document.querySelector('.kp-modal');
-      if (existing) existing.remove();
-      const allPids = new Set();
-      State.data.games.forEach(gm => {
-        [...(gm.skinsPlayers||[]),...(gm.wolfPlayers||[]),...(gm.ninePointPlayers||[])].forEach(pid => allPids.add(pid));
-      });
-      const eligible = allPlayers.filter(p => allPids.has(p.id));
-      const overlay = document.createElement('div');
-      overlay.className = 'kp-modal';
-      const content = document.createElement('div');
-      content.className = 'kp-modal-content';
-      const titleEl = document.createElement('h3');
-      titleEl.textContent = 'Who was closest to the pin?';
-      content.appendChild(titleEl);
-      const subEl = document.createElement('div');
-      subEl.className = 'subtitle';
-      subEl.textContent = `Hole ${hole+1} \u2022 Par ${par}`;
-      content.appendChild(subEl);
-      eligible.forEach(p => {
-        const btn = document.createElement('button');
-        btn.className = 'kp-player-btn';
-        btn.textContent = p.name;
-        btn.onclick = () => { overlay.remove(); Game.setKPRanking(hole, [p.id]); State.scheduleSave(); State.scheduleRender(); };
-        content.appendChild(btn);
-      });
-      const noOneBtn = document.createElement('button');
-      noOneBtn.className = 'kp-player-btn no-one';
-      noOneBtn.textContent = 'No one';
-      noOneBtn.onclick = () => { overlay.remove(); Game.setKPRanking(hole, []); State.scheduleSave(); State.scheduleRender(); };
-      content.appendChild(noOneBtn);
-      if (existingRanking.length > 0) {
-        const clearBtn = document.createElement('button');
-        clearBtn.className = 'kp-player-btn';
-        clearBtn.style.cssText = 'color:var(--danger);border-color:var(--danger);margin-top:8px;';
-        clearBtn.textContent = 'Clear KP';
-        clearBtn.onclick = () => { overlay.remove(); Game.setKPRanking(hole, []); State.scheduleSave(); State.scheduleRender(); };
-        content.appendChild(clearBtn);
-      }
-      overlay.appendChild(content);
-      overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
-      document.body.appendChild(overlay);
-    }
+    // Start wizard with all nassau games as unresolved
+    const nassauGames = State.data.games.filter(gm => gm.gameType === 'nassau' || gm.gameType === 'vegas');
+    buildStep([], nassauGames);
   },
 
   // Check for sweeps after last par 3 KP entry, then ask quads question
@@ -5296,12 +5162,9 @@ const UI = {
       const dots = [];
       for (let gi = 0; gi < Math.min(6, State.data.games.length); gi++) {
         const gm = State.data.games[gi];
-        const inA = (gm.teamA||[]).includes(pid);
-        const inB = (gm.teamB||[]).includes(pid);
-        const inSkins = (gm.skinsPlayers||[]).includes(pid);
-        const inWolf = (gm.wolfPlayers||[]).includes(pid);
-        const inNP = (gm.ninePointPlayers||[]).includes(pid);
-        if (!inA && !inB && !inSkins && !inWolf && !inNP) continue;
+        const inA = (gm.teamA||[]).indexOf(pid)>=0;
+        const inB = (gm.teamB||[]).indexOf(pid)>=0;
+        if (!inA && !inB) continue;
         const s = Game.strokes(gm, pid, hole);
         if (s > 0) dots.push(h('span',{class:`dot g${gi+1}`}));
       }
@@ -5977,15 +5840,15 @@ const UI = {
         });
 
         const carry = mode === 'gross' ? result.grossCarry :
-                      mode === 'net' ? result.netCarry : null;
-        const carryBoth = mode === 'both';
+                      mode === 'net' ? result.netCarry :
+                      (result.grossCarry + result.netCarry);
 
         return h('div',{class:theme},[
           h('div',{class:'card'},[
             h('div',{class:'pill'},UI.gameLabel(g)),
             h('div',{class:'note',style:'margin-top:6px;'},`Mode: ${mode} | Buy-in: ${Utils.fmt(buyIn)} | Pot: ${Utils.fmt(result.totalPot)}`),
             h('div',{style:'margin-top:12px;'},playerRows),
-            carryBoth ? ((result.grossCarry > 0 || result.netCarry > 0) ? h('div',{class:'muted',style:'margin-top:8px;'},`Carryover: G:${result.grossCarry} / N:${result.netCarry}`) : '') : (carry > 0 ? h('div',{class:'muted',style:'margin-top:8px;'},`Carryover: ${carry} skin${carry>1?'s':''}`) : ''),
+            carry > 0 ? h('div',{class:'muted',style:'margin-top:8px;'},`Carryover: ${carry} skin${carry>1?'s':''}`) : '',
             h('div',{style:'margin-top:8px;font-weight:700;'},`$/Skin: ${Utils.fmt(mode === 'gross' ? result.grossSkinValue : result.netSkinValue)}`)
           ])
         ]);
@@ -7167,7 +7030,7 @@ const UI = {
           const players = g.skinsPlayers || [];
           players.forEach(pid => {
             const pr = res.playerResults[pid];
-            if (pr) lines.push(`  ${UI.playerName(pid)}: ${(pr.grossSkins||0)+(pr.netSkins||0)} skins = ${Utils.fmt(pr.profit)}`);
+            if (pr) lines.push(`  ${UI.playerName(pid)}: ${pr.totalSkins} skins = ${Utils.fmt(pr.profit)}`);
           });
         } else if (g.gameType === 'wolf') {
           const res = Game.computeWolfResult(g);
@@ -7627,15 +7490,6 @@ const UI = {
       games.forEach(g => {
         if (g.gameType === 'vegas') {
           tot += Game.computeVegasResult(g).totalValue;
-        } else if (g.gameType === 'skins') {
-          const res = Game.computeSkinsResult(g);
-          Object.values(res.playerResults).forEach(pr => { if (pr.profit > 0) tot += pr.profit; });
-        } else if (g.gameType === 'wolf') {
-          const res = Game.computeWolfResult(g);
-          Object.values(res.playerNet||{}).forEach(v => { if (v > 0) tot += v; });
-        } else if (g.gameType === 'ninepoint') {
-          const res = Game.computeNinePointResult(g);
-          Object.values(res.playerNet||{}).forEach(v => { if (v > 0) tot += v; });
         } else {
           tot += Game.computeResult(g).teamTotals.total;
         }
@@ -8048,7 +7902,7 @@ checkInstallBanner();
     Wizard.start();
   } else if (hasActiveGame()) {
     // Same day with active game - go to scores tab
-    State.data.tab = 'scores';
+    State.data.tab = 'live';
     State.scheduleRender();
     Err.toast('Welcome back');
   } else {
