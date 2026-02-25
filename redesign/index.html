@@ -2137,7 +2137,16 @@ const Wizard = {
       const splash = document.querySelector('.wizard-splash');
       if (splash) {
         splash.classList.add('curtain-up');
-        setTimeout(() => { this.step = 'course'; this.render(); }, 1400);
+        setTimeout(() => {
+          this.step = 'course';
+          splash.remove();
+          // Reset course content positioning
+          const overlay = document.getElementById('wizardOverlay');
+          if (overlay) {
+            const courseEl = overlay.querySelector('.wizard-screen');
+            if (courseEl) { courseEl.style.position = ''; courseEl.style.inset = ''; courseEl.style.zIndex = ''; }
+          }
+        }, 1400);
       } else {
         this.step = 'course'; this.render();
       }
@@ -2348,6 +2357,17 @@ const Wizard = {
       case 'players': content = this.renderPlayers(); break;
       case 'game': content = this.renderGame(); break;
       default: content = document.createElement('div');
+    }
+
+    // During splash, pre-render course step behind it so curtain reveals it
+    if (this.step === 'splash') {
+      const courseContent = this.renderCourse();
+      courseContent.style.position = 'absolute';
+      courseContent.style.inset = '0';
+      courseContent.style.zIndex = '0';
+      overlay.appendChild(courseContent);
+      content.style.position = 'relative';
+      content.style.zIndex = '1';
     }
 
     overlay.appendChild(content);
