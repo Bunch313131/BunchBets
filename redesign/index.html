@@ -4903,7 +4903,7 @@ const UI = {
         if (isNassau) {
           lines.push(buildNineLine('Front', fmtSeg(result.segments.front), junk ? junk.frontNetPts : 0, frontKP, result.segments.front.payA));
           if (hasBack9Score) lines.push(buildNineLine('Back', fmtSeg(result.segments.back), junk ? junk.backNetPts : 0, backKP, result.segments.back.payA));
-          if (allHolesScored) lines.push(buildNineLine('Overall', fmtSeg(result.segments.overall), 0, 0, result.segments.overall.payA));
+          lines.push(buildNineLine('Overall', fmtSeg(result.segments.overall), 0, 0, result.segments.overall.payA));
         } else {
           const frontPP = result.frontPoints * (game.pointValue.front || 0);
           const backPP = result.backPoints * (game.pointValue.back || 0);
@@ -5820,7 +5820,7 @@ const UI = {
         if (isNassau) {
           lines.push(buildNineLine('Front', fmtSeg(result.segments.front), junk ? junk.frontNetPts : 0, frontKP, result.segments.front.payA));
           if (hasBack9Score) lines.push(buildNineLine('Back', fmtSeg(result.segments.back), junk ? junk.backNetPts : 0, backKP, result.segments.back.payA));
-          if (allHolesScored) lines.push(buildNineLine('Overall', fmtSeg(result.segments.overall), 0, 0, result.segments.overall.payA));
+          lines.push(buildNineLine('Overall', fmtSeg(result.segments.overall), 0, 0, result.segments.overall.payA));
         } else {
           const frontPP = result.frontPoints * (game.pointValue.front || 0);
           const backPP = result.backPoints * (game.pointValue.back || 0);
