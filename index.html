@@ -8058,25 +8058,33 @@ window.addEventListener('appinstalled', () => {
   }
   if (weatherEl) {
     weatherEl.textContent = '';
-    // Use IP-based location for weather — no permission popup needed
-    fetch('https://ipapi.co/json/')
-      .then(r => r.json())
-      .then(loc => {
-        if (!loc.latitude || !loc.longitude) { weatherEl.textContent = ''; return; }
-        return fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&current=temperature_2m,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`);
-      })
-      .then(r => r ? r.json() : null)
-      .then(data => {
-        if (!data || !data.current) return;
-        const c = data.current;
-        const temp = Math.round(c.temperature_2m);
-        const wind = Math.round(c.wind_speed_10m);
-        const codes = {0:['☀️','Clear'],1:['🌤','Mostly Clear'],2:['⛅','Partly Cloudy'],3:['☁️','Overcast'],45:['🌫','Foggy'],48:['🌫','Foggy'],51:['🌦','Light Drizzle'],53:['🌦','Drizzle'],55:['🌧','Heavy Drizzle'],61:['🌧','Light Rain'],63:['🌧','Rain'],65:['🌧️','Heavy Rain'],71:['🌨','Light Snow'],73:['❄️','Snow'],75:['❄️','Heavy Snow'],80:['🌦','Showers'],81:['🌧','Showers'],82:['⛈','Heavy Showers'],95:['⛈','Thunderstorm'],96:['⛈','Thunderstorm'],99:['⛈','Thunderstorm']};
-        const [emoji, desc] = codes[c.weather_code] || ['☀️','Clear'];
-        const windEmoji = wind >= 15 ? '💨' : '🍃';
-        weatherEl.textContent = `${emoji} ${temp}°F ${desc}  ${windEmoji} ${wind}mph`;
-      })
-      .catch(() => { weatherEl.textContent = ''; });
+    // Get weather from selected course coordinates, fall back to IP location
+    function fetchWeather(lat, lng) {
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`)
+        .then(r => r.json())
+        .then(data => {
+          if (!data || !data.current) return;
+          const c = data.current;
+          const temp = Math.round(c.temperature_2m);
+          const wind = Math.round(c.wind_speed_10m);
+          const codes = {0:['☀️','Clear'],1:['🌤','Mostly Clear'],2:['⛅','Partly Cloudy'],3:['☁️','Overcast'],45:['🌫','Foggy'],48:['🌫','Foggy'],51:['🌦','Light Drizzle'],53:['🌦','Drizzle'],55:['🌧','Heavy Drizzle'],61:['🌧','Light Rain'],63:['🌧','Rain'],65:['🌧️','Heavy Rain'],71:['🌨','Light Snow'],73:['❄️','Snow'],75:['❄️','Heavy Snow'],80:['🌦','Showers'],81:['🌧','Showers'],82:['⛈','Heavy Showers'],95:['⛈','Thunderstorm'],96:['⛈','Thunderstorm'],99:['⛈','Thunderstorm']};
+          const [emoji, desc] = codes[c.weather_code] || ['☀️','Clear'];
+          const windEmoji = wind >= 15 ? '💨' : '🍃';
+          weatherEl.textContent = `${emoji} ${temp}°F ${desc}  ${windEmoji} ${wind}mph`;
+        })
+        .catch(() => { weatherEl.textContent = ''; });
+    }
+    const courseName = State.data && State.data.course && State.data.course.name;
+    const dbCourse = courseName && typeof COURSE_DB !== 'undefined' ? COURSE_DB.find(c => c.name === courseName) : null;
+    if (dbCourse && dbCourse.lat && dbCourse.lng) {
+      fetchWeather(dbCourse.lat, dbCourse.lng);
+    } else {
+      // Fallback: IP-based location
+      fetch('https://ipapi.co/json/')
+        .then(r => r.json())
+        .then(loc => { if (loc.latitude && loc.longitude) fetchWeather(loc.latitude, loc.longitude); })
+        .catch(() => {});
+    }
   }
 })();
 
