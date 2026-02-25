@@ -457,22 +457,23 @@ td:nth-child(11), th:nth-child(11) { border-left:3px double var(--muted); }
 .bottom-nav-btn.active { color:var(--acc); }
 .bottom-nav-btn svg { width:22px; height:22px; }
 .bottom-nav-dark-toggle { flex:0 0 48px; display:flex; align-items:center; justify-content:center; background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer; padding:16px 0 10px; transition:color 0.2s; }
-/* === INSTALL BANNER === */
-.install-banner { display:none; position:fixed; bottom:16px; left:0; right:0; z-index:300; background:linear-gradient(135deg,var(--card),var(--bg)); color:var(--txt); padding:14px 16px; margin:0 12px; border-radius:14px; border:1px solid var(--border); box-shadow:0 4px 20px rgba(0,0,0,0.5); }
-.install-banner.show { display:block; }
-.install-banner-top { display:flex; align-items:center; gap:12px; }
-.install-banner-icon { width:44px; height:44px; border-radius:10px; flex-shrink:0; overflow:hidden; }
-.install-banner-icon svg { width:100%; height:100%; display:block; }
-.install-banner-text { flex:1; }
-.install-banner-text strong { display:block; font-size:15px; margin-bottom:2px; }
-.install-banner-text span { font-size:12px; color:var(--muted); }
-.install-banner-close { background:none; border:none; color:var(--muted); font-size:1.3rem; cursor:pointer; padding:4px; line-height:1; flex-shrink:0; }
-.install-banner-close:hover { color:var(--txt); }
-.install-banner-actions { display:flex; gap:8px; margin-top:10px; }
-.install-banner-actions .btn { flex:1; justify-content:center; font-size:13px; padding:8px 12px; }
-.install-ios-steps { margin-top:10px; padding:10px 12px; background:rgba(0,0,0,0.2); border-radius:10px; font-size:13px; line-height:1.6; }
-.install-ios-steps .step-num { display:inline-block; width:20px; height:20px; background:var(--acc); color:#fff; border-radius:50%; text-align:center; line-height:20px; font-size:11px; font-weight:bold; margin-right:6px; }
-.install-ios-steps .share-icon { display:inline-block; width:16px; height:16px; vertical-align:middle; }
+/* === INSTALL GATE === */
+.install-gate { display:none; position:fixed; inset:0; z-index:9999; background:#050d08; color:#e5e5e5; flex-direction:column; align-items:center; justify-content:center; padding:32px 24px; text-align:center; font-family:'Inter',system-ui,sans-serif; }
+.install-gate.show { display:flex; }
+.install-gate-icon { width:120px; height:120px; margin-bottom:24px; filter:drop-shadow(0 8px 30px rgba(22,163,74,0.4)); }
+.install-gate-icon svg { width:100%; height:100%; display:block; }
+.install-gate-title { font-size:32px; font-weight:900; letter-spacing:3px; text-transform:uppercase; margin-bottom:6px; color:#fff; }
+.install-gate-subtitle { font-size:13px; font-weight:500; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,0.4); margin-bottom:32px; }
+.install-gate-card { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:20px 24px; max-width:340px; width:100%; }
+.install-gate-card h3 { font-size:16px; font-weight:700; margin:0 0 14px 0; color:#fff; }
+.install-gate-steps { text-align:left; font-size:14px; line-height:1.7; color:rgba(255,255,255,0.7); }
+.install-gate-steps .step-num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background:#16a34a; color:#fff; border-radius:50%; font-size:11px; font-weight:700; margin-right:8px; flex-shrink:0; }
+.install-gate-steps .step { display:flex; align-items:flex-start; margin-bottom:8px; }
+.install-gate-steps .share-icon { display:inline-block; width:16px; height:16px; vertical-align:middle; margin:0 2px; }
+.install-gate-actions { display:flex; flex-direction:column; gap:10px; margin-top:20px; max-width:340px; width:100%; }
+.install-gate-actions .btn { width:100%; justify-content:center; font-size:15px; font-weight:700; padding:14px 20px; border-radius:12px; border:none; cursor:pointer; }
+.install-gate-actions .btn.primary { background:#16a34a; color:#fff; }
+.install-gate-actions .btn.secondary { background:transparent; color:rgba(255,255,255,0.4); font-size:12px; font-weight:500; padding:8px; }
 </style>
 </head>
 <body>
@@ -535,7 +536,7 @@ td:nth-child(11), th:nth-child(11) { border-left:3px double var(--muted); }
   </div>
 </div>
 <div id="liveBanner" class="live-banner" style="display:none;"></div>
-<div class="install-banner" id="installBanner"></div>
+<div class="install-gate" id="installGate"></div>
 <main>
   <div id="tabs"></div>
   <div id="app"></div>
@@ -7959,87 +7960,77 @@ UI.initMenu();
   };
 })();
 
-// === ADD TO HOME SCREEN ===
-const INSTALL_KEY = 'bunchbets-install-dismissed';
+// === INSTALL GATE ===
+const INSTALL_KEY = 'bunchbets-installed';
 let deferredInstallPrompt = null;
 
 function isStandalone() {
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 }
 function isIOS_install() { return /iphone|ipad|ipod/i.test(navigator.userAgent); }
-function isAndroid() { return /android/i.test(navigator.userAgent); }
-function installDismissed() { return localStorage.getItem(INSTALL_KEY) === 'true'; }
-
-function dismissInstall() {
-  localStorage.setItem(INSTALL_KEY, 'true');
-  const b = document.getElementById('installBanner');
-  if (b) b.classList.remove('show');
-}
-
-function confirmInstalled() {
-  localStorage.setItem(INSTALL_KEY, 'installed');
-  const b = document.getElementById('installBanner');
-  if (b) b.classList.remove('show');
-  Err.toast('Launch from your Home Screen anytime!');
-}
+function isInstalled() { return localStorage.getItem(INSTALL_KEY) === 'true'; }
 
 const IOS_SHARE_SVG = `<svg class="share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M5 10l7-7 7 7"/><path d="M5 17h14v4H5z" fill="none"/></svg>`;
 
 const INSTALL_ICON_SVG = `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="200" height="200" rx="38" fill="#0d3a1a"/><rect x="0" y="0" width="200" height="200" rx="38" fill="url(#iiBg)"/><rect x="4" y="4" width="192" height="192" rx="36" fill="none" stroke="rgba(22,163,74,0.3)" stroke-width="1"/><rect x="0" y="0" width="200" height="200" rx="38" fill="url(#iiGlow)" opacity="0.4"/><ellipse cx="100" cy="150" rx="58" ry="14" fill="#16a34a" opacity="0.4"/><ellipse cx="100" cy="150" rx="40" ry="9" fill="#16a34a" opacity="0.3"/><ellipse cx="100" cy="150" rx="7" ry="3" fill="#000" opacity="0.7"/><line x1="100" y1="150" x2="100" y2="36" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><path d="M100,36 L100,74 Q122,60 150,53 Q122,44 100,36Z" fill="#ffdd00"/><circle cx="124" cy="140" r="18" fill="#f5f5f5"/><circle cx="124" cy="140" r="18" fill="url(#iiBallGrad)"/><text x="124" y="145" text-anchor="middle" font-size="16" font-weight="800" font-family="Inter,system-ui,sans-serif" fill="#16a34a" opacity="0.8">$</text><circle cx="118" cy="132" r="5" fill="rgba(255,255,255,0.25)"/><defs><linearGradient id="iiBg" x1="0" y1="0" x2="200" y2="200" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#0a2e14"/><stop offset="50%" stop-color="#061a0b"/><stop offset="100%" stop-color="#030d06"/></linearGradient><radialGradient id="iiBallGrad" cx="118" cy="132" r="18" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="rgba(255,255,255,0.5)"/><stop offset="50%" stop-color="rgba(255,255,255,0)"/><stop offset="100%" stop-color="rgba(0,0,0,0.2)"/></radialGradient><radialGradient id="iiGlow" cx="100" cy="80" r="100" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#16a34a"/><stop offset="100%" stop-color="#16a34a" stop-opacity="0"/></radialGradient></defs></svg>`;
 
-function showInstallBanner() {
-  const banner = document.getElementById('installBanner');
-  if (!banner) return;
+function confirmInstalled() {
+  localStorage.setItem(INSTALL_KEY, 'true');
+  const gate = document.getElementById('installGate');
+  if (gate) gate.classList.remove('show');
+}
+
+function showInstallGate() {
+  const gate = document.getElementById('installGate');
+  if (!gate) return;
 
   if (isIOS_install()) {
-    banner.innerHTML = `
-      <div class="install-banner-top">
-        <div class="install-banner-icon">${INSTALL_ICON_SVG}</div>
-        <div class="install-banner-text">
-          <strong>Bunch Bets</strong>
-          <span>Add to Home Screen for the full experience</span>
+    gate.innerHTML = `
+      <div class="install-gate-icon">${INSTALL_ICON_SVG}</div>
+      <div class="install-gate-title">Bunch Bets</div>
+      <div class="install-gate-subtitle">Settle it on the course</div>
+      <div class="install-gate-card">
+        <h3>Add to Home Screen</h3>
+        <div class="install-gate-steps">
+          <div class="step"><span class="step-num">1</span><span>Tap the <strong>Share</strong> button ${IOS_SHARE_SVG} at the bottom of Safari</span></div>
+          <div class="step"><span class="step-num">2</span><span>Scroll down and tap <strong>Add to Home Screen</strong></span></div>
+          <div class="step"><span class="step-num">3</span><span>Tap <strong>Add</strong> in the top right</span></div>
         </div>
-        <button class="install-banner-close" onclick="dismissInstall()" aria-label="Close">&times;</button>
       </div>
-      <div class="install-ios-steps">
-        <div><span class="step-num">1</span>Tap the <strong>Share</strong> button ${IOS_SHARE_SVG} at the bottom of Safari</div>
-        <div style="margin-top:6px;"><span class="step-num">2</span>Scroll down and tap <strong>Add to Home Screen</strong></div>
-        <div style="margin-top:6px;"><span class="step-num">3</span>Tap <strong>Add</strong> in the top right</div>
-      </div>
-      <div class="install-banner-actions">
+      <div class="install-gate-actions">
         <button class="btn primary" onclick="confirmInstalled()">Done - I Added It</button>
-        <button class="btn" onclick="dismissInstall()">Not Now</button>
       </div>`;
   } else if (deferredInstallPrompt) {
-    banner.innerHTML = `
-      <div class="install-banner-top">
-        <div class="install-banner-icon">${INSTALL_ICON_SVG}</div>
-        <div class="install-banner-text">
-          <strong>Bunch Bets</strong>
-          <span>Quick access from your Home Screen</span>
+    gate.innerHTML = `
+      <div class="install-gate-icon">${INSTALL_ICON_SVG}</div>
+      <div class="install-gate-title">Bunch Bets</div>
+      <div class="install-gate-subtitle">Settle it on the course</div>
+      <div class="install-gate-card">
+        <h3>Install the App</h3>
+        <div class="install-gate-steps">
+          <div class="step" style="justify-content:center;"><span>Tap below to add Bunch Bets to your Home Screen</span></div>
         </div>
-        <button class="install-banner-close" onclick="dismissInstall()" aria-label="Close">&times;</button>
       </div>
-      <div class="install-banner-actions">
+      <div class="install-gate-actions">
         <button class="btn primary" onclick="triggerNativeInstall()">Add to Home Screen</button>
-        <button class="btn" onclick="dismissInstall()">Not Now</button>
       </div>`;
   } else {
-    banner.innerHTML = `
-      <div class="install-banner-top">
-        <div class="install-banner-icon">${INSTALL_ICON_SVG}</div>
-        <div class="install-banner-text">
-          <strong>Bunch Bets</strong>
-          <span>Use your browser menu to add this app</span>
+    gate.innerHTML = `
+      <div class="install-gate-icon">${INSTALL_ICON_SVG}</div>
+      <div class="install-gate-title">Bunch Bets</div>
+      <div class="install-gate-subtitle">Settle it on the course</div>
+      <div class="install-gate-card">
+        <h3>Add to Home Screen</h3>
+        <div class="install-gate-steps">
+          <div class="step"><span class="step-num">1</span><span>Open your browser menu</span></div>
+          <div class="step"><span class="step-num">2</span><span>Tap <strong>Add to Home Screen</strong></span></div>
         </div>
-        <button class="install-banner-close" onclick="dismissInstall()" aria-label="Close">&times;</button>
       </div>
-      <div class="install-banner-actions">
+      <div class="install-gate-actions">
         <button class="btn primary" onclick="confirmInstalled()">Done - I Added It</button>
-        <button class="btn" onclick="dismissInstall()">Not Now</button>
       </div>`;
   }
-  banner.classList.add('show');
+  gate.classList.add('show');
 }
 
 async function triggerNativeInstall() {
@@ -8053,7 +8044,6 @@ async function triggerNativeInstall() {
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredInstallPrompt = e;
-  if (!isStandalone() && !installDismissed()) showInstallBanner();
 });
 
 window.addEventListener('appinstalled', () => {
@@ -8061,15 +8051,13 @@ window.addEventListener('appinstalled', () => {
   confirmInstalled();
 });
 
-function checkInstallBanner() {
-  if (isStandalone()) return;
-  if (installDismissed()) return;
-  if (!isIOS_install() && !isAndroid() && !deferredInstallPrompt) return;
-  setTimeout(() => showInstallBanner(), 3500);
-}
-
-checkInstallBanner();
-// === END ADD TO HOME SCREEN ===
+// Gate check — block app unless standalone or confirmed installed
+(function() {
+  if (isStandalone()) return;  // launched from home screen — skip gate
+  if (isInstalled()) return;   // already confirmed — skip gate
+  showInstallGate();
+})();
+// === END INSTALL GATE ===
 
 // Header: date + weather
 (function() {
