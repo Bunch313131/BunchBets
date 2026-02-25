@@ -452,11 +452,12 @@ td:nth-child(11), th:nth-child(11) { border-left:3px double var(--muted); }
 #app { animation:fadeIn 0.15s ease-in; }
 @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
 /* Bottom nav bar */
-.bottom-nav { position:fixed; bottom:0; left:0; right:0; background:var(--card); border-top:1px solid var(--border); display:flex; z-index:50; padding-bottom:calc(env(safe-area-inset-bottom) + 8px); }
-.bottom-nav-btn { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:16px 4px 10px; background:none; border:none; color:var(--muted); font-size:11px; cursor:pointer; transition:color 0.2s; }
+.bottom-nav { position:fixed; bottom:0; left:0; right:0; background:var(--card); border-top:1px solid var(--border); display:flex; z-index:50; padding:0 12px calc(env(safe-area-inset-bottom) + 2px); }
+.bottom-nav-btn { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:10px 4px 6px; background:none; border:none; color:var(--muted); font-size:11px; cursor:pointer; transition:color 0.2s; }
 .bottom-nav-btn.active { color:var(--acc); }
 .bottom-nav-btn svg { width:22px; height:22px; }
-.bottom-nav-dark-toggle { flex:0 0 48px; display:flex; align-items:center; justify-content:center; background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer; padding:16px 0 10px; transition:color 0.2s; }
+.bottom-nav-dark-toggle { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:10px 4px 6px; background:none; border:none; color:var(--muted); font-size:11px; cursor:pointer; transition:color 0.2s; }
+.bottom-nav-dark-toggle .toggle-icon { font-size:20px; line-height:22px; height:22px; }
 /* === INSTALL GATE === */
 .install-gate { display:none; position:fixed; inset:0; z-index:9999; background:#050d08; color:#e5e5e5; flex-direction:column; align-items:center; justify-content:center; padding:32px 24px; text-align:center; font-family:'Inter',system-ui,sans-serif; }
 .install-gate.show { display:flex; }
@@ -3895,7 +3896,7 @@ const UI = {
     const isLight = document.documentElement.classList.contains('light-mode');
     bottomNav.innerHTML = navItems.map(item =>
       `<button class="bottom-nav-btn ${State.data.tab === item.id ? 'active' : ''}" data-tab="${item.id}">${item.icon}<span>${item.label}</span></button>`
-    ).join('') + `<button class="bottom-nav-dark-toggle" id="bottomDarkToggle" title="Toggle dark/light">${isLight ? '🌙' : '☀️'}</button>`;
+    ).join('') + `<button class="bottom-nav-dark-toggle" id="bottomDarkToggle" title="Toggle dark/light"><span class="toggle-icon">${isLight ? '🌙' : '☀️'}</span><span>${isLight ? 'Dark' : 'Light'}</span></button>`;
     bottomNav.querySelectorAll('.bottom-nav-btn').forEach(btn => {
       btn.onclick = () => {
         State.data.tab = btn.dataset.tab;
