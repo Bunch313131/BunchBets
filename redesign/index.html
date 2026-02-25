@@ -126,7 +126,7 @@ th.sticky, td.sticky { position:sticky; left:0; background:var(--card); z-index:
 .whats-new-modal .btn { width:100%; margin-top:16px; }
 @keyframes slideIn { from { transform:translateX(400px); opacity:0; } to { transform:translateX(0); opacity:1; } }
 .theme-g1 .card { outline:1px solid rgba(22,163,74,.45); background:linear-gradient(0deg,rgba(22,163,74,.08),rgba(22,163,74,.08)) var(--card); }
-.theme-g2 .card { outline:1px solid rgba(202,138,4,.45); background:linear-gradient(0deg,rgba(202,138,4,.08),rgba(202,138,4,.08)) var(--card); }
+.theme-g2 .card { outline:1px solid rgba(220,38,38,.45); background:linear-gradient(0deg,rgba(220,38,38,.08),rgba(220,38,38,.08)) var(--card); }
 .theme-g3 .card { outline:1px solid rgba(217,119,6,.45); background:linear-gradient(0deg,rgba(217,119,6,.08),rgba(217,119,6,.08)) var(--card); }
 .theme-g4 .card { outline:1px solid rgba(99,102,241,.45); background:linear-gradient(0deg,rgba(99,102,241,.08),rgba(99,102,241,.08)) var(--card); }
 .theme-g5 .card { outline:1px solid rgba(20,184,166,.45); background:linear-gradient(0deg,rgba(20,184,166,.08),rgba(20,184,166,.08)) var(--card); }
@@ -163,7 +163,7 @@ th.sticky, td.sticky { position:sticky; left:0; background:var(--card); z-index:
 select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .press-row { background:rgba(255,255,255,0.02); }
 .press-row.theme-g1 { background:rgba(22,163,74,0.15); }
-.press-row.theme-g2 { background:rgba(202,138,4,0.15); }
+.press-row.theme-g2 { background:rgba(220,38,38,0.15); }
 .press-row.theme-g3 { background:rgba(217,119,6,0.15); }
 .press-row.theme-g4 { background:rgba(99,102,241,0.15); }
 .press-row.theme-g5 { background:rgba(20,184,166,0.15); }
@@ -177,7 +177,7 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .hole-press-section { padding:6px 12px 2px; }
 .hole-press-row { display:flex; align-items:center; justify-content:space-between; padding:6px 10px; border-radius:8px; margin-bottom:4px; }
 .hole-press-row.theme-g1 { background:rgba(22,163,74,0.15); }
-.hole-press-row.theme-g2 { background:rgba(202,138,4,0.15); }
+.hole-press-row.theme-g2 { background:rgba(220,38,38,0.15); }
 .hole-press-row.theme-g3 { background:rgba(217,119,6,0.15); }
 .hole-press-row.theme-g4 { background:rgba(99,102,241,0.15); }
 .hole-press-row.theme-g5 { background:rgba(20,184,166,0.15); }
@@ -2890,7 +2890,7 @@ const Wizard = {
       const canDelete = this.data.games.length > 1;
       const gameLabel = game.gameType === 'vegas' ? 'Vegas' : game.gameType === 'skins' ? 'Skins' : game.gameType === 'wolf' ? 'Wolf' : game.gameType === 'ninepoint' ? '9-Point' : 'Nassau';
       return `<span class="wizard-game-tab ${isActive ? 'active' : ''}" data-game-idx="${idx}">
-        Game ${idx + 1}${canDelete && isActive ? '<span class="delete-game" data-delete-idx="' + idx + '">&times;</span>' : ''}
+        Game ${idx + 1} – <b>${gameLabel}</b>${canDelete && isActive ? '<span class="delete-game" data-delete-idx="' + idx + '">&times;</span>' : ''}
       </span>`;
     }).join('');
 
