@@ -4792,12 +4792,13 @@ const UI = {
         // Build lines
         const lines = [];
 
-        // Line 1: Team names + total (bold)
+        // Line 1: Game type + team names + total (bold)
+        const typeLabel = isNassau ? 'Nassau' : 'Vegas';
         const aN = (game.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
         const bN = (game.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
         const totStr = perPlayer !== 0 ? (perPlayer > 0 ? '+' : '') + Utils.fmt(perPlayer) + '/ea' : 'Even';
         lines.push(h('div',{style:'display:flex;justify-content:space-between;font-weight:700;font-size:12px;'},[
-          h('span',{},`${aN} vs ${bN}`),
+          h('span',{},[h('b',{},typeLabel), `: ${aN} vs ${bN}`]),
           h('span',{},totStr)
         ]));
 
@@ -5708,6 +5709,7 @@ const UI = {
         }
 
         const perPlayer = isNassau ? result.teamTotals.total / sz : result.totalValue / sz;
+        const typeLabel = isNassau ? 'Nassau' : 'Vegas';
         const aN = (game.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
         const bN = (game.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
         const totStr = perPlayer !== 0 ? (perPlayer > 0 ? '+' : '') + Utils.fmt(perPlayer) + '/ea' : 'Even';
@@ -5725,7 +5727,7 @@ const UI = {
 
         const lines = [];
         lines.push(h('div',{style:'display:flex;justify-content:space-between;font-weight:700;font-size:12px;'},[
-          h('span',{},`${aN} vs ${bN}`),
+          h('span',{},[h('b',{},typeLabel), `: ${aN} vs ${bN}`]),
           h('span',{},totStr)
         ]));
 
