@@ -2479,7 +2479,7 @@ const Wizard = {
         <p>Choose a course or use current setup</p>
       </div>
       <div class="wizard-content" id="wizardCourseList">
-        <div class="wizard-course-locating">Finding nearby courses...</div>
+        <div class="wizard-course-locating">Loading courses...</div>
       </div>
       <div class="wizard-footer">
         <button class="btn primary" id="wizardCourseNext">Next</button>
@@ -2551,6 +2551,24 @@ const Wizard = {
         presetCourses.forEach(addCard);
       }
 
+      // "Find Nearby Courses" button (only if no location yet)
+      if (!hasLocation && navigator.geolocation) {
+        const nearbyBtn = document.createElement('button');
+        nearbyBtn.className = 'btn primary';
+        nearbyBtn.style.cssText = 'width:100%;margin:8px 0;font-size:13px;';
+        nearbyBtn.textContent = '📍 Find Nearby Courses';
+        nearbyBtn.onclick = () => {
+          nearbyBtn.textContent = 'Locating...';
+          nearbyBtn.disabled = true;
+          navigator.geolocation.getCurrentPosition(
+            pos => buildList(pos.coords.latitude, pos.coords.longitude),
+            () => { nearbyBtn.textContent = 'Location unavailable'; setTimeout(() => nearbyBtn.remove(), 2000); },
+            { timeout: 8000 }
+          );
+        };
+        container.appendChild(nearbyBtn);
+      }
+
       // Then DB courses
       if (dbCourses.length) {
         const label = document.createElement('div');
@@ -2587,16 +2605,8 @@ const Wizard = {
 
     // Event handlers
     setTimeout(() => {
-      // Request geolocation, then build the list
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          pos => buildList(pos.coords.latitude, pos.coords.longitude),
-          () => buildList(null, null),
-          { timeout: 5000 }
-        );
-      } else {
-        buildList(null, null);
-      }
+      // Build list immediately with presets + alphabetical DB — no geolocation
+      buildList(null, null);
 
       document.getElementById('wizardCourseNext').onclick = () => {
         if (this.data.selectedCourse === '__new__') {
@@ -8003,29 +8013,25 @@ checkInstallBanner();
   }
   if (weatherEl) {
     weatherEl.textContent = '';
-    // Delay geolocation until after splash to avoid permission popup over animations
-    setTimeout(() => {
-    weatherEl.textContent = 'Loading weather...';
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude: lat, longitude: lon } = pos.coords;
-        fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`)
-          .then(r => r.json())
-          .then(data => {
-            const c = data.current;
-            const temp = Math.round(c.temperature_2m);
-            const wind = Math.round(c.wind_speed_10m);
-            const codes = {0:['☀️','Clear'],1:['🌤','Mostly Clear'],2:['⛅','Partly Cloudy'],3:['☁️','Overcast'],45:['🌫','Foggy'],48:['🌫','Foggy'],51:['🌦','Light Drizzle'],53:['🌦','Drizzle'],55:['🌧','Heavy Drizzle'],61:['🌧','Light Rain'],63:['🌧','Rain'],65:['🌧️','Heavy Rain'],71:['🌨','Light Snow'],73:['❄️','Snow'],75:['❄️','Heavy Snow'],80:['🌦','Showers'],81:['🌧','Showers'],82:['⛈','Heavy Showers'],95:['⛈','Thunderstorm'],96:['⛈','Thunderstorm'],99:['⛈','Thunderstorm']};
-            const [emoji, desc] = codes[c.weather_code] || ['☀️','Clear'];
-            const windEmoji = wind >= 15 ? '💨' : '🍃';
-            weatherEl.textContent = `${emoji} ${temp}°F ${desc}  ${windEmoji} ${wind}mph`;
-          })
-          .catch(() => { weatherEl.textContent = ''; });
-      },
-      () => { weatherEl.textContent = ''; },
-      { timeout: 5000 }
-    );
-    }, 12000);
+    // Use IP-based location for weather — no permission popup needed
+    fetch('https://ipapi.co/json/')
+      .then(r => r.json())
+      .then(loc => {
+        if (!loc.latitude || !loc.longitude) { weatherEl.textContent = ''; return; }
+        return fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&current=temperature_2m,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`);
+      })
+      .then(r => r ? r.json() : null)
+      .then(data => {
+        if (!data || !data.current) return;
+        const c = data.current;
+        const temp = Math.round(c.temperature_2m);
+        const wind = Math.round(c.wind_speed_10m);
+        const codes = {0:['☀️','Clear'],1:['🌤','Mostly Clear'],2:['⛅','Partly Cloudy'],3:['☁️','Overcast'],45:['🌫','Foggy'],48:['🌫','Foggy'],51:['🌦','Light Drizzle'],53:['🌦','Drizzle'],55:['🌧','Heavy Drizzle'],61:['🌧','Light Rain'],63:['🌧','Rain'],65:['🌧️','Heavy Rain'],71:['🌨','Light Snow'],73:['❄️','Snow'],75:['❄️','Heavy Snow'],80:['🌦','Showers'],81:['🌧','Showers'],82:['⛈','Heavy Showers'],95:['⛈','Thunderstorm'],96:['⛈','Thunderstorm'],99:['⛈','Thunderstorm']};
+        const [emoji, desc] = codes[c.weather_code] || ['☀️','Clear'];
+        const windEmoji = wind >= 15 ? '💨' : '🍃';
+        weatherEl.textContent = `${emoji} ${temp}°F ${desc}  ${windEmoji} ${wind}mph`;
+      })
+      .catch(() => { weatherEl.textContent = ''; });
   }
 })();
 
