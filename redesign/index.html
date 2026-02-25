@@ -2187,7 +2187,8 @@ const Wizard = {
       handicapMode: 'full', // full, off_low, team_delta
       stakes: {front:2, back:5, overall:2},
       junkValue: {front:1, back:2},
-      pointValue: {front:1, back:1}
+      pointValue: {front:1, back:1},
+      autoPress: {front:true, back:true, overall:false}
     };
   },
 
@@ -2219,6 +2220,7 @@ const Wizard = {
       g.withJunk = wg.withJunk;
       g.junkValue = wg.withJunk ? {...wg.junkValue} : {front:0, back:0};
       g.pointValue = {...wg.pointValue};
+      g.autoPress = {...wg.autoPress};
       // Skins-specific
       g.skinsMode = wg.skinsMode || 'net';
       g.skinsPlayers = wg.skinsPlayers || [];
