@@ -111,7 +111,7 @@ if (!window._bbDev) {
 .theme-switch input:checked + .theme-slider:before { transform:translateX(24px); }
 .theme-icons { position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 5px; font-size:12px; pointer-events:none; }
 .theme-swatch.active { border-color: var(--acc) !important; }
-* { box-sizing:border-box; }
+* { box-sizing:border-box; touch-action:manipulation; }
 body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; color:var(--txt); background:var(--bg); }
 h1, h2, h3 { font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial; }
 header { background:var(--card); border-bottom:1px solid var(--border); padding:9px 12px; position:sticky; top:0; z-index:10; background-image:repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.015) 10px, rgba(255,255,255,0.015) 20px); }
@@ -7328,15 +7328,17 @@ const UI = {
         fl.rel = 'stylesheet';
         fl.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Kalam:wght@400;700&display=swap';
         document.head.appendChild(fl);
+        // Wait for stylesheet to load before trying to use fonts
+        await new Promise(r => { fl.onload = r; fl.onerror = r; setTimeout(r, 4000); });
       }
       try {
         await Promise.race([
-          Promise.all([
+          document.fonts.ready.then(() => Promise.all([
+            document.fonts.load('400 16px "Kalam"'), document.fonts.load('700 16px "Kalam"'),
             document.fonts.load('400 16px "Inter"'), document.fonts.load('600 16px "Inter"'),
-            document.fonts.load('700 16px "Inter"'), document.fonts.load('800 16px "Inter"'),
-            document.fonts.load('400 16px "Kalam"'), document.fonts.load('700 16px "Kalam"')
-          ]),
-          new Promise((_, r) => setTimeout(r, 3000))
+            document.fonts.load('700 16px "Inter"'), document.fonts.load('800 16px "Inter"')
+          ])),
+          new Promise((_, r) => setTimeout(r, 5000))
         ]);
       } catch(e) {}
 
@@ -7492,7 +7494,7 @@ const UI = {
       const tableW = holeW + parW + numP * playerW;
       const W = tableW + 2 * padLR;
       const rowH = 28;
-      const headerH = 58, courseH = 44;
+      const headerH = 110, courseH = 44;
       const numTableRows = 22;
       const tableH = numTableRows * rowH;
 
@@ -7597,7 +7599,7 @@ const UI = {
       const logoPad = 12;
       if (logoImg) {
         ctx.save();
-        const lx = logoPad, ly = (headerH - logoSize) / 2;
+        const lx = logoPad, ly = headerH - logoSize - 10;
         const lr = 8;
         ctx.beginPath();
         ctx.moveTo(lx + lr, ly); ctx.lineTo(lx + logoSize - lr, ly);
@@ -7617,7 +7619,7 @@ const UI = {
       ctx.fillStyle = P.white;
       ctx.font = `800 22px ${fS}`;
       ctx.textAlign = 'right';
-      ctx.fillText('BUNCH BETS', W - logoPad, headerH/2 + 8);
+      ctx.fillText('BUNCH BETS', W - logoPad, headerH - 18);
       y = headerH;
 
       // 2. COURSE & DATE
