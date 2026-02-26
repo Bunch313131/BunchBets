@@ -9,7 +9,7 @@
 
   bunchbets.com
 -->
-<html lang="en" style="background:#000">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -481,7 +481,9 @@ td:nth-child(11), th:nth-child(11) { border-left:3px double var(--muted); }
 .bottom-nav { background:var(--card); border-top:1px solid var(--border); display:flex; flex-shrink:0; padding:0 12px env(safe-area-inset-bottom, 10px); }
 body:has(.wizard-overlay) .bottom-nav { display:none; }
 body:has(.wizard-overlay) { background:#000; }
+html:has(.wizard-overlay) { background:#000; }
 body:has(.install-gate.show) { background:#050d08; }
+html:has(.install-gate.show) { background:#050d08; }
 .bottom-nav-btn { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:10px 4px 6px; background:none; border:none; color:var(--muted); font-size:11px; cursor:pointer; transition:color 0.2s; }
 .bottom-nav-btn.active { color:var(--acc); }
 .bottom-nav-btn svg { width:22px; height:22px; }
@@ -504,11 +506,9 @@ body:has(.install-gate.show) { background:#050d08; }
 .install-gate-actions .btn { width:100%; justify-content:center; font-size:15px; font-weight:700; padding:14px 20px; border-radius:12px; border:none; cursor:pointer; }
 .install-gate-actions .btn.primary { background:#16a34a; color:#fff; }
 .install-gate-actions .btn.secondary { background:transparent; color:rgba(255,255,255,0.4); font-size:12px; font-weight:500; padding:8px; }
-.init-cover { position:fixed; top:calc(-1 * env(safe-area-inset-top, 0px)); left:0; right:0; bottom:calc(-1 * env(safe-area-inset-bottom, 0px)); background:#000; z-index:99999; }
 </style>
 </head>
 <body style="background:#000">
-<div id="initCover" style="position:fixed;inset:0;background:#000;z-index:99999"></div>
 <header>
   <div class="row" style="align-items:center; justify-content:space-between;">
     <div class="header-brand">
@@ -2341,6 +2341,7 @@ const Wizard = {
   removeOverlay() {
     const overlay = document.getElementById('wizardOverlay');
     if (overlay) overlay.remove();
+    document.body.style.background = '';
   },
 
   updateWolfUI() {
@@ -8338,27 +8339,24 @@ window.addEventListener('appinstalled', () => {
   };
 
   // If joining via URL, don't auto-launch wizard (joinGame will handle navigation)
-  if (joiningViaUrl) { const c = document.getElementById('initCover'); if (c) requestAnimationFrame(() => requestAnimationFrame(() => c.remove())); return; }
+  const clearInitBg = () => { document.body.style.background = ''; };
+  if (joiningViaUrl) { clearInitBg(); return; }
 
   // If it's a new day, show wizard for fresh start
   // If same day with active game, go to scores
-  // Remove init cover after next paint so the overlay/content is rendered first
-  const removeCover = () => { const c = document.getElementById('initCover'); if (c) requestAnimationFrame(() => requestAnimationFrame(() => c.remove())); };
   if (lastActive !== today) {
     // New day - show wizard, then show What's New after splash finishes
     Wizard.start();
-    removeCover();
     setTimeout(() => showWhatsNew(), 10000);
   } else if (hasActiveGame()) {
     // Same day with active game - go to scores tab
     State.data.tab = 'scores';
     State.scheduleRender();
-    removeCover();
+    clearInitBg();
     showWhatsNew();
   } else {
     // Same day but no active game - show wizard
     Wizard.start();
-    removeCover();
     setTimeout(() => showWhatsNew(), 10000);
   }
 })();
