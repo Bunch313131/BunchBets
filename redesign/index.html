@@ -8338,26 +8338,27 @@ window.addEventListener('appinstalled', () => {
   };
 
   // If joining via URL, don't auto-launch wizard (joinGame will handle navigation)
-  if (joiningViaUrl) { const c = document.getElementById('initCover'); if (c) c.remove(); return; }
+  if (joiningViaUrl) { const c = document.getElementById('initCover'); if (c) requestAnimationFrame(() => requestAnimationFrame(() => c.remove())); return; }
 
   // If it's a new day, show wizard for fresh start
   // If same day with active game, go to scores
-  const cover = document.getElementById('initCover');
+  // Remove init cover after next paint so the overlay/content is rendered first
+  const removeCover = () => { const c = document.getElementById('initCover'); if (c) requestAnimationFrame(() => requestAnimationFrame(() => c.remove())); };
   if (lastActive !== today) {
     // New day - show wizard, then show What's New after splash finishes
     Wizard.start();
-    if (cover) cover.remove();
+    removeCover();
     setTimeout(() => showWhatsNew(), 10000);
   } else if (hasActiveGame()) {
     // Same day with active game - go to scores tab
     State.data.tab = 'scores';
     State.scheduleRender();
-    if (cover) cover.remove();
+    removeCover();
     showWhatsNew();
   } else {
     // Same day but no active game - show wizard
     Wizard.start();
-    if (cover) cover.remove();
+    removeCover();
     setTimeout(() => showWhatsNew(), 10000);
   }
 })();
