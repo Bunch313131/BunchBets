@@ -506,9 +506,10 @@ html:has(.install-gate.show) { background:#050d08; }
 .install-gate-actions .btn { width:100%; justify-content:center; font-size:15px; font-weight:700; padding:14px 20px; border-radius:12px; border:none; cursor:pointer; }
 .install-gate-actions .btn.primary { background:#16a34a; color:#fff; }
 .install-gate-actions .btn.secondary { background:transparent; color:rgba(255,255,255,0.4); font-size:12px; font-weight:500; padding:8px; }
+body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { display:none; }
 </style>
 </head>
-<body style="background:#000">
+<body class="splashing" style="background:#000">
 <header>
   <div class="row" style="align-items:center; justify-content:space-between;">
     <div class="header-brand">
@@ -2341,6 +2342,7 @@ const Wizard = {
   removeOverlay() {
     const overlay = document.getElementById('wizardOverlay');
     if (overlay) overlay.remove();
+    document.body.classList.remove('splashing');
     document.body.style.background = '';
   },
 
@@ -8339,8 +8341,8 @@ window.addEventListener('appinstalled', () => {
   };
 
   // If joining via URL, don't auto-launch wizard (joinGame will handle navigation)
-  const clearInitBg = () => { document.body.style.background = ''; };
-  if (joiningViaUrl) { clearInitBg(); return; }
+  const appReady = () => { document.body.classList.remove('splashing'); document.body.style.background = ''; };
+  if (joiningViaUrl) { appReady(); return; }
 
   // If it's a new day, show wizard for fresh start
   // If same day with active game, go to scores
@@ -8352,7 +8354,7 @@ window.addEventListener('appinstalled', () => {
     // Same day with active game - go to scores tab
     State.data.tab = 'scores';
     State.scheduleRender();
-    clearInitBg();
+    appReady();
     showWhatsNew();
   } else {
     // Same day but no active game - show wizard
