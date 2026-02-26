@@ -12,7 +12,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0b0e13" />
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&display=swap" rel="stylesheet">
 <link rel="icon" type="image/png" sizes="32x32" href="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/favicon-16.png">
@@ -117,7 +118,7 @@ if (!window._bbDev) {
 * { box-sizing:border-box; touch-action:manipulation; }
 body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; color:var(--txt); background:var(--bg); }
 h1, h2, h3 { font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial; }
-header { background:var(--card); border-bottom:1px solid var(--border); padding:9px 12px; position:sticky; top:0; z-index:10; background-image:repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.015) 10px, rgba(255,255,255,0.015) 20px); }
+header { background:var(--card); border-bottom:1px solid var(--border); padding:9px 12px; padding-top:calc(env(safe-area-inset-top) + 9px); position:sticky; top:0; z-index:10; background-image:repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.015) 10px, rgba(255,255,255,0.015) 20px); }
 h1 { font-size:18px; margin:0; }
 main { padding:11px; padding-bottom:85px; }
 .row { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-start; }
@@ -262,7 +263,7 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .menu-item.primary { color:var(--acc); font-weight:600; }
 
 /* Wizard Styles */
-.wizard-overlay { position:fixed; inset:0; z-index:200; display:flex; flex-direction:column; overflow:hidden; }
+.wizard-overlay { position:fixed; inset:0; z-index:200; display:flex; flex-direction:column; overflow:hidden; background:#000; }
 body:has(.wizard-overlay) { overflow:hidden; }
 .wizard-splash {
   background: linear-gradient(135deg, #0a2e14 0%, #061a0b 50%, #000 100%);
@@ -297,7 +298,7 @@ body:has(.wizard-overlay) { overflow:hidden; }
 @keyframes splashTextIn { 0%{opacity:0;transform:translateY(16px) scale(0.95);} 100%{opacity:1;transform:translateY(0) scale(1);} }
 @keyframes splashLineIn { 0%{opacity:0;width:0;} 100%{opacity:1;width:60px;} }
 .wizard-screen { background:var(--bg); flex:1; display:flex; flex-direction:column; overflow:hidden; }
-.wizard-header { padding:20px 16px 12px; text-align:center; }
+.wizard-header { padding:20px 16px 12px; padding-top:calc(env(safe-area-inset-top) + 20px); text-align:center; }
 .wizard-header h2 { margin:0 0 4px 0; font-size:22px; }
 .wizard-header p { margin:0; color:var(--muted); font-size:14px; }
 .wizard-content { flex:1; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; padding:12px 16px; -webkit-overflow-scrolling:touch; scrollbar-width:none; -ms-overflow-style:none; }
@@ -8112,7 +8113,7 @@ UI.render();
 UI.initMenu();
 
 // === WHAT'S NEW / VERSION CHECK ===
-(function() {
+function showWhatsNew() {
   const storedVersion = localStorage.getItem(VERSION_KEY);
   if (!storedVersion) {
     // First launch ever — store version, don't show notes
@@ -8153,7 +8154,7 @@ UI.initMenu();
       overlay.remove();
     }
   };
-})();
+}
 
 // === INSTALL GATE ===
 const INSTALL_KEY = 'bunchbets-installed';
@@ -8238,8 +8239,10 @@ window.addEventListener('appinstalled', () => {
 
 // Gate check — block app unless standalone or confirmed installed
 (function() {
-  if (isStandalone()) return;  // launched from home screen — skip gate
-  if (isInstalled()) return;   // already confirmed — skip gate
+  if (isStandalone() || isInstalled()) {
+    // No install gate — What's New will be triggered by launch detection below
+    return;
+  }
   showInstallGate();
 })();
 // === END INSTALL GATE ===
@@ -8318,16 +8321,19 @@ window.addEventListener('appinstalled', () => {
   // If it's a new day, show wizard for fresh start
   // If same day with active game, go to scores
   if (lastActive !== today) {
-    // New day - show wizard
+    // New day - show wizard, then show What's New after splash finishes
     Wizard.start();
+    setTimeout(() => showWhatsNew(), 10000);
   } else if (hasActiveGame()) {
     // Same day with active game - go to scores tab
     State.data.tab = 'scores';
     State.scheduleRender();
     Err.toast('Welcome back');
+    showWhatsNew();
   } else {
     // Same day but no active game - show wizard
     Wizard.start();
+    setTimeout(() => showWhatsNew(), 10000);
   }
 })();
 
