@@ -8119,14 +8119,18 @@ UI.initMenu();
     localStorage.setItem(VERSION_KEY, APP_VERSION);
     return;
   }
-  if (storedVersion === APP_VERSION) return; // Same version, nothing new
+  if (parseFloat(storedVersion) >= parseFloat(APP_VERSION)) return; // Same or newer, nothing new
 
-  // New version — show release notes
-  const notes = RELEASE_NOTES[APP_VERSION];
-  if (!notes || !notes.length) {
+  // Older version — collect all notes the user hasn't seen
+  const allNotes = [];
+  Object.keys(RELEASE_NOTES).sort((a,b) => parseFloat(a) - parseFloat(b)).forEach(v => {
+    if (parseFloat(v) > parseFloat(storedVersion)) allNotes.push(...RELEASE_NOTES[v]);
+  });
+  if (!allNotes.length) {
     localStorage.setItem(VERSION_KEY, APP_VERSION);
     return;
   }
+  const notes = allNotes;
 
   const overlay = document.createElement('div');
   overlay.className = 'whats-new-overlay';
