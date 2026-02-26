@@ -7322,6 +7322,51 @@ const UI = {
 
   async shareImage() {
     try {
+      // Load share fonts (Kalam for handwritten scores, Inter for structure)
+      if (!document.querySelector('link[href*="Kalam"]')) {
+        const fl = document.createElement('link');
+        fl.rel = 'stylesheet';
+        fl.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Kalam:wght@400;700&display=swap';
+        document.head.appendChild(fl);
+      }
+      try {
+        await Promise.race([
+          Promise.all([
+            document.fonts.load('400 16px "Inter"'), document.fonts.load('600 16px "Inter"'),
+            document.fonts.load('700 16px "Inter"'), document.fonts.load('800 16px "Inter"'),
+            document.fonts.load('400 16px "Kalam"'), document.fonts.load('700 16px "Kalam"')
+          ]),
+          new Promise((_, r) => setTimeout(r, 3000))
+        ]);
+      } catch(e) {}
+
+      // Load logo SVG as image
+      const logoImg = await new Promise((resolve) => {
+        const blob = new Blob([INSTALL_ICON_SVG], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+        img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+        img.src = url;
+      });
+
+      const fS = '"Inter",system-ui,sans-serif';
+      const fK = '"Kalam",Georgia,serif';
+
+      // Share-specific formatter with +/- prefix, clean integers
+      const sfmt = v => {
+        if (v == null || !isFinite(v)) return '$0';
+        const abs = Math.abs(v);
+        const str = abs % 1 === 0 ? '$' + abs : '$' + abs.toFixed(2);
+        return v < -0.005 ? '-' + str : v > 0.005 ? '+' + str : '$0';
+      };
+      const tfmt = v => {
+        if (!isFinite(v)) return '$0';
+        const abs = Math.abs(v);
+        return abs % 1 === 0 ? '$' + abs : '$' + abs.toFixed(2);
+      };
+
+      // Gather data
       const players = State.data.players;
       const games = State.data.games;
       const course = State.data.course;
@@ -7329,7 +7374,6 @@ const UI = {
       const g0 = games[0];
       if (!g0) { Err.toast('No game data to share'); return; }
 
-      // Gather player scores
       const playerData = players.map(p => {
         const arr = (g0.gross[p.id]) || [];
         const scores = [];
@@ -7339,43 +7383,74 @@ const UI = {
         const t = (f == null && b == null) ? null : ((f||0) + (b||0));
         return { name: p.name, id: p.id, scores, front: f, back: b, total: t };
       });
+      const numP = players.length;
 
-      // Gather game results
-      const gameThemes = ['#16a34a','#dc2626','#d97706','#6366f1','#14b8a6','#db2777'];
+      // Build gameLines in new format
       const gameLines = [];
-      games.forEach((g, gi) => {
+      games.forEach(g => {
         if (!Game.hasAnyScores(g)) return;
-        const color = gameThemes[gi % 6];
+
         if (g.gameType === 'vegas') {
           const res = Game.computeVegasResult(g);
           const sz = (g.teamA||[]).length || 1;
-          const vegasVals = [`Front: ${Utils.fmt(res.frontPoints*(g.pointValue.front||0))}/ea`, `Back: ${Utils.fmt(res.backPoints*(g.pointValue.back||0))}/ea`, `Junk: ${Utils.fmt(res.junkValue/sz)}/ea`];
-          if (res.kpValue !== 0) vegasVals.push(`KP: ${Utils.fmt(res.kpValue/sz)}/ea`);
-          vegasVals.push(`Total: ${Utils.fmt(res.totalValue/sz)}/ea`);
-          gameLines.push({ label: this.gameLabel(g), color, values: vegasVals});
+          const teamANames = (g.teamA || []).map(pid => this.playerName(pid));
+          const teamBNames = (g.teamB || []).map(pid => this.playerName(pid));
+          const teamLabel = `${teamANames.join(' / ')} vs ${teamBNames.join(' / ')}`;
+          const frontVal = res.frontPoints * (g.pointValue.front || 0);
+          const backVal = res.backPoints * (g.pointValue.back || 0);
+          const overallVal = frontVal + backVal;
+          const segLines = [
+            [`Front: ${sfmt(frontVal)}/ea`, `Back: ${sfmt(backVal)}/ea`, `Overall: ${sfmt(overallVal)}/ea`]
+          ];
+          const extras = [];
+          if (Math.abs(res.junkValue/sz) > 0.005) extras.push(`Junk: ${sfmt(res.junkValue/sz)}/ea`);
+          if (Math.abs(res.kpValue/sz) > 0.005) extras.push(`KP: ${sfmt(res.kpValue/sz)}/ea`);
+          if (extras.length) segLines.push(extras);
+          segLines.push([`Total: ${sfmt(res.totalValue/sz)}/ea`]);
+          gameLines.push({ label: 'Vegas', type: 'team', teamLabel, segmentLines: segLines });
         } else if (g.gameType === 'skins') {
           const res = Game.computeSkinsResult(g);
-          const top = (g.skinsPlayers||[]).reduce((best, pid) => {
-            const pr = res.playerResults[pid];
-            return pr && pr.profit > (best?.profit ?? -Infinity) ? {name:this.playerName(pid), profit:pr.profit} : best;
-          }, null);
-          gameLines.push({ label: this.gameLabel(g), color, values: [
-            `Skins Won: ${res.totalGrossSkins + res.totalNetSkins}`, top ? `Leader: ${top.name} ${Utils.fmt(top.profit)}` : ''
-          ].filter(Boolean)});
+          const buyIn = res.buyIn || 0;
+          const rows = (g.skinsPlayers || []).map(pid => {
+            const pr = res.playerResults[pid] || {};
+            const totalSkins = (pr.grossSkins || 0) + (pr.netSkins || 0);
+            return { name: this.playerName(pid), detail: `${totalSkins} skin${totalSkins !== 1 ? 's' : ''}`, net: pr.profit || 0 };
+          });
+          gameLines.push({ label: `Skins $${buyIn}`, type: 'individual', rows });
         } else if (g.gameType === 'wolf') {
           const res = Game.computeWolfResult(g);
-          gameLines.push({ label: this.gameLabel(g), color, values: [`Total Pot: ${Utils.fmt(res.totalMoney)}`]});
+          const pv = res.pointValue || 0;
+          const rows = (g.wolfPlayers || []).map(pid => ({
+            name: this.playerName(pid), detail: '', net: res.playerNet[pid] || 0
+          }));
+          gameLines.push({ label: `Wolf $${pv}`, type: 'individual', rows });
+        } else if (g.gameType === 'ninepoint') {
+          const res = Game.computeNinePointResult(g);
+          const pv = res.pointValue || 0;
+          const rows = (g.ninePointPlayers || []).map(pid => ({
+            name: this.playerName(pid), detail: `${res.playerPoints[pid] || 0} pts`, net: res.playerNet[pid] || 0
+          }));
+          gameLines.push({ label: `9-Point $${pv}`, type: 'individual', rows });
         } else {
+          // Nassau (default)
           const res = Game.computeResult(g);
           const sz = (g.teamA||[]).length || 1;
-          const nassauVals = [`Front: ${Utils.fmt(res.segments.front.payA)}/ea`, `Back: ${Utils.fmt(res.segments.back.payA)}/ea`, `Overall: ${Utils.fmt(res.segments.overall.payA)}/ea`, `Junk: ${Utils.fmt(res.teamTotals.junk/sz)}/ea`];
-          if (res.teamTotals.kp !== 0) nassauVals.push(`KP: ${Utils.fmt(res.teamTotals.kp/sz)}/ea`);
-          nassauVals.push(`Total: ${Utils.fmt(res.teamTotals.total/sz)}/ea`);
-          gameLines.push({ label: this.gameLabel(g), color, values: nassauVals});
+          const teamANames = (g.teamA || []).map(pid => this.playerName(pid));
+          const teamBNames = (g.teamB || []).map(pid => this.playerName(pid));
+          const teamLabel = `${teamANames.join(' / ')} vs ${teamBNames.join(' / ')}`;
+          const segLines = [
+            [`Front: ${sfmt(res.segments.front.payA)}/ea`, `Back: ${sfmt(res.segments.back.payA)}/ea`, `Overall: ${sfmt(res.segments.overall.payA)}/ea`]
+          ];
+          const extras = [];
+          if (Math.abs(res.teamTotals.junk/sz) > 0.005) extras.push(`Junk: ${sfmt(res.teamTotals.junk/sz)}/ea`);
+          if (Math.abs(res.teamTotals.kp/sz) > 0.005) extras.push(`KP: ${sfmt(res.teamTotals.kp/sz)}/ea`);
+          if (extras.length) segLines.push(extras);
+          segLines.push([`Total: ${sfmt(res.teamTotals.total/sz)}/ea`]);
+          gameLines.push({ label: 'Nassau', type: 'team', teamLabel, segmentLines: segLines });
         }
       });
 
-      // Compute per-player net using unified helper
+      // Compute per-player net
       const net = {};
       players.forEach(p => net[p.id] = 0);
       games.forEach(g => {
@@ -7385,35 +7460,60 @@ const UI = {
       });
       const xfers = this.calcTransfers(net);
 
-      // --- Canvas Setup ---
-      const scale = 2;
-      const pad = 24;
-      const colW = 44;
-      const nameW = 96;
-      const rowH = 34;
-      const font = '-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif';
+      // Seeded random for hand-drawn lines
+      let seed = 1;
+      if (course.name) for (let i = 0; i < course.name.length; i++) seed = (seed * 31 + course.name.charCodeAt(i)) & 0x7fffffff;
+      seed = seed || 12345;
+      const srand = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
 
-      const C = {
-        bg:'#0b0e13', card:'#141a26', text:'#ecf0f6', muted:'#8890a0',
-        border:'#1e2633', headerBg:'#0f1420', parBg:'#111827',
-        birdie:'#16a34a', bogey:'#dc2626', accent:'#3b82f6'
+      const P = {
+        paper: '#f5f0e1', paperDark: '#ebe5d3', ink: '#2c2c2c', inkLight: '#8a7e6b',
+        green: '#1a5632', greenInk: '#1a6b35', redInk: '#c0392b',
+        gold: '#b8960c', grid: '#c4b99a', white: '#faf8f0'
       };
 
-      const back9Cols = 11; // 9 holes + IN + TOT
-      const tableW = nameW + back9Cols * colW;
-      const W = tableW + pad * 2;
-      const numPlayers = players.length;
-      const tableRows = 2 + numPlayers;
+      // Dynamic sizing
+      const scale = 2;
+      const padLR = 20;
+      const mc = document.createElement('canvas').getContext('2d');
+      mc.font = `bold 14px ${fS}`;
+      const holeW = Math.max(42, mc.measureText('Hole').width + 16);
+      const parW = Math.max(42, mc.measureText('Par').width + 16);
+      mc.font = `bold 13px ${fS}`;
+      let maxNameW = 0;
+      playerData.forEach(p => {
+        const nm = p.name.length > 8 ? p.name.substring(0, 8) : p.name;
+        maxNameW = Math.max(maxNameW, mc.measureText(nm).width);
+      });
+      mc.font = `16px ${fK}`;
+      const scoreW = mc.measureText('88').width;
+      const playerW = Math.max(scoreW + 28, maxNameW + 14);
 
-      // Pre-calculate height
-      const titleH = 70;
-      const gap = 16;
-      const front9H = tableRows * rowH;
-      const back9H = tableRows * rowH;
-      const gameH = gameLines.length > 0 ? 28 + gameLines.length * 54 : 0;
-      const settlH = 28 + numPlayers * 24 + (xfers.length ? 28 + xfers.length * 24 : 0);
-      const footerH = 36;
-      const H = titleH + gap + front9H + gap + back9H + gap + gameH + gap + settlH + footerH;
+      const tableW = holeW + parW + numP * playerW;
+      const W = tableW + 2 * padLR;
+      const rowH = 28;
+      const headerH = 58, courseH = 44;
+      const numTableRows = 22;
+      const tableH = numTableRows * rowH;
+
+      // Pre-measure game & settle section heights
+      let gameSectionH = 0;
+      if (gameLines.length > 0) {
+        gameSectionH = 32;
+        gameLines.forEach(game => {
+          gameSectionH += 22;
+          if (game.type === 'team') {
+            gameSectionH += 16;
+            gameSectionH += (game.segmentLines?.length || 0) * 15;
+          } else {
+            gameSectionH += game.rows.length * 18;
+          }
+          gameSectionH += 8;
+        });
+      }
+      const settleSectionH = 32 + numP * 20 + (xfers.length ? 2 + xfers.length * 20 : 0);
+      const footerH = 40;
+      const H = headerH + courseH + gameSectionH + 16 + settleSectionH + 20 + tableH + footerH;
 
       const canvas = document.createElement('canvas');
       canvas.width = W * scale;
@@ -7421,239 +7521,316 @@ const UI = {
       const ctx = canvas.getContext('2d');
       ctx.scale(scale, scale);
 
-      // Background
-      ctx.fillStyle = C.bg;
-      ctx.fillRect(0, 0, W, H);
-
-      // --- Title ---
-      ctx.fillStyle = C.card;
-      ctx.fillRect(0, 0, W, titleH);
-      ctx.fillStyle = C.border;
-      ctx.fillRect(0, titleH - 1, W, 1);
-      ctx.fillStyle = C.text;
-      ctx.font = `bold 22px ${font}`;
-      ctx.textAlign = 'center';
-      ctx.fillText('Bunch Bets', W/2, 32);
-      ctx.fillStyle = C.muted;
-      ctx.font = `13px ${font}`;
-      const dateStr = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-      ctx.fillText(`${course.name}  \u00b7  ${dateStr}`, W/2, 52);
-
-      let y = titleH + gap;
-
-      // --- Helper: draw scorecard table ---
-      const drawTable = (startHole, endHole, summaryLabels, yStart) => {
-        const numHoles = endHole - startHole + 1;
-        const numSumm = summaryLabels.length;
-        const numCols = numHoles + numSumm;
-        const tW = nameW + numCols * colW;
-        const tx = pad;
-        let cy = yStart;
-
-        // Par sums
-        let segParSum = 0;
-        for (let i = startHole; i <= endHole; i++) segParSum += (par[i]||0);
-        let totalPar = 0;
-        for (let i = 0; i < 18; i++) totalPar += (par[i]||0);
-
-        // Hole header row
-        ctx.fillStyle = C.headerBg;
-        ctx.fillRect(tx, cy, tW, rowH);
-        ctx.fillStyle = C.muted;
-        ctx.font = `bold 11px ${font}`;
+      // Drawing helpers — hand-drawn wobbly lines
+      const drawLine = (x1, y1, x2, y2, amp) => {
+        amp = amp || 0.7;
+        const steps = Math.max(3, Math.ceil(Math.hypot(x2-x1, y2-y1) / 25));
+        ctx.beginPath(); ctx.moveTo(x1, y1);
+        for (let i = 1; i <= steps; i++) {
+          const t = i / steps;
+          ctx.lineTo(
+            x1 + (x2-x1)*t + (i < steps ? (srand()-0.5)*amp : 0),
+            y1 + (y2-y1)*t + (i < steps ? (srand()-0.5)*amp : 0)
+          );
+        }
+        ctx.stroke();
+      };
+      const drawCircle = (cx, cy, r) => {
+        ctx.beginPath();
+        const pts = Math.ceil(Math.PI * 2 / 0.12);
+        for (let i = 0; i <= pts; i++) {
+          const a = (i / pts) * Math.PI * 2;
+          const rr = r + (srand()-0.5) * 1.0;
+          const x = cx + Math.cos(a) * rr, y2 = cy + Math.sin(a) * rr;
+          i === 0 ? ctx.moveTo(x, y2) : ctx.lineTo(x, y2);
+        }
+        ctx.closePath(); ctx.stroke();
+      };
+      const drawRect2 = (cx, cy, s) => {
+        const hf = s/2;
+        drawLine(cx-hf,cy-hf,cx+hf,cy-hf,0.5); drawLine(cx+hf,cy-hf,cx+hf,cy+hf,0.5);
+        drawLine(cx+hf,cy+hf,cx-hf,cy+hf,0.5); drawLine(cx-hf,cy+hf,cx-hf,cy-hf,0.5);
+      };
+      const drawDivider = (title, atY) => {
+        ctx.font = `bold 11px ${fS}`;
+        const tw = ctx.measureText(title).width;
+        const dp = 10;
+        ctx.strokeStyle = P.grid; ctx.lineWidth = 0.8;
+        drawLine(padLR, atY + 9, W/2 - tw/2 - dp, atY + 9);
+        drawLine(W/2 + tw/2 + dp, atY + 9, W - padLR, atY + 9);
+        ctx.fillStyle = P.inkLight;
         ctx.textAlign = 'center';
-        ctx.fillText('Hole', tx + nameW/2, cy + 21);
-        for (let i = 0; i < numHoles; i++) {
-          ctx.fillText(String(startHole+i+1), tx + nameW + i*colW + colW/2, cy + 21);
-        }
-        ctx.fillStyle = C.text;
-        ctx.font = `bold 12px ${font}`;
-        for (let s = 0; s < numSumm; s++) {
-          ctx.fillText(summaryLabels[s], tx + nameW + (numHoles+s)*colW + colW/2, cy + 21);
-        }
-        ctx.strokeStyle = C.border;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(tx, cy, tW, rowH);
-        cy += rowH;
-
-        // Par row
-        ctx.fillStyle = C.parBg;
-        ctx.fillRect(tx, cy, tW, rowH);
-        ctx.fillStyle = C.muted;
-        ctx.font = `12px ${font}`;
-        ctx.textAlign = 'center';
-        ctx.fillText('Par', tx + nameW/2, cy + 21);
-        for (let i = 0; i < numHoles; i++) {
-          ctx.fillText(String(par[startHole+i]||''), tx + nameW + i*colW + colW/2, cy + 21);
-        }
-        ctx.fillStyle = C.text;
-        ctx.font = `bold 12px ${font}`;
-        ctx.fillText(String(segParSum), tx + nameW + numHoles*colW + colW/2, cy + 21);
-        if (numSumm > 1) ctx.fillText(String(totalPar), tx + nameW + (numHoles+1)*colW + colW/2, cy + 21);
-        ctx.strokeStyle = C.border;
-        ctx.strokeRect(tx, cy, tW, rowH);
-        cy += rowH;
-
-        // Player rows
-        playerData.forEach((p, pi) => {
-          ctx.fillStyle = pi % 2 === 0 ? C.card : C.bg;
-          ctx.fillRect(tx, cy, tW, rowH);
-
-          // Name
-          ctx.fillStyle = C.text;
-          ctx.font = `13px ${font}`;
-          ctx.textAlign = 'left';
-          const displayName = p.name.length > 10 ? p.name.substring(0,10) : p.name;
-          ctx.fillText(displayName, tx + 8, cy + 21);
-
-          // Hole scores
-          ctx.textAlign = 'center';
-          for (let i = 0; i < numHoles; i++) {
-            const hIdx = startHole + i;
-            const score = p.scores[hIdx];
-            const hp = par[hIdx] || 4;
-            const cx = tx + nameW + i*colW + colW/2;
-            const cyC = cy + rowH/2;
-
-            if (score != null) {
-              const diff = score - hp;
-              // Draw indicators
-              if (diff <= -2) {
-                ctx.strokeStyle = C.birdie; ctx.lineWidth = 1.5;
-                ctx.beginPath(); ctx.arc(cx, cyC, 11, 0, Math.PI*2); ctx.stroke();
-                ctx.beginPath(); ctx.arc(cx, cyC, 15, 0, Math.PI*2); ctx.stroke();
-              } else if (diff === -1) {
-                ctx.strokeStyle = C.birdie; ctx.lineWidth = 1.5;
-                ctx.beginPath(); ctx.arc(cx, cyC, 13, 0, Math.PI*2); ctx.stroke();
-              } else if (diff === 1) {
-                ctx.strokeStyle = C.bogey; ctx.lineWidth = 1.5;
-                ctx.strokeRect(cx-12, cyC-12, 24, 24);
-              } else if (diff >= 2) {
-                ctx.strokeStyle = C.bogey; ctx.lineWidth = 1.5;
-                ctx.strokeRect(cx-10, cyC-10, 20, 20);
-                ctx.strokeRect(cx-14, cyC-14, 28, 28);
-              }
-              ctx.fillStyle = C.text;
-              ctx.font = `13px ${font}`;
-              ctx.fillText(String(score), cx, cy + 22);
-            } else {
-              ctx.fillStyle = C.muted;
-              ctx.font = `13px ${font}`;
-              ctx.fillText('\u2013', cx, cy + 22);
-            }
-          }
-
-          // Summary columns
-          ctx.fillStyle = C.text;
-          ctx.font = `bold 13px ${font}`;
-          if (summaryLabels[0] === 'OUT') {
-            ctx.fillText(p.front != null ? String(p.front) : '\u2013', tx + nameW + numHoles*colW + colW/2, cy + 22);
-          } else {
-            ctx.fillText(p.back != null ? String(p.back) : '\u2013', tx + nameW + numHoles*colW + colW/2, cy + 22);
-            if (numSumm > 1) {
-              ctx.fillText(p.total != null ? String(p.total) : '\u2013', tx + nameW + (numHoles+1)*colW + colW/2, cy + 22);
-            }
-          }
-
-          // Row border
-          ctx.strokeStyle = C.border;
-          ctx.lineWidth = 0.5;
-          ctx.strokeRect(tx, cy, tW, rowH);
-          cy += rowH;
-        });
-
-        // Summary column separator line
-        ctx.strokeStyle = C.border;
-        ctx.lineWidth = 1.5;
-        const sepX = tx + nameW + numHoles * colW;
-        ctx.beginPath(); ctx.moveTo(sepX, yStart); ctx.lineTo(sepX, cy); ctx.stroke();
-
-        // Name column separator
-        ctx.beginPath(); ctx.moveTo(tx + nameW, yStart); ctx.lineTo(tx + nameW, cy); ctx.stroke();
-
-        return cy;
+        ctx.fillText(title, W/2, atY + 13);
       };
 
-      // Draw Front 9
-      y = drawTable(0, 8, ['OUT'], y);
-      y += gap;
+      // === START DRAWING ===
 
-      // Draw Back 9
-      y = drawTable(9, 17, ['IN','TOT'], y);
-      y += gap;
+      // Parchment background
+      ctx.fillStyle = P.paper;
+      ctx.fillRect(0, 0, W, H);
+      const vg = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.3, W/2, H/2, Math.max(W,H)*0.7);
+      vg.addColorStop(0, 'rgba(0,0,0,0)');
+      vg.addColorStop(1, 'rgba(0,0,0,0.05)');
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = 'rgba(180,170,150,0.07)';
+      ctx.lineWidth = 0.5;
+      for (let i = 0; i < 15; i++) {
+        const fy = srand() * H;
+        ctx.beginPath(); ctx.moveTo(0, fy); ctx.lineTo(W, fy + (srand()-0.5)*2); ctx.stroke();
+      }
 
-      // --- Game Results ---
+      // 1. GREEN HEADER BAR
+      let y = 0;
+      const hdrGrad = ctx.createLinearGradient(0, 0, 0, headerH);
+      hdrGrad.addColorStop(0, '#1e6b3a');
+      hdrGrad.addColorStop(1, '#0f3d1e');
+      ctx.fillStyle = hdrGrad;
+      ctx.fillRect(0, 0, W, headerH);
+      ctx.fillStyle = P.gold;
+      ctx.fillRect(0, headerH - 2.5, W, 2.5);
+      ctx.fillStyle = 'rgba(184,150,12,0.3)';
+      ctx.fillRect(0, 0, W, 1.5);
+
+      // Logo — left side
+      const logoSize = 38;
+      const logoPad = 12;
+      if (logoImg) {
+        ctx.save();
+        const lx = logoPad, ly = (headerH - logoSize) / 2;
+        const lr = 8;
+        ctx.beginPath();
+        ctx.moveTo(lx + lr, ly); ctx.lineTo(lx + logoSize - lr, ly);
+        ctx.quadraticCurveTo(lx + logoSize, ly, lx + logoSize, ly + lr);
+        ctx.lineTo(lx + logoSize, ly + logoSize - lr);
+        ctx.quadraticCurveTo(lx + logoSize, ly + logoSize, lx + logoSize - lr, ly + logoSize);
+        ctx.lineTo(lx + lr, ly + logoSize);
+        ctx.quadraticCurveTo(lx, ly + logoSize, lx, ly + logoSize - lr);
+        ctx.lineTo(lx, ly + lr);
+        ctx.quadraticCurveTo(lx, ly, lx + lr, ly);
+        ctx.closePath(); ctx.clip();
+        ctx.drawImage(logoImg, lx, ly, logoSize, logoSize);
+        ctx.restore();
+      }
+
+      // "BUNCH BETS" — right side
+      ctx.fillStyle = P.white;
+      ctx.font = `800 22px ${fS}`;
+      ctx.textAlign = 'right';
+      ctx.fillText('BUNCH BETS', W - logoPad, headerH/2 + 8);
+      y = headerH;
+
+      // 2. COURSE & DATE
+      ctx.fillStyle = P.ink;
+      ctx.font = `600 15px ${fS}`;
+      ctx.textAlign = 'center';
+      const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      ctx.fillText(`${course.name}  \u00b7  ${dateStr}`, W/2, y + 28);
+      ctx.strokeStyle = P.grid; ctx.lineWidth = 0.8;
+      drawLine(padLR + 30, y + 36, W - padLR - 30, y + 36);
+      y += courseH;
+
+      // 3. GAME RESULTS
       if (gameLines.length > 0) {
-        ctx.fillStyle = C.muted;
-        ctx.font = `bold 11px ${font}`;
-        ctx.textAlign = 'left';
-        ctx.fillText('GAME RESULTS', pad, y + 16);
-        y += 28;
+        drawDivider('GAME RESULTS', y);
+        y += 32;
 
         gameLines.forEach(game => {
-          const boxH = 44;
-          ctx.fillStyle = C.card;
-          ctx.fillRect(pad, y, tableW, boxH);
-          // Colored left accent
-          ctx.fillStyle = game.color;
-          ctx.fillRect(pad, y, 4, boxH);
-          // Border
-          ctx.strokeStyle = C.border;
-          ctx.lineWidth = 0.5;
-          ctx.strokeRect(pad, y, tableW, boxH);
-          // Label
-          ctx.fillStyle = C.text;
-          ctx.font = `bold 12px ${font}`;
+          ctx.fillStyle = P.ink;
+          ctx.font = `bold 16px ${fK}`;
           ctx.textAlign = 'left';
-          ctx.fillText(game.label, pad + 14, y + 17);
-          // Values
-          ctx.fillStyle = C.muted;
-          ctx.font = `11px ${font}`;
-          ctx.fillText(game.values.join('  \u00b7  '), pad + 14, y + 34);
-          y += boxH + 6;
+          ctx.fillText(game.label, padLR + 8, y + 16);
+          y += 22;
+          if (game.type === 'team') {
+            // Team subtitle
+            ctx.fillStyle = P.inkLight;
+            ctx.font = `13px ${fK}`;
+            ctx.textAlign = 'left';
+            ctx.fillText(game.teamLabel, padLR + 14, y + 12);
+            y += 16;
+            // Segment lines
+            if (game.segmentLines) {
+              game.segmentLines.forEach((lineSegs, li) => {
+                const isTotal = li === game.segmentLines.length - 1;
+                ctx.font = isTotal ? `bold 13px ${fK}` : `13px ${fK}`;
+                ctx.fillStyle = P.ink;
+                ctx.textAlign = 'left';
+                ctx.fillText(lineSegs.join(' \u00b7 '), padLR + 14, y + 12);
+                y += 15;
+              });
+            }
+          } else {
+            // Individual games — per-player
+            game.rows.forEach(row => {
+              ctx.textAlign = 'left';
+              const netStr = sfmt(row.net);
+              ctx.fillStyle = P.inkLight;
+              ctx.font = `14px ${fK}`;
+              const nameStr = row.detail ? `${row.name}: ${row.detail}` : row.name;
+              ctx.fillText(nameStr, padLR + 14, y + 13);
+              const nameW2 = ctx.measureText(nameStr + '  ').width;
+              ctx.fillStyle = P.ink;
+              ctx.font = `bold 14px ${fK}`;
+              ctx.fillText(netStr, padLR + 14 + nameW2, y + 13);
+              y += 18;
+            });
+          }
+          y += 8;
         });
       }
 
-      y += gap;
+      y += 16;
 
-      // --- Settlements ---
-      ctx.fillStyle = C.muted;
-      ctx.font = `bold 11px ${font}`;
-      ctx.textAlign = 'left';
-      ctx.fillText('SETTLEMENTS', pad, y + 16);
-      y += 28;
+      // 4. SETTLE UP
+      drawDivider('SETTLE UP', y);
+      y += 32;
 
-      // Per-player net in a row
       players.forEach(p => {
         const val = net[p.id];
-        ctx.fillStyle = val > 0.005 ? C.birdie : val < -0.005 ? C.bogey : C.text;
-        ctx.font = `13px ${font}`;
+        const color = val > 0.005 ? P.greenInk : val < -0.005 ? P.redInk : P.ink;
+        ctx.fillStyle = color;
+        ctx.font = `bold 16px ${fK}`;
         ctx.textAlign = 'left';
-        ctx.fillText(`${p.name}: ${Utils.fmt(val)}`, pad + 12, y + 14);
-        y += 24;
+        ctx.fillText(`${p.name}:  ${sfmt(val)}`, padLR + 12, y + 15);
+        y += 20;
       });
 
       if (xfers.length) {
-        y += 4;
-        ctx.fillStyle = C.muted;
-        ctx.font = `bold 11px ${font}`;
-        ctx.fillText('TRANSFERS', pad + 12, y + 14);
-        y += 24;
+        y += 2;
         xfers.forEach(x => {
-          ctx.fillStyle = C.text;
-          ctx.font = `13px ${font}`;
-          ctx.fillText(`${this.playerName(x.from)}  \u2192  ${this.playerName(x.to)}: ${Utils.fmt(x.amount)}`, pad + 12, y + 14);
-          y += 24;
+          ctx.fillStyle = P.ink;
+          ctx.font = `15px ${fK}`;
+          ctx.textAlign = 'left';
+          ctx.fillText(`${this.playerName(x.from)}  \u2192  ${this.playerName(x.to)}:  ${tfmt(x.amount)}`, padLR + 14, y + 15);
+          y += 20;
         });
       }
 
-      // --- Footer ---
-      ctx.fillStyle = C.muted;
-      ctx.font = `10px ${font}`;
-      ctx.textAlign = 'center';
-      ctx.fillText('Generated by Bunch Bets', W/2, H - 12);
+      y += 20;
 
-      // --- Share or download the image ---
+      // 5. SCORECARD TABLE (rotated: players across, holes down)
+      const tx = padLR;
+      let cy = y;
+
+      const rowDefs = [];
+      for (let h = 0; h < 9; h++) rowDefs.push({ type: 'hole', idx: h });
+      rowDefs.push({ type: 'sum', label: 'OUT', key: 'front' });
+      for (let h = 9; h < 18; h++) rowDefs.push({ type: 'hole', idx: h });
+      rowDefs.push({ type: 'sum', label: 'IN', key: 'back' });
+      rowDefs.push({ type: 'sum', label: 'TOT', key: 'total' });
+
+      let fPar = 0, bPar = 0;
+      for (let i = 0; i < 9; i++) fPar += (par[i] || 0);
+      for (let i = 9; i < 18; i++) bPar += (par[i] || 0);
+      const tPar = fPar + bPar;
+
+      // Column header — INTER
+      ctx.fillStyle = P.green;
+      ctx.fillRect(tx, cy, tableW, rowH);
+      ctx.fillStyle = P.white;
+      ctx.font = `bold 13px ${fS}`;
+      ctx.textAlign = 'center';
+      ctx.fillText('HOLE', tx + holeW/2, cy + 18);
+      ctx.fillText('PAR', tx + holeW + parW/2, cy + 18);
+      for (let pi = 0; pi < numP; pi++) {
+        const nm = playerData[pi].name.length > 8 ? playerData[pi].name.substring(0, 8) : playerData[pi].name;
+        ctx.fillText(nm.toUpperCase(), tx + holeW + parW + pi * playerW + playerW/2, cy + 18);
+      }
+      cy += rowH;
+
+      // Data rows
+      rowDefs.forEach((row, ri) => {
+        const isSum = row.type === 'sum';
+        ctx.fillStyle = isSum ? P.paperDark : (ri % 2 === 0 ? P.paper : 'rgba(196,185,154,0.13)');
+        ctx.fillRect(tx, cy, tableW, rowH);
+
+        // Hole number / label — INTER
+        ctx.fillStyle = P.ink;
+        ctx.font = isSum ? `bold 13px ${fS}` : `13px ${fS}`;
+        ctx.textAlign = 'center';
+        ctx.fillText(isSum ? row.label : String(row.idx + 1), tx + holeW/2, cy + 18);
+
+        // Par — INTER
+        ctx.fillStyle = isSum ? P.ink : P.inkLight;
+        ctx.font = isSum ? `bold 13px ${fS}` : `13px ${fS}`;
+        const parVal = isSum ? (row.key === 'front' ? fPar : row.key === 'back' ? bPar : tPar) : (par[row.idx] || '');
+        ctx.fillText(String(parVal), tx + holeW + parW/2, cy + 18);
+
+        // Scores — KALAM
+        for (let pi = 0; pi < numP; pi++) {
+          const colCx = tx + holeW + parW + pi * playerW + playerW/2;
+          const colCy = cy + rowH/2;
+
+          if (isSum) {
+            const val = playerData[pi][row.key];
+            ctx.fillStyle = P.ink;
+            ctx.font = `bold 16px ${fK}`;
+            ctx.textAlign = 'center';
+            ctx.fillText(val != null ? String(val) : '\u2013', colCx, cy + 19);
+          } else {
+            const score = playerData[pi].scores[row.idx];
+            const hp = par[row.idx] || 4;
+
+            if (score != null) {
+              const diff = score - hp;
+              if (diff <= -2) {
+                ctx.strokeStyle = P.greenInk; ctx.lineWidth = 1.2;
+                drawCircle(colCx, colCy, 9); drawCircle(colCx, colCy, 13);
+              } else if (diff === -1) {
+                ctx.strokeStyle = P.greenInk; ctx.lineWidth = 1.2;
+                drawCircle(colCx, colCy, 11);
+              } else if (diff === 1) {
+                ctx.strokeStyle = P.redInk; ctx.lineWidth = 1.2;
+                drawRect2(colCx, colCy, 22);
+              } else if (diff >= 2) {
+                ctx.strokeStyle = P.redInk; ctx.lineWidth = 1.2;
+                drawRect2(colCx, colCy, 18); drawRect2(colCx, colCy, 24);
+              }
+
+              ctx.fillStyle = diff < 0 ? P.greenInk : diff > 0 ? P.redInk : P.ink;
+              ctx.font = `16px ${fK}`;
+              ctx.textAlign = 'center';
+              ctx.fillText(String(score), colCx, cy + 19);
+            } else {
+              ctx.fillStyle = P.inkLight;
+              ctx.font = `15px ${fK}`;
+              ctx.textAlign = 'center';
+              ctx.fillText('\u2013', colCx, cy + 19);
+            }
+          }
+        }
+        cy += rowH;
+      });
+
+      // Grid lines
+      const tableTop = y, tableBot = cy;
+      let gy = tableTop;
+      for (let r = 0; r <= numTableRows; r++) {
+        const thick = r === 0 || r === numTableRows || r === 1 || r === 10 || r === 11 || r === 20 || r === 21;
+        ctx.strokeStyle = thick ? 'rgba(140,128,100,0.6)' : P.grid;
+        ctx.lineWidth = thick ? 1.3 : 0.6;
+        drawLine(tx, gy, tx + tableW, gy);
+        gy += rowH;
+      }
+      ctx.strokeStyle = P.grid;
+      ctx.lineWidth = 1.2;
+      drawLine(tx, tableTop, tx, tableBot);
+      drawLine(tx + tableW, tableTop, tx + tableW, tableBot);
+      ctx.lineWidth = 0.9;
+      drawLine(tx + holeW, tableTop, tx + holeW, tableBot);
+      drawLine(tx + holeW + parW, tableTop, tx + holeW + parW, tableBot);
+      ctx.lineWidth = 0.5;
+      for (let pi = 1; pi < numP; pi++) {
+        drawLine(tx + holeW + parW + pi * playerW, tableTop, tx + holeW + parW + pi * playerW, tableBot);
+      }
+
+      // 6. FOOTER
+      ctx.fillStyle = P.inkLight;
+      ctx.font = `500 11px ${fS}`;
+      ctx.textAlign = 'center';
+      ctx.fillText('\u26f3  bunchbets.com', W/2, H - 14);
+
+      // Share or download
       gtag('event', 'share_results', { method: 'image', player_count: State.data.players.length });
       canvas.toBlob(async (blob) => {
         if (!blob) { Err.show('Failed to generate image'); return; }
