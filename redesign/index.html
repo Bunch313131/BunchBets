@@ -504,9 +504,11 @@ body:has(.install-gate.show) { background:#050d08; }
 .install-gate-actions .btn { width:100%; justify-content:center; font-size:15px; font-weight:700; padding:14px 20px; border-radius:12px; border:none; cursor:pointer; }
 .install-gate-actions .btn.primary { background:#16a34a; color:#fff; }
 .install-gate-actions .btn.secondary { background:transparent; color:rgba(255,255,255,0.4); font-size:12px; font-weight:500; padding:8px; }
+.init-cover { position:fixed; top:calc(-1 * env(safe-area-inset-top, 0px)); left:0; right:0; bottom:calc(-1 * env(safe-area-inset-bottom, 0px)); background:#000; z-index:99999; }
 </style>
 </head>
 <body>
+<div class="init-cover" id="initCover"></div>
 <header>
   <div class="row" style="align-items:center; justify-content:space-between;">
     <div class="header-brand">
@@ -8336,23 +8338,26 @@ window.addEventListener('appinstalled', () => {
   };
 
   // If joining via URL, don't auto-launch wizard (joinGame will handle navigation)
-  if (joiningViaUrl) return;
+  if (joiningViaUrl) { const c = document.getElementById('initCover'); if (c) c.remove(); return; }
 
   // If it's a new day, show wizard for fresh start
   // If same day with active game, go to scores
+  const cover = document.getElementById('initCover');
   if (lastActive !== today) {
     // New day - show wizard, then show What's New after splash finishes
     Wizard.start();
+    if (cover) cover.remove();
     setTimeout(() => showWhatsNew(), 10000);
   } else if (hasActiveGame()) {
     // Same day with active game - go to scores tab
     State.data.tab = 'scores';
     State.scheduleRender();
-    Err.toast('Welcome back');
+    if (cover) cover.remove();
     showWhatsNew();
   } else {
     // Same day but no active game - show wizard
     Wizard.start();
+    if (cover) cover.remove();
     setTimeout(() => showWhatsNew(), 10000);
   }
 })();
