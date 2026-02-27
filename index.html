@@ -512,8 +512,7 @@ td:nth-child(11), th:nth-child(11) { border-left:3px double var(--muted); }
 .install-gate-actions .btn { width:100%; justify-content:center; font-size:15px; font-weight:700; padding:14px 20px; border-radius:12px; border:none; cursor:pointer; }
 .install-gate-actions .btn.primary { background:#16a34a; color:#fff; }
 .install-gate-actions .btn.secondary { background:transparent; color:rgba(255,255,255,0.4); font-size:12px; font-weight:500; padding:8px; }
-body:has(.wizard-overlay) { background:#000; }
-html:has(.wizard-overlay) { background:#000; }
+body:has(.wizard-overlay) .bottom-nav { display:none; }
 body:has(.install-gate.show) { background:#050d08; }
 html:has(.install-gate.show) { background:#050d08; }
 body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { display:none !important; visibility:hidden !important; }
