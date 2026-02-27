@@ -2213,7 +2213,7 @@ const Wizard = {
           const overlay = document.getElementById('wizardOverlay');
           if (overlay) {
             const courseEl = overlay.querySelector('.wizard-screen');
-            if (courseEl) { courseEl.style.position = ''; courseEl.style.inset = ''; courseEl.style.zIndex = ''; }
+            if (courseEl) { courseEl.style.cssText = ''; }
           }
         }, 1400);
       } else {
@@ -2447,9 +2447,7 @@ const Wizard = {
     // During splash, pre-render course step behind it so curtain reveals it
     if (this.step === 'splash') {
       const courseContent = this.renderCourse();
-      courseContent.style.position = 'absolute';
-      courseContent.style.inset = '0';
-      courseContent.style.zIndex = '0';
+      courseContent.style.cssText = 'position:absolute; top:0; left:0; right:0; bottom:0; z-index:0; padding-top:env(safe-area-inset-top, 0px);';
       overlay.appendChild(courseContent);
       content.style.position = 'relative';
       content.style.zIndex = '1';
