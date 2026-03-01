@@ -7944,7 +7944,8 @@ const UI = {
       const playerW = Math.max(scoreW + 28, maxNameW + 14);
 
       const tableW = holeW + parW + numP * playerW;
-      const W = tableW + 2 * padLR;
+      const minW = 380; // Prevent header/game text from being cut off with few players
+      const W = Math.max(tableW + 2 * padLR, minW);
       const rowH = 28;
       const headerH = 110, courseH = 44;
       const numTableRows = 22;
@@ -8163,7 +8164,7 @@ const UI = {
       y += 20;
 
       // 5. SCORECARD TABLE (rotated: players across, holes down)
-      const tx = padLR;
+      const tx = Math.max(padLR, (W - tableW) / 2);
       let cy = y;
 
       const rowDefs = [];
