@@ -8481,25 +8481,21 @@ State.data.games = State.data.games.map(Game.sanitize);
 
 document.getElementById('resetBtn').onclick = () => {
   UI.closeMenu();
-  if (!confirm('Start a new round? All scores & junk cleared. Teams, stakes, and course kept.')) return;
-  State.data.games.forEach(g => {
-    State.data.players.forEach(p => {
-      g.gross[p.id] = Utils.make18(null);
-      g.junkCounts[p.id] = Utils.make18(0);
-    });
-    g.kpData = Utils.make18(null);
-    g.quadsConfirmed = {};
-    g.presses = Utils.make18('');
-    g.wolfSelections = Utils.make18('');
-  });
+  if (!confirm('Start a new round? Everything will be reset.')) return;
+  const keepCourse = Utils.clone(State.data.course);
+  const keepPresets = Utils.clone(State.presets);
+  State.data.players = [];
+  State.data.games = [];
+  State.data.course = keepCourse;
+  State.presets = keepPresets;
   State.data.roundCompleteShown = false;
   State.data.pressWizardShown = false;
   State.data._scoredHoles = {};
   State.data._clearedHoles = {};
   State.data.scoringHole = 0;
+  State.data.tab = 'scores';
   State.scheduleSave();
-  State.scheduleRender();
-  Err.toast('New round — scores cleared');
+  Wizard.start();
 };
 
 document.getElementById('clearBtn').onclick = () => {
