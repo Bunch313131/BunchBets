@@ -2517,9 +2517,19 @@ const Wizard = {
   },
 
   skip() {
+    // Apply wizard player data if State has no players (e.g. after Start New Game cleared them)
+    const wizardPlayers = this.data.players.filter(p => p.name.trim());
+    if (State.data.players.length === 0 && wizardPlayers.length > 0) {
+      State.data.players = wizardPlayers.map((p, i) => ({
+        id: 'p' + (i+1),
+        name: p.name.trim(),
+        handicap: p.handicap || 0
+      }));
+    }
     this.active = false;
     this.removeOverlay();
     State.data.tab = 'setup';
+    State.scheduleSave();
     State.scheduleRender();
   },
 
@@ -7934,7 +7944,8 @@ const UI = {
       const playerW = Math.max(scoreW + 28, maxNameW + 14);
 
       const tableW = holeW + parW + numP * playerW;
-      const W = tableW + 2 * padLR;
+      const minW = 380; // Prevent header/game text from being cut off with few players
+      const W = Math.max(tableW + 2 * padLR, minW);
       const rowH = 28;
       const headerH = 110, courseH = 44;
       const numTableRows = 22;
@@ -8153,7 +8164,7 @@ const UI = {
       y += 20;
 
       // 5. SCORECARD TABLE (rotated: players across, holes down)
-      const tx = padLR;
+      const tx = Math.max(padLR, (W - tableW) / 2);
       let cy = y;
 
       const rowDefs = [];
@@ -8479,31 +8490,33 @@ State.data.games = State.data.games.map(Game.sanitize);
 
 document.getElementById('resetBtn').onclick = () => {
   UI.closeMenu();
-  if (!confirm('Start a new round? Everything will be reset.')) return;
-  const keepCourse = Utils.clone(State.data.course);
-  const keepPresets = Utils.clone(State.presets);
-  State.data.players = [];
+  if (!confirm('New round? Same players, new game setup. Scores will be cleared.')) return;
+  // Keep players and course, clear games/scores
   State.data.games = [];
-  State.data.course = keepCourse;
-  State.presets = keepPresets;
   State.data.roundCompleteShown = false;
   State.data.pressWizardShown = false;
   State.data._scoredHoles = {};
   State.data._clearedHoles = {};
   State.data.scoringHole = 0;
   State.data.tab = 'setup';
-  State.data.lastActiveDate = null;
-  // Save immediately (not debounced) to ensure reset persists
   try {
     const saveData = {...State.data, presets: State.presets};
     localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
   } catch(e) {}
-  Wizard.start();
+  // Pre-populate wizard with existing players
+  Wizard.data.players = State.data.players.map(p => ({name: p.name, handicap: p.handicap || 0}));
+  Wizard.active = true;
+  Wizard.step = 'game';
+  Wizard.currentGameIndex = 0;
+  Wizard.data.games = [Wizard.createGameData()];
+  Wizard.data.selectedCourse = State.data.course.name;
+  Wizard.render();
 };
 
 document.getElementById('clearBtn').onclick = () => {
   UI.closeMenu();
-  if (!confirm('Clear all scores & junk? Teams/stakes/course stay the same.')) return;
+  if (!confirm('Clear all scores & junk? Players, teams, stakes, and course stay the same.')) return;
+  State.data.scoringHole = 0;
   State.data.games.forEach(g => {
     State.data.players.forEach(p => {
       g.gross[p.id] = Utils.make18(null);
@@ -8511,9 +8524,14 @@ document.getElementById('clearBtn').onclick = () => {
     });
     g.kpData = Utils.make18(null);
     g.quadsConfirmed = {};
+    // Reset presses back to original stakes
+    if (g.presses) g.presses = {};
+    if (g.vegasMultipliers) g.vegasMultipliers = Utils.make18(1);
   });
   State.data._clearedHoles = {};
   State.data._scoredHoles = {};
+  State.data.roundCompleteShown = false;
+  State.data.pressWizardShown = false;
   State.scheduleSave();
   State.scheduleRender();
   Err.toast('Scores cleared');
@@ -8532,9 +8550,18 @@ document.getElementById('joinBtn').onclick = () => { UI.closeMenu(); LiveSync.sh
 
 // Wizard button
 document.getElementById('startWizardBtn').onclick = () => {
-  if (!confirm('Start a new game?\n\nThis will erase all scores and settings from the current game.')) return;
+  if (!confirm('Start a new game?\n\nThis will erase all players, scores, and settings.')) return;
   UI.closeMenu();
-  Wizard.start();
+  // Keep course and presets, wipe everything else — behave like a fresh session
+  const keepCourse = Utils.clone(State.data.course);
+  const keepPresets = Utils.clone(State.presets);
+  localStorage.removeItem(STORAGE_KEY);
+  // Save just course/presets so reload picks them up
+  try {
+    const fresh = {course: keepCourse, presets: keepPresets};
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
+  } catch(e) {}
+  location.reload();
 };
 
 // Check URL for join code on load
