@@ -519,7 +519,7 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 <header>
   <div class="row" style="align-items:center; justify-content:space-between;">
     <div class="header-brand">
-      <img src="BunchBets180.png" alt="Bunch Bets">
+      <img src="BunchBets180_red.png" alt="Bunch Bets">
       <div class="header-info">
         <div class="header-date" id="headerDate"></div>
         <div class="header-weather" id="headerWeather"></div>
@@ -8479,31 +8479,33 @@ State.data.games = State.data.games.map(Game.sanitize);
 
 document.getElementById('resetBtn').onclick = () => {
   UI.closeMenu();
-  if (!confirm('Start a new round? Everything will be reset.')) return;
-  const keepCourse = Utils.clone(State.data.course);
-  const keepPresets = Utils.clone(State.presets);
-  State.data.players = [];
+  if (!confirm('New round? Same players, new game setup. Scores will be cleared.')) return;
+  // Keep players and course, clear games/scores
   State.data.games = [];
-  State.data.course = keepCourse;
-  State.presets = keepPresets;
   State.data.roundCompleteShown = false;
   State.data.pressWizardShown = false;
   State.data._scoredHoles = {};
   State.data._clearedHoles = {};
   State.data.scoringHole = 0;
   State.data.tab = 'setup';
-  State.data.lastActiveDate = null;
-  // Save immediately (not debounced) to ensure reset persists
   try {
     const saveData = {...State.data, presets: State.presets};
     localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
   } catch(e) {}
-  Wizard.start();
+  // Pre-populate wizard with existing players
+  Wizard.data.players = State.data.players.map(p => ({name: p.name, handicap: p.handicap || 0}));
+  Wizard.active = true;
+  Wizard.step = 'game';
+  Wizard.currentGameIndex = 0;
+  Wizard.data.games = [Wizard.createGameData()];
+  Wizard.data.selectedCourse = State.data.course.name;
+  Wizard.render();
 };
 
 document.getElementById('clearBtn').onclick = () => {
   UI.closeMenu();
-  if (!confirm('Clear all scores & junk? Teams/stakes/course stay the same.')) return;
+  if (!confirm('Clear all scores & junk? Players, teams, stakes, and course stay the same.')) return;
+  State.data.scoringHole = 0;
   State.data.games.forEach(g => {
     State.data.players.forEach(p => {
       g.gross[p.id] = Utils.make18(null);
@@ -8511,9 +8513,14 @@ document.getElementById('clearBtn').onclick = () => {
     });
     g.kpData = Utils.make18(null);
     g.quadsConfirmed = {};
+    // Reset presses back to original stakes
+    if (g.presses) g.presses = {};
+    if (g.vegasMultipliers) g.vegasMultipliers = Utils.make18(1);
   });
   State.data._clearedHoles = {};
   State.data._scoredHoles = {};
+  State.data.roundCompleteShown = false;
+  State.data.pressWizardShown = false;
   State.scheduleSave();
   State.scheduleRender();
   Err.toast('Scores cleared');
@@ -8532,8 +8539,25 @@ document.getElementById('joinBtn').onclick = () => { UI.closeMenu(); LiveSync.sh
 
 // Wizard button
 document.getElementById('startWizardBtn').onclick = () => {
-  if (!confirm('Start a new game?\n\nThis will erase all scores and settings from the current game.')) return;
+  if (!confirm('Start a new game?\n\nThis will erase all players, scores, and settings.')) return;
   UI.closeMenu();
+  const keepCourse = Utils.clone(State.data.course);
+  const keepPresets = Utils.clone(State.presets);
+  State.data.players = [];
+  State.data.games = [];
+  State.data.course = keepCourse;
+  State.presets = keepPresets;
+  State.data.roundCompleteShown = false;
+  State.data.pressWizardShown = false;
+  State.data._scoredHoles = {};
+  State.data._clearedHoles = {};
+  State.data.scoringHole = 0;
+  State.data.tab = 'setup';
+  State.data.lastActiveDate = null;
+  try {
+    const saveData = {...State.data, presets: State.presets};
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
+  } catch(e) {}
   Wizard.start();
 };
 
