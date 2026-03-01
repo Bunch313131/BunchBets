@@ -8489,6 +8489,9 @@ document.getElementById('resetBtn').onclick = () => {
   State.presets = keepPresets;
   State.data.roundCompleteShown = false;
   State.data.pressWizardShown = false;
+  State.data._scoredHoles = {};
+  State.data._clearedHoles = {};
+  State.data.scoringHole = 0;
   State.scheduleSave();
   State.scheduleRender();
   Err.toast('Round reset');
