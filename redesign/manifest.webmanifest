@@ -7,7 +7,7 @@
   "theme_color": "#1a1a1a",
   "icons": [
     {
-      "src": "BunchBets180.png",
+      "src": "BunchBets180_red.png",
       "sizes": "180x180",
       "type": "image/png"
     },
