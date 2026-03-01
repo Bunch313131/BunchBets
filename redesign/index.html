@@ -2517,9 +2517,19 @@ const Wizard = {
   },
 
   skip() {
+    // Apply wizard player data if State has no players (e.g. after Start New Game cleared them)
+    const wizardPlayers = this.data.players.filter(p => p.name.trim());
+    if (State.data.players.length === 0 && wizardPlayers.length > 0) {
+      State.data.players = wizardPlayers.map((p, i) => ({
+        id: 'p' + (i+1),
+        name: p.name.trim(),
+        handicap: p.handicap || 0
+      }));
+    }
     this.active = false;
     this.removeOverlay();
     State.data.tab = 'setup';
+    State.scheduleSave();
     State.scheduleRender();
   },
 
@@ -8541,24 +8551,16 @@ document.getElementById('joinBtn').onclick = () => { UI.closeMenu(); LiveSync.sh
 document.getElementById('startWizardBtn').onclick = () => {
   if (!confirm('Start a new game?\n\nThis will erase all players, scores, and settings.')) return;
   UI.closeMenu();
+  // Keep course and presets, wipe everything else — behave like a fresh session
   const keepCourse = Utils.clone(State.data.course);
   const keepPresets = Utils.clone(State.presets);
-  State.data.players = [];
-  State.data.games = [];
-  State.data.course = keepCourse;
-  State.presets = keepPresets;
-  State.data.roundCompleteShown = false;
-  State.data.pressWizardShown = false;
-  State.data._scoredHoles = {};
-  State.data._clearedHoles = {};
-  State.data.scoringHole = 0;
-  State.data.tab = 'setup';
-  State.data.lastActiveDate = null;
+  localStorage.removeItem(STORAGE_KEY);
+  // Save just course/presets so reload picks them up
   try {
-    const saveData = {...State.data, presets: State.presets};
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
+    const fresh = {course: keepCourse, presets: keepPresets};
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
   } catch(e) {}
-  Wizard.start();
+  location.reload();
 };
 
 // Check URL for join code on load
