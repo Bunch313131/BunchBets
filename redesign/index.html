@@ -24,7 +24,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="BunchBets180_red.png">
 <link rel="mask-icon" href="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/safari-pinned-tab.svg" color="#2563eb">
 <link rel="manifest" href="https://raw.githubusercontent.com/Bunch313131/nassau-app/main/manifest.webmanifest" crossorigin="anonymous">
-<title>Bunch Bets V7.0</title>
+<title>Bunch Bets V7.1</title>
 <!-- Viewport height fix — must run before body renders to avoid flash -->
 <script>
 (function(){
@@ -592,9 +592,14 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.0';
+const APP_VERSION = '7.1';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.1': [
+    'Historical status bars — scroll back to any hole and see bet status as of that hole',
+    'Press at the turn — wizard offers trailing team a press when you reach hole 10',
+    'Smarter defaults — unscored holes no longer affect bet calculations',
+  ],
   '7.0': [
     'Fresh interface redesign with color themes and light/dark modes',
     'KPs now handled outside of junk — prompted automatically on Par 3s',
