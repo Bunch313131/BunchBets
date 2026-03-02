@@ -867,14 +867,25 @@ window.LiveSync = {
         </div>
         <p class="muted" style="font-size:12px;">Or share this link:</p>
         <input type="text" value="${url}" readonly style="font-size:12px;margin-bottom:8px;" onclick="this.select()">
-        <div class="modal-actions">
-          <button class="btn" onclick="this.closest('.modal-overlay').remove()">Close</button>
+        <div class="modal-actions" style="flex-wrap:wrap;gap:8px;">
+          <button class="btn primary" id="shareInviteBtn" style="width:100%;">Share Invite</button>
           <button class="copy-btn" onclick="navigator.clipboard.writeText('${code}');Err.toast('Code copied!');">Copy Code</button>
           <button class="copy-btn" onclick="navigator.clipboard.writeText('${url}');Err.toast('Link copied!');">Copy Link</button>
+          <button class="btn" onclick="this.closest('.modal-overlay').remove()">Close</button>
         </div>
       </div>
     `;
     document.body.appendChild(overlay);
+    document.getElementById('shareInviteBtn').onclick = async () => {
+      const msg = `Join my Bunch Bets game!\n\nOpen Bunch Bets from your home screen, tap Join Live Game, and paste this code:\n\n${code}\n\nDon't have the app? Tap this link:\n${url}`;
+      if (navigator.share) {
+        try { await navigator.share({ title: 'Bunch Bets — Join My Game', text: msg }); }
+        catch(e) { if (e.name !== 'AbortError') { navigator.clipboard.writeText(msg); Err.toast('Invite copied!'); } }
+      } else {
+        navigator.clipboard.writeText(msg);
+        Err.toast('Invite copied to clipboard!');
+      }
+    };
     overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
   },
 
@@ -2758,6 +2769,7 @@ const Wizard = {
         <div class="splash-line"></div>
         <div class="splash-title">BUNCH BET<span class="splash-s" id="splashS">S<span class="s-line"></span></span></div>
         <div class="splash-subtitle">Settle it on the course</div>
+        <button class="btn" id="splashJoinBtn" style="margin-top:24px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);font-size:14px;padding:10px 24px;border-radius:10px;backdrop-filter:blur(8px);letter-spacing:0.5px;">Join Live Game</button>
       </div>
     `;
 
@@ -2766,6 +2778,19 @@ const Wizard = {
       const s = document.getElementById('splashS');
       if (s) s.classList.add('morph');
     }, 5200);
+
+    // Join Live Game button
+    setTimeout(() => {
+      const joinBtn = document.getElementById('splashJoinBtn');
+      if (joinBtn) joinBtn.onclick = (e) => {
+        e.stopPropagation();
+        this.active = false;
+        this.removeOverlay();
+        document.body.classList.remove('splashing');
+        document.body.style.background = '';
+        LiveSync.showJoinModal();
+      };
+    }, 0);
 
     // Bokeh particle system
     requestAnimationFrame(() => {
