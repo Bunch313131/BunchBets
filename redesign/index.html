@@ -331,11 +331,11 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .wizard-skip { width:100%; text-align:center; margin-top:4px; }
 .wizard-skip a { color:var(--muted); font-size:13px; text-decoration:underline; cursor:pointer; }
 .wizard-skip a:hover { color:var(--acc); }
-.wizard-join-live { position:relative; width:100%; margin-top:8px; padding:12px 12px; font-size:14px; font-weight:600; letter-spacing:0.5px; color:#fff; background:transparent; border:none; border-radius:999px; cursor:pointer; isolation:isolate; }
-.wizard-join-live::before { content:''; position:absolute; inset:-2px; z-index:-2; border-radius:999px; background:conic-gradient(from var(--glow-angle, 0deg), #ff3b30, #ff9500, #ffcc00, #34c759, #00c7be, #3b82f6, #a855f7, #ff3b30); animation:glowSpin 3s linear infinite; }
-.wizard-join-live::after { content:''; position:absolute; inset:2px; z-index:-1; border-radius:999px; background:var(--card); }
-@property --glow-angle { syntax:'<angle>'; initial-value:0deg; inherits:false; }
-@keyframes glowSpin { to { --glow-angle:360deg; } }
+.wizard-join-live { position:relative; width:100%; margin-top:8px; padding:12px 12px; font-size:14px; font-weight:600; letter-spacing:0.5px; color:#fff; background:var(--card); border:2px solid transparent; border-radius:999px; cursor:pointer; overflow:hidden; }
+.wizard-join-live .glow-border { position:absolute; inset:-50%; z-index:0; background:conic-gradient(#16a34a, #ffdd00, #fff, #16a34a, #ffdd00, #fff, #16a34a); animation:glowSpin 3s linear infinite; }
+.wizard-join-live .glow-inner { position:absolute; inset:2px; z-index:1; border-radius:999px; background:var(--card); }
+.wizard-join-live .glow-text { position:relative; z-index:2; }
+@keyframes glowSpin { to { transform:rotate(360deg); } }
 .wizard-player-row { display:grid; grid-template-columns:1fr 80px 40px; gap:8px; align-items:center; margin-bottom:12px; }
 .wizard-player-row.header { font-size:12px; color:var(--muted); margin-bottom:8px; }
 .wizard-player-row input { min-height:44px; }
@@ -2859,7 +2859,7 @@ const Wizard = {
         <div class="wizard-skip">
           <a id="wizardSkip">Skip to Advanced Setup</a>
         </div>
-        <button class="wizard-join-live" id="wizardJoinLive">📡 Join Live Game</button>
+        <button class="wizard-join-live" id="wizardJoinLive"><span class="glow-border"></span><span class="glow-inner"></span><span class="glow-text">📡 Join Live Game</span></button>
       </div>
     `;
 
