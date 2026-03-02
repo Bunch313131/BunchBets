@@ -331,6 +331,11 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .wizard-skip { width:100%; text-align:center; margin-top:4px; }
 .wizard-skip a { color:var(--muted); font-size:13px; text-decoration:underline; cursor:pointer; }
 .wizard-skip a:hover { color:var(--acc); }
+.wizard-join-live { position:relative; width:100%; margin-top:8px; padding:12px 12px; font-size:14px; font-weight:600; letter-spacing:0.5px; color:#fff; background:var(--card); border:none; border-radius:999px; cursor:pointer; z-index:0; overflow:hidden; }
+.wizard-join-live::before { content:''; position:absolute; top:-2px; left:-2px; right:-2px; bottom:-2px; z-index:-1; border-radius:999px; background:conic-gradient(from var(--glow-angle, 0deg), #ff3b30, #ff9500, #ffcc00, #34c759, #00c7be, #3b82f6, #a855f7, #ff3b30); animation:glowSpin 3s linear infinite; }
+.wizard-join-live::after { content:''; position:absolute; top:2px; left:2px; right:2px; bottom:2px; z-index:-1; border-radius:999px; background:var(--card); }
+@property --glow-angle { syntax:'<angle>'; initial-value:0deg; inherits:false; }
+@keyframes glowSpin { to { --glow-angle:360deg; } }
 .wizard-player-row { display:grid; grid-template-columns:1fr 80px 40px; gap:8px; align-items:center; margin-bottom:12px; }
 .wizard-player-row.header { font-size:12px; color:var(--muted); margin-bottom:8px; }
 .wizard-player-row input { min-height:44px; }
@@ -2769,7 +2774,6 @@ const Wizard = {
         <div class="splash-line"></div>
         <div class="splash-title">BUNCH BET<span class="splash-s" id="splashS">S<span class="s-line"></span></span></div>
         <div class="splash-subtitle">Settle it on the course</div>
-        <button class="btn" id="splashJoinBtn" style="margin-top:24px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);font-size:14px;padding:10px 24px;border-radius:10px;backdrop-filter:blur(8px);letter-spacing:0.5px;">Join Live Game</button>
       </div>
     `;
 
@@ -2779,18 +2783,6 @@ const Wizard = {
       if (s) s.classList.add('morph');
     }, 5200);
 
-    // Join Live Game button
-    setTimeout(() => {
-      const joinBtn = document.getElementById('splashJoinBtn');
-      if (joinBtn) joinBtn.onclick = (e) => {
-        e.stopPropagation();
-        this.active = false;
-        this.removeOverlay();
-        document.body.classList.remove('splashing');
-        document.body.style.background = '';
-        LiveSync.showJoinModal();
-      };
-    }, 0);
 
     // Bokeh particle system
     requestAnimationFrame(() => {
@@ -2867,6 +2859,7 @@ const Wizard = {
         <div class="wizard-skip">
           <a id="wizardSkip">Skip to Advanced Setup</a>
         </div>
+        <button class="wizard-join-live" id="wizardJoinLive">📡 Join Live Game</button>
       </div>
     `;
 
@@ -3025,6 +3018,11 @@ const Wizard = {
       };
 
       document.getElementById('wizardSkip').onclick = () => this.skip();
+      document.getElementById('wizardJoinLive').onclick = () => {
+        this.active = false;
+        this.removeOverlay();
+        LiveSync.showJoinModal();
+      };
     }, 0);
 
     return div;
