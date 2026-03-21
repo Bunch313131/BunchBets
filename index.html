@@ -7674,6 +7674,19 @@ const UI = {
   },
 
   showRoundCompleteModal() {
+    // Fire analytics event once per round
+    if (!State.data.roundCompleteShown) {
+      State.data.roundCompleteShown = true;
+      const gameTypes = [...new Set(State.data.games.map(g => g.gameType))];
+      gtag('event', 'round_completed', {
+        player_count: State.data.players.length,
+        game_count: State.data.games.length,
+        game_types: gameTypes.join(','),
+        course: State.data.course.name || 'custom'
+      });
+      State.scheduleSave();
+    }
+
     // Build quick summary using unified helper
     const net = {};
     State.data.players.forEach(p => net[p.id] = 0);
@@ -8688,9 +8701,15 @@ const IOS_SHARE_SVG = `<svg class="share-icon" viewBox="0 0 24 24" fill="none" s
 const INSTALL_ICON_SVG = `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="200" height="200" rx="38" fill="#0d3a1a"/><rect x="0" y="0" width="200" height="200" rx="38" fill="url(#iiBg)"/><rect x="4" y="4" width="192" height="192" rx="36" fill="none" stroke="rgba(22,163,74,0.3)" stroke-width="1"/><rect x="0" y="0" width="200" height="200" rx="38" fill="url(#iiGlow)" opacity="0.4"/><ellipse cx="100" cy="150" rx="58" ry="14" fill="#16a34a" opacity="0.4"/><ellipse cx="100" cy="150" rx="40" ry="9" fill="#16a34a" opacity="0.3"/><ellipse cx="100" cy="150" rx="7" ry="3" fill="#000" opacity="0.7"/><line x1="100" y1="150" x2="100" y2="36" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><path d="M100,36 L100,74 Q122,60 150,53 Q122,44 100,36Z" fill="#ffdd00"/><circle cx="124" cy="140" r="18" fill="#f5f5f5"/><circle cx="124" cy="140" r="18" fill="url(#iiBallGrad)"/><text x="124" y="145" text-anchor="middle" font-size="16" font-weight="800" font-family="Inter,system-ui,sans-serif" fill="#16a34a" opacity="0.8">$</text><circle cx="118" cy="132" r="5" fill="rgba(255,255,255,0.25)"/><defs><linearGradient id="iiBg" x1="0" y1="0" x2="200" y2="200" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#0a2e14"/><stop offset="50%" stop-color="#061a0b"/><stop offset="100%" stop-color="#030d06"/></linearGradient><radialGradient id="iiBallGrad" cx="118" cy="132" r="18" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="rgba(255,255,255,0.5)"/><stop offset="50%" stop-color="rgba(255,255,255,0)"/><stop offset="100%" stop-color="rgba(0,0,0,0.2)"/></radialGradient><radialGradient id="iiGlow" cx="100" cy="80" r="100" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#16a34a"/><stop offset="100%" stop-color="#16a34a" stop-opacity="0"/></radialGradient></defs></svg>`;
 
 function confirmInstalled() {
+  const isNew = localStorage.getItem(INSTALL_KEY) !== 'true';
   localStorage.setItem(INSTALL_KEY, 'true');
   const gate = document.getElementById('installGate');
   if (gate) gate.classList.remove('show');
+  if (isNew) {
+    gtag('event', 'pwa_installed', {
+      method: isStandalone() ? 'standalone' : 'prompt'
+    });
+  }
 }
 
 function showInstallGate() {
