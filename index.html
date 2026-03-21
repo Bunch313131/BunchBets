@@ -1112,6 +1112,7 @@ const Game = {
       // Each entry: { ranking: [pid1, pid2, ...] } ordered closest to farthest (on green + made par or better)
       // null = no KP data entered for this hole
       kpData: Utils.make18(null),
+      vegasBirdieDouble: false,
       quadsConfirmed: {},
       handicapMode: 'full' // full, off_low, team_delta
     };
@@ -1156,6 +1157,7 @@ const Game = {
     g.ninePointMode = ['net','gross'].includes(g.ninePointMode) ? g.ninePointMode : 'net';
     g.ninePointWinBy2 = g.ninePointWinBy2 !== false;
     g.ninePointBirdieDouble = g.ninePointBirdieDouble === true;
+    g.vegasBirdieDouble = g.vegasBirdieDouble === true;
     g.handicapMode = ['full','off_low','team_delta'].includes(g.handicapMode) ? g.handicapMode : 'full';
 
     let pa = Array.isArray(g.presses) ? g.presses.slice(0,18) : Utils.make18('');
@@ -1846,7 +1848,11 @@ const Game = {
     let multiplier = 1;
     if (press === 'press') multiplier = 2;
     else if (press === 'blind') multiplier = 4;
-    
+
+    const bothABirdie = teamA.p1gross < par && teamA.p2gross < par;
+    const bothBBirdie = teamB.p1gross < par && teamB.p2gross < par;
+    if (g.vegasBirdieDouble && (bothABirdie || bothBBirdie)) multiplier *= 2;
+
     return {
       numA,
       numB,
@@ -1854,6 +1860,8 @@ const Game = {
       bFlip,
       aHasBirdie: hasBirdie(teamA),
       bHasBirdie: hasBirdie(teamB),
+      bothABirdie,
+      bothBBirdie,
       basePoints,
       multiplier,
       pointsToA: basePoints * multiplier
@@ -2570,6 +2578,7 @@ const Wizard = {
       g.ninePointValue = wg.ninePointValue || 1;
       g.ninePointWinBy2 = wg.ninePointWinBy2 !== false;
       g.ninePointBirdieDouble = wg.ninePointBirdieDouble === true;
+      g.vegasBirdieDouble = wg.vegasBirdieDouble === true;
       g.handicapMode = wg.handicapMode || 'full';
 
       // Apply handicap strokes based on mode
@@ -3456,6 +3465,15 @@ const Wizard = {
         </div>
         ` : ''}
 
+        ${g.gameType === 'vegas' ? `
+        <div class="wizard-section">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="wizardVegasBirdieDouble" ${g.vegasBirdieDouble?'checked':''} style="width:20px;height:20px;">
+            <span>Double Birdies (both players birdie = 2x hole)</span>
+          </label>
+        </div>
+        ` : ''}
+
         ${g.gameType === 'skins' ? `
         <div class="wizard-section">
           <div class="wizard-section-title">Buy-in (per player)</div>
@@ -3880,6 +3898,15 @@ const Wizard = {
       if (ninePointBirdieDouble) {
         ninePointBirdieDouble.onchange = (e) => {
           g.ninePointBirdieDouble = e.target.checked;
+          State.scheduleSave();
+        };
+      }
+
+      // Vegas double birdies
+      const vegasBirdieDouble = document.getElementById('wizardVegasBirdieDouble');
+      if (vegasBirdieDouble) {
+        vegasBirdieDouble.onchange = (e) => {
+          g.vegasBirdieDouble = e.target.checked;
           State.scheduleSave();
         };
       }
@@ -4666,6 +4693,10 @@ const UI = {
               h('div',{},[h('div',{class:'muted'},'Front'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.front,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.front=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.front);State.end();}})]),
               h('div',{},[h('div',{class:'muted'},'Back'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.back,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.back=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.back);State.end();}})]),
             ]) : h('div',{}),
+            h('label',{style:'display:flex;align-items:center;gap:8px;margin:8px 0;cursor:pointer;'},[
+              h('input',{type:'checkbox',checked:g.vegasBirdieDouble===true,onclick:(e)=>{g.vegasBirdieDouble=e.target.checked;State.scheduleSave();}}),
+              ' Double Birdies (both birdie = 2x hole)'
+            ]),
             h('div',{class:'note',style:'margin-top:8px;'},'Flip if: opponent birdie, OR no one on your team has net par or better')
           ]) : h('div',{}),
 
@@ -6367,6 +6398,7 @@ const UI = {
           h('div',{class:'card'},[
             h('div',{class:'pill'},UI.gameLabel(g)),
             h('div',{class:'note',style:'margin-top:6px;'},`A: ${teamANames}  |  B: ${teamBNames}`),
+            g.vegasBirdieDouble ? h('div',{class:'note'},`Dbl Birdie 2x`) : null,
             h('div',{style:'margin-top:12px;'},(() => {
               const sz = (g.teamA||[]).length || 1;
               const frontPP = result.frontPoints * (g.pointValue.front || 0);
@@ -6688,6 +6720,7 @@ const UI = {
           h('div',{class:'card'},[
             h('div',{class:'pill'},UI.gameLabel(g)),
             h('div',{class:'note',style:'margin-top:6px;'},`Team A: ${teamANames.join(' & ')}  |  Team B: ${teamBNames.join(' & ')}`),
+            g.vegasBirdieDouble ? h('div',{class:'note'},`Dbl Birdie 2x`) : null,
 
             // Front 9
             h('div',{style:'margin-top:12px;'},[
