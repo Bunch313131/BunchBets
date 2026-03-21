@@ -7317,8 +7317,7 @@ const UI = {
 
   transactions() {
     const shareBtn = h('div',{style:'margin-bottom:12px;display:flex;gap:8px;'},[
-      h('button',{class:'btn small share',onclick:()=>this.shareImage()},'Share Image'),
-      h('button',{class:'btn small',onclick:()=>this.share(),style:'background:var(--border);color:var(--txt);'},'Share Text')
+      h('button',{class:'btn small share',onclick:()=>this.shareImage()},'Share Results')
     ]);
 
     const net = {};
@@ -7714,8 +7713,7 @@ const UI = {
           ${transfersHtml}
         </div>
         <div class="modal-actions" style="flex-direction:column;gap:8px;">
-          <button class="btn share" id="shareImageBtn" style="width:100%;">Share Image</button>
-          <button class="btn primary" id="shareResultsBtn" style="width:100%;">Share Text</button>
+          <button class="btn share" id="shareImageBtn" style="width:100%;">Share Results</button>
           <button class="btn" id="viewPaymentsBtn" style="width:100%;">View Full Details</button>
           <button class="btn secondary" id="dismissCompleteBtn" style="width:100%;">Dismiss</button>
         </div>
@@ -7726,10 +7724,6 @@ const UI = {
     document.getElementById('shareImageBtn').onclick = () => {
       overlay.remove();
       this.shareImage();
-    };
-    document.getElementById('shareResultsBtn').onclick = () => {
-      overlay.remove();
-      this.share();
     };
     document.getElementById('viewPaymentsBtn').onclick = () => {
       overlay.remove();
@@ -8351,7 +8345,7 @@ const UI = {
           try { await navigator.share({ files: [file], title: 'Bunch Bets Scorecard', text: '\u26f3 Scored with Bunch Bets\n\n\ud83c\udf7a Enjoying the app? Buy the creator a beer: https://venmo.com/BrianBunch1313' }); }
           catch (e) { if (e.name !== 'AbortError') this._downloadCanvas(canvas); }
         } else {
-          this._downloadCanvas(canvas);
+          this.share();
         }
       }, 'image/png');
     } catch(e) {
