@@ -7807,7 +7807,7 @@ const UI = {
 
       lines.push('');
       lines.push('\u26f3 Scored with Bunch Bets');
-      lines.push('\ud83c\udf7a Enjoying the app? Buy the creator a beer: venmo://paycharge?txn=pay&recipients=BrianBunch1313');
+      lines.push('\ud83c\udf7a Enjoying the app? Buy the creator a beer: https://venmo.com/BrianBunch1313');
       const txt = lines.join('\n');
       gtag('event', 'share_results', { method: 'text', player_count: State.data.players.length });
 
@@ -8342,7 +8342,7 @@ const UI = {
         if (!blob) { Err.show('Failed to generate image'); return; }
         const file = new File([blob], 'bunch-bets-scorecard.png', { type: 'image/png' });
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-          try { await navigator.share({ files: [file], title: 'Bunch Bets Scorecard', text: '\u26f3 Scored with Bunch Bets\n\ud83c\udf7a Enjoying the app? Buy the creator a beer: venmo://paycharge?txn=pay&recipients=BrianBunch1313' }); }
+          try { await navigator.share({ files: [file], title: 'Bunch Bets Scorecard', text: '\u26f3 Scored with Bunch Bets\n\ud83c\udf7a Enjoying the app? Buy the creator a beer: https://venmo.com/BrianBunch1313' }); }
           catch (e) { if (e.name !== 'AbortError') this._downloadCanvas(canvas); }
         } else {
           this.share();
