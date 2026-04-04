@@ -22,7 +22,7 @@
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="BunchBets180.png">
 <link rel="manifest" href="manifest.webmanifest">
-<title>Bunch Bets V7.1</title>
+<title>Bunch Bets V7.2</title>
 <!-- Viewport height fix — must run before body renders to avoid flash -->
 <script>
 (function(){
@@ -268,7 +268,7 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .menu-overlay.open { opacity:1; visibility:visible; }
 .slide-menu { position:fixed; top:0; right:-280px; width:280px; height:100%; background:var(--card); border-left:1px solid var(--border); z-index:101; transition:right 0.3s ease; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; display:flex; flex-direction:column; }
 .slide-menu.open { right:0; }
-.menu-header { padding:16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.menu-header { padding:16px; padding-top:calc(env(safe-area-inset-top, 0px) + 16px); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
 .menu-header h2 { margin:0; font-size:16px; }
 .menu-close { background:none; border:none; color:var(--txt); font-size:24px; cursor:pointer; padding:4px; line-height:1; }
 .menu-close:hover { color:var(--danger); }
@@ -515,6 +515,38 @@ html:has(.install-gate.show) { background:#050d08; }
 .install-gate-actions .btn.primary { background:#16a34a; color:#fff; }
 .install-gate-actions .btn.secondary { background:transparent; color:rgba(255,255,255,0.4); font-size:12px; font-weight:500; padding:8px; }
 body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { display:none; }
+
+/* === ROUND HISTORY === */
+.history-overlay { position:fixed; top:0; left:0; right:0; bottom:0; z-index:300; background:var(--bg); display:flex; flex-direction:column; overflow:hidden; }
+.history-header { padding:12px 16px; padding-top:calc(env(safe-area-inset-top, 0px) + 12px); border-bottom:1px solid var(--border); background:var(--card); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+.history-header h2 { margin:0; font-size:18px; }
+.history-back { background:none; border:none; color:var(--acc); font-size:15px; cursor:pointer; padding:4px 8px; }
+.history-list { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:12px; }
+.history-empty { text-align:center; color:var(--muted); padding:60px 20px; font-size:15px; }
+.history-round { background:var(--card); border:1px solid var(--border); border-radius:var(--radius, 14px); padding:14px; margin-bottom:10px; cursor:pointer; transition:transform 0.15s; }
+.history-round:active { transform:scale(0.98); }
+.history-round-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+.history-round-date { font-weight:700; font-size:15px; }
+.history-round-course { font-size:13px; color:var(--muted); }
+.history-round-games { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+.history-round-games .pill { display:inline-block; padding:2px 8px; font-size:11px; border-radius:999px; background:rgba(59,130,246,0.15); color:var(--acc); font-weight:600; text-transform:uppercase; }
+.history-round-players { font-size:13px; color:var(--muted); }
+.history-round-net { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; font-size:13px; }
+.history-round-net span { padding:2px 6px; border-radius:6px; }
+.history-round-net .winner { background:rgba(22,163,74,0.15); color:var(--success); font-weight:600; }
+.history-round-net .loser { color:var(--muted); }
+.history-detail { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:12px; }
+.history-detail-section { background:var(--card); border:1px solid var(--border); border-radius:var(--radius, 14px); padding:14px; margin-bottom:10px; }
+.history-detail-section h3 { margin:0 0 10px 0; font-size:15px; }
+.history-detail-section table { width:100%; border-collapse:collapse; font-size:13px; }
+.history-detail-section th, .history-detail-section td { padding:4px 6px; text-align:center; border-bottom:1px solid var(--border); }
+.history-detail-section th { color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; }
+.history-transfers li { padding:4px 0; font-size:14px; }
+.history-delete { background:none; border:1px solid var(--danger); color:var(--danger); border-radius:8px; padding:10px; width:100%; font-size:14px; cursor:pointer; margin-top:8px; }
+.history-delete:hover { background:var(--danger); color:#fff; }
+.wizard-history-link { width:100%; text-align:center; margin-top:4px; }
+.wizard-history-link a { color:var(--muted); font-size:13px; text-decoration:underline; cursor:pointer; }
+.wizard-history-link a:hover { color:var(--acc); }
 </style>
 </head>
 <body class="splashing" style="background:#000">
@@ -567,6 +599,9 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
     <button class="menu-item" id="joinBtn">Join Game</button>
   </div>
   <div class="menu-section">
+    <button class="menu-item" id="historyMenuBtn" style="font-weight:600;">📋 Round History</button>
+  </div>
+  <div class="menu-section">
     <div class="menu-section-title">Actions</div>
     <button class="menu-item" id="resetBtn">New Round</button>
     <button class="menu-item" id="clearBtn">Clear Scores</button>
@@ -592,9 +627,14 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.1';
+const APP_VERSION = '7.2';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.2': [
+    'Round History — completed rounds are auto-saved and browsable from the wizard or menu',
+    'View old scorecards, settlements, and player nets anytime',
+    'Fixed menu overlap with phone notch/Dynamic Island',
+  ],
   '7.1': [
     'Historical status bars — scroll back to any hole and see bet status as of that hole',
     'Press at the turn — wizard offers trailing team a press when you reach hole 10',
@@ -1074,6 +1114,256 @@ const State = {
       Err.show('Load failed: ' + e.message);
       return false; 
     }
+  }
+};
+
+// === ROUND HISTORY ===
+const HISTORY_KEY = 'bunchbets_history';
+const HISTORY_MAX = 50;
+
+const History = {
+  load() {
+    try {
+      const raw = localStorage.getItem(HISTORY_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch(e) { return []; }
+  },
+
+  save(rounds) {
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(rounds.slice(0, HISTORY_MAX)));
+    } catch(e) { Err.show('History save failed: ' + e.message); }
+  },
+
+  // Snapshot current round before clearing
+  archiveCurrent() {
+    if (!State.data.games.length) return;
+    // Must have at least some scores entered
+    const hasScores = State.data.games.some(g =>
+      State.data.players.some(p => {
+        const s = g.gross[p.id];
+        return s && s.some(v => v !== null);
+      })
+    );
+    if (!hasScores) return;
+
+    // Prevent duplicate saves for the same round
+    const rounds = this.load();
+    const fingerprint = State.data.players.map(p => p.name).sort().join(',') + '|' +
+      State.data.course.name + '|' + State.data.lastActiveDate;
+    if (rounds.length && rounds[0]._fp === fingerprint) {
+      // Update the existing entry with latest data instead of duplicating
+      rounds.shift();
+    }
+
+    const net = {};
+    State.data.players.forEach(p => net[p.id] = 0);
+    State.data.games.forEach(g => {
+      const gameNet = Game.computeGamePlayerNet(g);
+      Object.keys(gameNet).forEach(pid => { net[pid] = (net[pid]||0) + gameNet[pid]; });
+    });
+
+    const snapshot = {
+      id: Utils.uid(),
+      _fp: fingerprint,
+      date: new Date().toISOString(),
+      course: Utils.clone(State.data.course),
+      players: Utils.clone(State.data.players),
+      games: Utils.clone(State.data.games),
+      playerNet: Utils.clone(net)
+    };
+
+    rounds.unshift(snapshot);
+    this.save(rounds);
+  },
+
+  deleteRound(id) {
+    const rounds = this.load().filter(r => r.id !== id);
+    this.save(rounds);
+  },
+
+  formatDate(iso) {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric', year:'numeric'});
+    } catch(e) { return iso; }
+  },
+
+  gameLabel(type) {
+    const labels = {nassau:'Nassau', vegas:'Vegas', skins:'Skins', wolf:'Wolf', ninepoint:'9-Point'};
+    return labels[type] || type;
+  },
+
+  show() {
+    const rounds = this.load();
+    const overlay = document.createElement('div');
+    overlay.className = 'history-overlay';
+    overlay.innerHTML = `
+      <div class="history-header">
+        <button class="history-back" id="historyBack">&larr; Back</button>
+        <h2>Round History</h2>
+        <div style="width:60px;"></div>
+      </div>
+      <div class="history-list" id="historyList"></div>
+    `;
+    document.body.appendChild(overlay);
+
+    const list = overlay.querySelector('#historyList');
+    if (!rounds.length) {
+      list.innerHTML = '<div class="history-empty">No saved rounds yet.<br><br>Rounds are automatically saved when you start a new game.</div>';
+    } else {
+      list.innerHTML = rounds.map(r => {
+        const gameTypes = [...new Set(r.games.map(g => g.gameType))];
+        const playerNames = r.players.map(p => p.name).join(', ');
+        const netEntries = Object.entries(r.playerNet || {})
+          .map(([pid, val]) => ({name: (r.players.find(p => p.id === pid)||{}).name || pid, val}))
+          .sort((a,b) => b.val - a.val);
+        const netHtml = netEntries.map(e =>
+          `<span class="${e.val > 0.005 ? 'winner' : e.val < -0.005 ? 'loser' : ''}">${e.name}: ${e.val > 0 ? '+' : ''}${Utils.fmt(e.val)}</span>`
+        ).join('');
+
+        return `<div class="history-round" data-id="${r.id}">
+          <div class="history-round-top">
+            <div>
+              <div class="history-round-date">${this.formatDate(r.date)}</div>
+              <div class="history-round-course">${r.course.name || 'Custom Course'}</div>
+            </div>
+          </div>
+          <div class="history-round-games">${gameTypes.map(t => `<span class="pill">${this.gameLabel(t)}</span>`).join('')}</div>
+          <div class="history-round-players">${playerNames}</div>
+          <div class="history-round-net">${netHtml}</div>
+        </div>`;
+      }).join('');
+    }
+
+    // Event listeners
+    overlay.querySelector('#historyBack').onclick = () => overlay.remove();
+    list.querySelectorAll('.history-round').forEach(el => {
+      el.onclick = () => this.showDetail(el.dataset.id, overlay);
+    });
+  },
+
+  showDetail(id, parentOverlay) {
+    const rounds = this.load();
+    const r = rounds.find(x => x.id === id);
+    if (!r) return;
+
+    const detailEl = parentOverlay.querySelector('#historyList');
+    const headerH2 = parentOverlay.querySelector('.history-header h2');
+    headerH2.textContent = this.formatDate(r.date);
+
+    // Build scores table
+    const players = r.players || [];
+    let scoresHtml = '';
+    if (r.games.length && players.length) {
+      const g = r.games[0]; // Primary game for scores
+      const pids = players.map(p => p.id);
+      let headerRow = '<th>Hole</th><th>Par</th>' + players.map(p => `<th>${p.name}</th>`).join('');
+      let rows = '';
+      for (let h = 0; h < 18; h++) {
+        rows += `<tr><td style="font-weight:600;">${h+1}</td><td>${r.course.par[h]||''}</td>`;
+        players.forEach(p => {
+          const s = g.gross[p.id];
+          const val = s ? s[h] : null;
+          rows += `<td>${val !== null && val !== undefined ? val : '-'}</td>`;
+        });
+        rows += '</tr>';
+        if (h === 8) {
+          // Front 9 totals
+          rows += '<tr style="font-weight:700;border-top:2px solid var(--border);"><td>OUT</td><td>' + Utils.sumRange(r.course.par,0,8) + '</td>';
+          players.forEach(p => {
+            const s = g.gross[p.id];
+            const tot = s ? Utils.sumRange(s,0,8) : null;
+            rows += `<td>${tot !== null ? tot : '-'}</td>`;
+          });
+          rows += '</tr>';
+        }
+      }
+      // Back 9 + total
+      rows += '<tr style="font-weight:700;border-top:2px solid var(--border);"><td>IN</td><td>' + Utils.sumRange(r.course.par,9,17) + '</td>';
+      players.forEach(p => {
+        const s = r.games[0].gross[p.id];
+        const tot = s ? Utils.sumRange(s,9,17) : null;
+        rows += `<td>${tot !== null ? tot : '-'}</td>`;
+      });
+      rows += '</tr>';
+      rows += '<tr style="font-weight:700;"><td>TOT</td><td>' + Utils.sumRange(r.course.par,0,17) + '</td>';
+      players.forEach(p => {
+        const s = r.games[0].gross[p.id];
+        const f = s ? Utils.sumRange(s,0,8) : null;
+        const b = s ? Utils.sumRange(s,9,17) : null;
+        const tot = (f !== null || b !== null) ? ((f||0)+(b||0)) : null;
+        rows += `<td>${tot !== null ? tot : '-'}</td>`;
+      });
+      rows += '</tr>';
+
+      scoresHtml = `<div class="history-detail-section">
+        <h3>Scorecard</h3>
+        <div style="overflow-x:auto;">
+          <table><thead><tr>${headerRow}</tr></thead><tbody>${rows}</tbody></table>
+        </div>
+      </div>`;
+    }
+
+    // Settlement summary
+    const netEntries = Object.entries(r.playerNet || {})
+      .map(([pid, val]) => ({pid, name: (players.find(p => p.id === pid)||{}).name || pid, val}))
+      .sort((a,b) => b.val - a.val);
+
+    // Compute transfers from saved net
+    const xfers = UI.calcTransfers(r.playerNet || {});
+    let xferHtml = '<p style="color:var(--muted);">All square!</p>';
+    if (xfers.length) {
+      const pName = pid => (players.find(p => p.id === pid)||{}).name || pid;
+      xferHtml = '<ul class="history-transfers" style="margin:0;padding-left:20px;">' +
+        xfers.map(x => `<li>${pName(x.from)} &rarr; ${pName(x.to)}: ${Utils.fmt(x.amount)}</li>`).join('') +
+        '</ul>';
+    }
+
+    const netHtml = netEntries.map(e =>
+      `<div style="display:flex;justify-content:space-between;padding:4px 0;">
+        <span>${e.name}</span>
+        <span style="font-weight:600;color:${e.val > 0.005 ? 'var(--success)' : e.val < -0.005 ? 'var(--danger)' : 'var(--muted)'};">${e.val > 0 ? '+' : ''}${Utils.fmt(e.val)}</span>
+      </div>`
+    ).join('');
+
+    const gamesHtml = r.games.map(g => `<span class="pill">${this.gameLabel(g.gameType)}</span>`).join(' ');
+
+    detailEl.className = 'history-detail';
+    detailEl.innerHTML = `
+      <div class="history-detail-section">
+        <h3>${r.course.name || 'Custom Course'}</h3>
+        <div style="margin-bottom:8px;">${gamesHtml}</div>
+        <div style="color:var(--muted);font-size:13px;">${players.map(p => p.name).join(', ')}</div>
+      </div>
+      <div class="history-detail-section">
+        <h3>Settlement</h3>
+        ${xferHtml}
+      </div>
+      <div class="history-detail-section">
+        <h3>Player Net</h3>
+        ${netHtml}
+      </div>
+      ${scoresHtml}
+      <button class="history-delete" id="historyDeleteRound">Delete This Round</button>
+    `;
+
+    // Rewire back button to go back to list
+    const backBtn = parentOverlay.querySelector('#historyBack');
+    backBtn.onclick = () => {
+      headerH2.textContent = 'Round History';
+      parentOverlay.remove();
+      this.show();
+    };
+
+    detailEl.querySelector('#historyDeleteRound').onclick = () => {
+      if (!confirm('Delete this round from history?')) return;
+      this.deleteRound(id);
+      headerH2.textContent = 'Round History';
+      parentOverlay.remove();
+      this.show();
+      Err.toast('Round deleted');
+    };
   }
 };
 
@@ -2854,6 +3144,7 @@ const Wizard = {
           <a id="wizardSkip">Skip to Advanced Setup</a>
         </div>
         <button class="wizard-join-live" id="wizardJoinLive">📡 Join Live Game</button>
+        <div class="wizard-history-link"><a id="wizardViewHistory">View Old Rounds</a></div>
       </div>
     `;
 
@@ -3016,6 +3307,9 @@ const Wizard = {
         this.active = false;
         this.removeOverlay();
         LiveSync.showJoinModal();
+      };
+      document.getElementById('wizardViewHistory').onclick = () => {
+        History.show();
       };
     }, 0);
 
@@ -7673,9 +7967,10 @@ const UI = {
   },
 
   showRoundCompleteModal() {
-    // Fire analytics event once per round
+    // Fire analytics event and auto-save to history once per round
     if (!State.data.roundCompleteShown) {
       State.data.roundCompleteShown = true;
+      History.archiveCurrent();
       const gameTypes = [...new Set(State.data.games.map(g => g.gameType))];
       gtag('event', 'round_completed', {
         player_count: State.data.players.length,
@@ -8539,9 +8834,12 @@ if (!State.load() || !State.data.games.length) {
 
 State.data.games = State.data.games.map(Game.sanitize);
 
+document.getElementById('historyMenuBtn').onclick = () => { UI.closeMenu(); History.show(); };
+
 document.getElementById('resetBtn').onclick = () => {
   UI.closeMenu();
   if (!confirm('New round? Same players, new game setup. Scores will be cleared.')) return;
+  History.archiveCurrent();
   // Keep players and course, clear games/scores
   State.data.games = [];
   State.data.roundCompleteShown = false;
@@ -8602,6 +8900,7 @@ document.getElementById('joinBtn').onclick = () => { UI.closeMenu(); LiveSync.sh
 // Wizard button
 document.getElementById('startWizardBtn').onclick = () => {
   if (!confirm('Start a new game?\n\nThis will erase all players, scores, and settings.')) return;
+  History.archiveCurrent();
   UI.closeMenu();
   // Keep course and presets, wipe everything else — behave like a fresh session
   const keepCourse = Utils.clone(State.data.course);
