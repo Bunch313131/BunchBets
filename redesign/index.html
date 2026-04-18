@@ -20,9 +20,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&display=swap" rel="stylesheet">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
-<link rel="apple-touch-icon" sizes="180x180" href="BunchBets180.png">
+<link rel="apple-touch-icon" sizes="180x180" href="BunchBets180_red.png">
 <link rel="manifest" href="manifest.webmanifest">
-<title>Bunch Bets V7.2</title>
+<title>Bunch Bets V7.1</title>
 <!-- Viewport height fix — must run before body renders to avoid flash -->
 <script>
 (function(){
@@ -268,7 +268,7 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .menu-overlay.open { opacity:1; visibility:visible; }
 .slide-menu { position:fixed; top:0; right:-280px; width:280px; height:100%; background:var(--card); border-left:1px solid var(--border); z-index:101; transition:right 0.3s ease; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; display:flex; flex-direction:column; }
 .slide-menu.open { right:0; }
-.menu-header { padding:16px; padding-top:calc(env(safe-area-inset-top, 0px) + 16px); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.menu-header { padding:16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
 .menu-header h2 { margin:0; font-size:16px; }
 .menu-close { background:none; border:none; color:var(--txt); font-size:24px; cursor:pointer; padding:4px; line-height:1; }
 .menu-close:hover { color:var(--danger); }
@@ -515,45 +515,13 @@ html:has(.install-gate.show) { background:#050d08; }
 .install-gate-actions .btn.primary { background:#16a34a; color:#fff; }
 .install-gate-actions .btn.secondary { background:transparent; color:rgba(255,255,255,0.4); font-size:12px; font-weight:500; padding:8px; }
 body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { display:none; }
-
-/* === ROUND HISTORY === */
-.history-overlay { position:fixed; top:0; left:0; right:0; bottom:0; z-index:300; background:var(--bg); display:flex; flex-direction:column; overflow:hidden; }
-.history-header { padding:12px 16px; padding-top:calc(env(safe-area-inset-top, 0px) + 12px); border-bottom:1px solid var(--border); background:var(--card); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
-.history-header h2 { margin:0; font-size:18px; }
-.history-back { background:none; border:none; color:var(--acc); font-size:15px; cursor:pointer; padding:4px 8px; }
-.history-list { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:12px; }
-.history-empty { text-align:center; color:var(--muted); padding:60px 20px; font-size:15px; }
-.history-round { background:var(--card); border:1px solid var(--border); border-radius:var(--radius, 14px); padding:14px; margin-bottom:10px; cursor:pointer; transition:transform 0.15s; }
-.history-round:active { transform:scale(0.98); }
-.history-round-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
-.history-round-date { font-weight:700; font-size:15px; }
-.history-round-course { font-size:13px; color:var(--muted); }
-.history-round-games { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
-.history-round-games .pill { display:inline-block; padding:2px 8px; font-size:11px; border-radius:999px; background:rgba(59,130,246,0.15); color:var(--acc); font-weight:600; text-transform:uppercase; }
-.history-round-players { font-size:13px; color:var(--muted); }
-.history-round-net { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; font-size:13px; }
-.history-round-net span { padding:2px 6px; border-radius:6px; }
-.history-round-net .winner { background:rgba(22,163,74,0.15); color:var(--success); font-weight:600; }
-.history-round-net .loser { color:var(--muted); }
-.history-detail { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:12px; }
-.history-detail-section { background:var(--card); border:1px solid var(--border); border-radius:var(--radius, 14px); padding:14px; margin-bottom:10px; }
-.history-detail-section h3 { margin:0 0 10px 0; font-size:15px; }
-.history-detail-section table { width:100%; border-collapse:collapse; font-size:13px; }
-.history-detail-section th, .history-detail-section td { padding:4px 6px; text-align:center; border-bottom:1px solid var(--border); }
-.history-detail-section th { color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; }
-.history-transfers li { padding:4px 0; font-size:14px; }
-.history-delete { background:none; border:1px solid var(--danger); color:var(--danger); border-radius:8px; padding:10px; width:100%; font-size:14px; cursor:pointer; margin-top:8px; }
-.history-delete:hover { background:var(--danger); color:#fff; }
-.wizard-history-link { width:100%; text-align:center; margin-top:4px; }
-.wizard-history-link a { color:var(--muted); font-size:13px; text-decoration:underline; cursor:pointer; }
-.wizard-history-link a:hover { color:var(--acc); }
 </style>
 </head>
 <body class="splashing" style="background:#000">
 <header>
   <div class="row" style="align-items:center; justify-content:space-between;">
     <div class="header-brand">
-      <img src="BunchBets180.png" alt="Bunch Bets">
+      <img src="BunchBets180_red.png" alt="Bunch Bets">
       <div class="header-info">
         <div class="header-date" id="headerDate"></div>
         <div class="header-weather" id="headerWeather"></div>
@@ -599,9 +567,6 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
     <button class="menu-item" id="joinBtn">Join Game</button>
   </div>
   <div class="menu-section">
-    <button class="menu-item" id="historyMenuBtn" style="font-weight:600;">📋 Round History</button>
-  </div>
-  <div class="menu-section">
     <div class="menu-section-title">Actions</div>
     <button class="menu-item" id="resetBtn">New Round</button>
     <button class="menu-item" id="clearBtn">Clear Scores</button>
@@ -627,14 +592,9 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.2';
+const APP_VERSION = '7.1';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
-  '7.2': [
-    'Round History — completed rounds are auto-saved and browsable from the wizard or menu',
-    'View old scorecards, settlements, and player nets anytime',
-    'Fixed menu overlap with phone notch/Dynamic Island',
-  ],
   '7.1': [
     'Historical status bars — scroll back to any hole and see bet status as of that hole',
     'Press at the turn — wizard offers trailing team a press when you reach hole 10',
@@ -909,14 +869,25 @@ window.LiveSync = {
         </div>
         <p class="muted" style="font-size:12px;">Or share this link:</p>
         <input type="text" value="${url}" readonly style="font-size:12px;margin-bottom:8px;" onclick="this.select()">
-        <div class="modal-actions">
-          <button class="btn" onclick="this.closest('.modal-overlay').remove()">Close</button>
+        <div class="modal-actions" style="flex-wrap:wrap;gap:8px;">
+          <button class="btn primary" id="shareInviteBtn" style="width:100%;">Share Invite</button>
           <button class="copy-btn" onclick="navigator.clipboard.writeText('${code}');Err.toast('Code copied!');">Copy Code</button>
           <button class="copy-btn" onclick="navigator.clipboard.writeText('${url}');Err.toast('Link copied!');">Copy Link</button>
+          <button class="btn" onclick="this.closest('.modal-overlay').remove()">Close</button>
         </div>
       </div>
     `;
     document.body.appendChild(overlay);
+    document.getElementById('shareInviteBtn').onclick = async () => {
+      const msg = `Join my Bunch Bets game!\n\nOpen Bunch Bets from your home screen, tap Join Live Game, and paste this code:\n\n${code}\n\nDon't have the app? Tap this link:\n${url}`;
+      if (navigator.share) {
+        try { await navigator.share({ title: 'Bunch Bets — Join My Game', text: msg }); }
+        catch(e) { if (e.name !== 'AbortError') { navigator.clipboard.writeText(msg); Err.toast('Invite copied!'); } }
+      } else {
+        navigator.clipboard.writeText(msg);
+        Err.toast('Invite copied to clipboard!');
+      }
+    };
     overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
   },
 
@@ -1117,256 +1088,6 @@ const State = {
   }
 };
 
-// === ROUND HISTORY ===
-const HISTORY_KEY = 'bunchbets_history';
-const HISTORY_MAX = 50;
-
-const History = {
-  load() {
-    try {
-      const raw = localStorage.getItem(HISTORY_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch(e) { return []; }
-  },
-
-  save(rounds) {
-    try {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(rounds.slice(0, HISTORY_MAX)));
-    } catch(e) { Err.show('History save failed: ' + e.message); }
-  },
-
-  // Snapshot current round before clearing
-  archiveCurrent() {
-    if (!State.data.games.length) return;
-    // Must have at least some scores entered
-    const hasScores = State.data.games.some(g =>
-      State.data.players.some(p => {
-        const s = g.gross[p.id];
-        return s && s.some(v => v !== null);
-      })
-    );
-    if (!hasScores) return;
-
-    // Prevent duplicate saves for the same round
-    const rounds = this.load();
-    const fingerprint = State.data.players.map(p => p.name).sort().join(',') + '|' +
-      State.data.course.name + '|' + State.data.lastActiveDate;
-    if (rounds.length && rounds[0]._fp === fingerprint) {
-      // Update the existing entry with latest data instead of duplicating
-      rounds.shift();
-    }
-
-    const net = {};
-    State.data.players.forEach(p => net[p.id] = 0);
-    State.data.games.forEach(g => {
-      const gameNet = Game.computeGamePlayerNet(g);
-      Object.keys(gameNet).forEach(pid => { net[pid] = (net[pid]||0) + gameNet[pid]; });
-    });
-
-    const snapshot = {
-      id: Utils.uid(),
-      _fp: fingerprint,
-      date: new Date().toISOString(),
-      course: Utils.clone(State.data.course),
-      players: Utils.clone(State.data.players),
-      games: Utils.clone(State.data.games),
-      playerNet: Utils.clone(net)
-    };
-
-    rounds.unshift(snapshot);
-    this.save(rounds);
-  },
-
-  deleteRound(id) {
-    const rounds = this.load().filter(r => r.id !== id);
-    this.save(rounds);
-  },
-
-  formatDate(iso) {
-    try {
-      const d = new Date(iso);
-      return d.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric', year:'numeric'});
-    } catch(e) { return iso; }
-  },
-
-  gameLabel(type) {
-    const labels = {nassau:'Nassau', vegas:'Vegas', skins:'Skins', wolf:'Wolf', ninepoint:'9-Point'};
-    return labels[type] || type;
-  },
-
-  show() {
-    const rounds = this.load();
-    const overlay = document.createElement('div');
-    overlay.className = 'history-overlay';
-    overlay.innerHTML = `
-      <div class="history-header">
-        <button class="history-back" id="historyBack">&larr; Back</button>
-        <h2>Round History</h2>
-        <div style="width:60px;"></div>
-      </div>
-      <div class="history-list" id="historyList"></div>
-    `;
-    document.body.appendChild(overlay);
-
-    const list = overlay.querySelector('#historyList');
-    if (!rounds.length) {
-      list.innerHTML = '<div class="history-empty">No saved rounds yet.<br><br>Rounds are automatically saved when you start a new game.</div>';
-    } else {
-      list.innerHTML = rounds.map(r => {
-        const gameTypes = [...new Set(r.games.map(g => g.gameType))];
-        const playerNames = r.players.map(p => p.name).join(', ');
-        const netEntries = Object.entries(r.playerNet || {})
-          .map(([pid, val]) => ({name: (r.players.find(p => p.id === pid)||{}).name || pid, val}))
-          .sort((a,b) => b.val - a.val);
-        const netHtml = netEntries.map(e =>
-          `<span class="${e.val > 0.005 ? 'winner' : e.val < -0.005 ? 'loser' : ''}">${e.name}: ${e.val > 0 ? '+' : ''}${Utils.fmt(e.val)}</span>`
-        ).join('');
-
-        return `<div class="history-round" data-id="${r.id}">
-          <div class="history-round-top">
-            <div>
-              <div class="history-round-date">${this.formatDate(r.date)}</div>
-              <div class="history-round-course">${r.course.name || 'Custom Course'}</div>
-            </div>
-          </div>
-          <div class="history-round-games">${gameTypes.map(t => `<span class="pill">${this.gameLabel(t)}</span>`).join('')}</div>
-          <div class="history-round-players">${playerNames}</div>
-          <div class="history-round-net">${netHtml}</div>
-        </div>`;
-      }).join('');
-    }
-
-    // Event listeners
-    overlay.querySelector('#historyBack').onclick = () => overlay.remove();
-    list.querySelectorAll('.history-round').forEach(el => {
-      el.onclick = () => this.showDetail(el.dataset.id, overlay);
-    });
-  },
-
-  showDetail(id, parentOverlay) {
-    const rounds = this.load();
-    const r = rounds.find(x => x.id === id);
-    if (!r) return;
-
-    const detailEl = parentOverlay.querySelector('#historyList');
-    const headerH2 = parentOverlay.querySelector('.history-header h2');
-    headerH2.textContent = this.formatDate(r.date);
-
-    // Build scores table
-    const players = r.players || [];
-    let scoresHtml = '';
-    if (r.games.length && players.length) {
-      const g = r.games[0]; // Primary game for scores
-      const pids = players.map(p => p.id);
-      let headerRow = '<th>Hole</th><th>Par</th>' + players.map(p => `<th>${p.name}</th>`).join('');
-      let rows = '';
-      for (let h = 0; h < 18; h++) {
-        rows += `<tr><td style="font-weight:600;">${h+1}</td><td>${r.course.par[h]||''}</td>`;
-        players.forEach(p => {
-          const s = g.gross[p.id];
-          const val = s ? s[h] : null;
-          rows += `<td>${val !== null && val !== undefined ? val : '-'}</td>`;
-        });
-        rows += '</tr>';
-        if (h === 8) {
-          // Front 9 totals
-          rows += '<tr style="font-weight:700;border-top:2px solid var(--border);"><td>OUT</td><td>' + Utils.sumRange(r.course.par,0,8) + '</td>';
-          players.forEach(p => {
-            const s = g.gross[p.id];
-            const tot = s ? Utils.sumRange(s,0,8) : null;
-            rows += `<td>${tot !== null ? tot : '-'}</td>`;
-          });
-          rows += '</tr>';
-        }
-      }
-      // Back 9 + total
-      rows += '<tr style="font-weight:700;border-top:2px solid var(--border);"><td>IN</td><td>' + Utils.sumRange(r.course.par,9,17) + '</td>';
-      players.forEach(p => {
-        const s = r.games[0].gross[p.id];
-        const tot = s ? Utils.sumRange(s,9,17) : null;
-        rows += `<td>${tot !== null ? tot : '-'}</td>`;
-      });
-      rows += '</tr>';
-      rows += '<tr style="font-weight:700;"><td>TOT</td><td>' + Utils.sumRange(r.course.par,0,17) + '</td>';
-      players.forEach(p => {
-        const s = r.games[0].gross[p.id];
-        const f = s ? Utils.sumRange(s,0,8) : null;
-        const b = s ? Utils.sumRange(s,9,17) : null;
-        const tot = (f !== null || b !== null) ? ((f||0)+(b||0)) : null;
-        rows += `<td>${tot !== null ? tot : '-'}</td>`;
-      });
-      rows += '</tr>';
-
-      scoresHtml = `<div class="history-detail-section">
-        <h3>Scorecard</h3>
-        <div style="overflow-x:auto;">
-          <table><thead><tr>${headerRow}</tr></thead><tbody>${rows}</tbody></table>
-        </div>
-      </div>`;
-    }
-
-    // Settlement summary
-    const netEntries = Object.entries(r.playerNet || {})
-      .map(([pid, val]) => ({pid, name: (players.find(p => p.id === pid)||{}).name || pid, val}))
-      .sort((a,b) => b.val - a.val);
-
-    // Compute transfers from saved net
-    const xfers = UI.calcTransfers(r.playerNet || {});
-    let xferHtml = '<p style="color:var(--muted);">All square!</p>';
-    if (xfers.length) {
-      const pName = pid => (players.find(p => p.id === pid)||{}).name || pid;
-      xferHtml = '<ul class="history-transfers" style="margin:0;padding-left:20px;">' +
-        xfers.map(x => `<li>${pName(x.from)} &rarr; ${pName(x.to)}: ${Utils.fmt(x.amount)}</li>`).join('') +
-        '</ul>';
-    }
-
-    const netHtml = netEntries.map(e =>
-      `<div style="display:flex;justify-content:space-between;padding:4px 0;">
-        <span>${e.name}</span>
-        <span style="font-weight:600;color:${e.val > 0.005 ? 'var(--success)' : e.val < -0.005 ? 'var(--danger)' : 'var(--muted)'};">${e.val > 0 ? '+' : ''}${Utils.fmt(e.val)}</span>
-      </div>`
-    ).join('');
-
-    const gamesHtml = r.games.map(g => `<span class="pill">${this.gameLabel(g.gameType)}</span>`).join(' ');
-
-    detailEl.className = 'history-detail';
-    detailEl.innerHTML = `
-      <div class="history-detail-section">
-        <h3>${r.course.name || 'Custom Course'}</h3>
-        <div style="margin-bottom:8px;">${gamesHtml}</div>
-        <div style="color:var(--muted);font-size:13px;">${players.map(p => p.name).join(', ')}</div>
-      </div>
-      <div class="history-detail-section">
-        <h3>Settlement</h3>
-        ${xferHtml}
-      </div>
-      <div class="history-detail-section">
-        <h3>Player Net</h3>
-        ${netHtml}
-      </div>
-      ${scoresHtml}
-      <button class="history-delete" id="historyDeleteRound">Delete This Round</button>
-    `;
-
-    // Rewire back button to go back to list
-    const backBtn = parentOverlay.querySelector('#historyBack');
-    backBtn.onclick = () => {
-      headerH2.textContent = 'Round History';
-      parentOverlay.remove();
-      this.show();
-    };
-
-    detailEl.querySelector('#historyDeleteRound').onclick = () => {
-      if (!confirm('Delete this round from history?')) return;
-      this.deleteRound(id);
-      headerH2.textContent = 'Round History';
-      parentOverlay.remove();
-      this.show();
-      Err.toast('Round deleted');
-    };
-  }
-};
-
 // === GAME LOGIC ===
 const Game = {
   create(clone = false) {
@@ -1402,7 +1123,6 @@ const Game = {
       // Each entry: { ranking: [pid1, pid2, ...] } ordered closest to farthest (on green + made par or better)
       // null = no KP data entered for this hole
       kpData: Utils.make18(null),
-      vegasBirdieDouble: false,
       quadsConfirmed: {},
       handicapMode: 'full' // full, off_low, team_delta
     };
@@ -1447,7 +1167,6 @@ const Game = {
     g.ninePointMode = ['net','gross'].includes(g.ninePointMode) ? g.ninePointMode : 'net';
     g.ninePointWinBy2 = g.ninePointWinBy2 !== false;
     g.ninePointBirdieDouble = g.ninePointBirdieDouble === true;
-    g.vegasBirdieDouble = g.vegasBirdieDouble === true;
     g.handicapMode = ['full','off_low','team_delta'].includes(g.handicapMode) ? g.handicapMode : 'full';
 
     let pa = Array.isArray(g.presses) ? g.presses.slice(0,18) : Utils.make18('');
@@ -2138,11 +1857,7 @@ const Game = {
     let multiplier = 1;
     if (press === 'press') multiplier = 2;
     else if (press === 'blind') multiplier = 4;
-
-    const bothABirdie = teamA.p1gross < par && teamA.p2gross < par;
-    const bothBBirdie = teamB.p1gross < par && teamB.p2gross < par;
-    if (g.vegasBirdieDouble && (bothABirdie || bothBBirdie)) multiplier *= 2;
-
+    
     return {
       numA,
       numB,
@@ -2150,8 +1865,6 @@ const Game = {
       bFlip,
       aHasBirdie: hasBirdie(teamA),
       bHasBirdie: hasBirdie(teamB),
-      bothABirdie,
-      bothBBirdie,
       basePoints,
       multiplier,
       pointsToA: basePoints * multiplier
@@ -2868,7 +2581,6 @@ const Wizard = {
       g.ninePointValue = wg.ninePointValue || 1;
       g.ninePointWinBy2 = wg.ninePointWinBy2 !== false;
       g.ninePointBirdieDouble = wg.ninePointBirdieDouble === true;
-      g.vegasBirdieDouble = wg.vegasBirdieDouble === true;
       g.handicapMode = wg.handicapMode || 'full';
 
       // Apply handicap strokes based on mode
@@ -3068,6 +2780,7 @@ const Wizard = {
       if (s) s.classList.add('morph');
     }, 5200);
 
+
     // Bokeh particle system
     requestAnimationFrame(() => {
       const canvas = div.querySelector('canvas.splash-particles');
@@ -3144,7 +2857,6 @@ const Wizard = {
           <a id="wizardSkip">Skip to Advanced Setup</a>
         </div>
         <button class="wizard-join-live" id="wizardJoinLive">📡 Join Live Game</button>
-        <div class="wizard-history-link"><a id="wizardViewHistory">View Old Rounds</a></div>
       </div>
     `;
 
@@ -3307,9 +3019,6 @@ const Wizard = {
         this.active = false;
         this.removeOverlay();
         LiveSync.showJoinModal();
-      };
-      document.getElementById('wizardViewHistory').onclick = () => {
-        History.show();
       };
     }, 0);
 
@@ -3759,15 +3468,6 @@ const Wizard = {
         </div>
         ` : ''}
 
-        ${g.gameType === 'vegas' ? `
-        <div class="wizard-section">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-            <input type="checkbox" id="wizardVegasBirdieDouble" ${g.vegasBirdieDouble?'checked':''} style="width:20px;height:20px;">
-            <span>Double Birdies (both players birdie = 2x hole)</span>
-          </label>
-        </div>
-        ` : ''}
-
         ${g.gameType === 'skins' ? `
         <div class="wizard-section">
           <div class="wizard-section-title">Buy-in (per player)</div>
@@ -4192,15 +3892,6 @@ const Wizard = {
       if (ninePointBirdieDouble) {
         ninePointBirdieDouble.onchange = (e) => {
           g.ninePointBirdieDouble = e.target.checked;
-          State.scheduleSave();
-        };
-      }
-
-      // Vegas double birdies
-      const vegasBirdieDouble = document.getElementById('wizardVegasBirdieDouble');
-      if (vegasBirdieDouble) {
-        vegasBirdieDouble.onchange = (e) => {
-          g.vegasBirdieDouble = e.target.checked;
           State.scheduleSave();
         };
       }
@@ -4987,10 +4678,6 @@ const UI = {
               h('div',{},[h('div',{class:'muted'},'Front'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.front,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.front=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.front);State.end();}})]),
               h('div',{},[h('div',{class:'muted'},'Back'),h('input',{type:'tel',inputmode:'numeric',value:g.junkValue.back,style:'width:64px;text-align:center;',onfocus:()=>State.begin(),oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},onblur:(e)=>{g.junkValue.back=parseInt(e.target.value)||0;e.target.value=String(g.junkValue.back);State.end();}})]),
             ]) : h('div',{}),
-            h('label',{style:'display:flex;align-items:center;gap:8px;margin:8px 0;cursor:pointer;'},[
-              h('input',{type:'checkbox',checked:g.vegasBirdieDouble===true,onclick:(e)=>{g.vegasBirdieDouble=e.target.checked;State.scheduleSave();}}),
-              ' Double Birdies (both birdie = 2x hole)'
-            ]),
             h('div',{class:'note',style:'margin-top:8px;'},'Flip if: opponent birdie, OR no one on your team has net par or better')
           ]) : h('div',{}),
 
@@ -6692,7 +6379,6 @@ const UI = {
           h('div',{class:'card'},[
             h('div',{class:'pill'},UI.gameLabel(g)),
             h('div',{class:'note',style:'margin-top:6px;'},`A: ${teamANames}  |  B: ${teamBNames}`),
-            g.vegasBirdieDouble ? h('div',{class:'note'},`Dbl Birdie 2x`) : null,
             h('div',{style:'margin-top:12px;'},(() => {
               const sz = (g.teamA||[]).length || 1;
               const frontPP = result.frontPoints * (g.pointValue.front || 0);
@@ -7014,7 +6700,6 @@ const UI = {
           h('div',{class:'card'},[
             h('div',{class:'pill'},UI.gameLabel(g)),
             h('div',{class:'note',style:'margin-top:6px;'},`Team A: ${teamANames.join(' & ')}  |  Team B: ${teamBNames.join(' & ')}`),
-            g.vegasBirdieDouble ? h('div',{class:'note'},`Dbl Birdie 2x`) : null,
 
             // Front 9
             h('div',{style:'margin-top:12px;'},[
@@ -7611,7 +7296,8 @@ const UI = {
 
   transactions() {
     const shareBtn = h('div',{style:'margin-bottom:12px;display:flex;gap:8px;'},[
-      h('button',{class:'btn small share',onclick:()=>this.shareImage()},'Share Results')
+      h('button',{class:'btn small share',onclick:()=>this.shareImage()},'Share Image'),
+      h('button',{class:'btn small',onclick:()=>this.share(),style:'background:var(--border);color:var(--txt);'},'Share Text')
     ]);
 
     const net = {};
@@ -7967,20 +7653,6 @@ const UI = {
   },
 
   showRoundCompleteModal() {
-    // Fire analytics event and auto-save to history once per round
-    if (!State.data.roundCompleteShown) {
-      State.data.roundCompleteShown = true;
-      History.archiveCurrent();
-      const gameTypes = [...new Set(State.data.games.map(g => g.gameType))];
-      gtag('event', 'round_completed', {
-        player_count: State.data.players.length,
-        game_count: State.data.games.length,
-        game_types: gameTypes.join(','),
-        course: State.data.course.name || 'custom'
-      });
-      State.scheduleSave();
-    }
-
     // Build quick summary using unified helper
     const net = {};
     State.data.players.forEach(p => net[p.id] = 0);
@@ -8008,7 +7680,8 @@ const UI = {
           ${transfersHtml}
         </div>
         <div class="modal-actions" style="flex-direction:column;gap:8px;">
-          <button class="btn share" id="shareImageBtn" style="width:100%;">Share Results</button>
+          <button class="btn share" id="shareImageBtn" style="width:100%;">Share Image</button>
+          <button class="btn primary" id="shareResultsBtn" style="width:100%;">Share Text</button>
           <button class="btn" id="viewPaymentsBtn" style="width:100%;">View Full Details</button>
           <button class="btn secondary" id="dismissCompleteBtn" style="width:100%;">Dismiss</button>
         </div>
@@ -8019,6 +7692,10 @@ const UI = {
     document.getElementById('shareImageBtn').onclick = () => {
       overlay.remove();
       this.shareImage();
+    };
+    document.getElementById('shareResultsBtn').onclick = () => {
+      overlay.remove();
+      this.share();
     };
     document.getElementById('viewPaymentsBtn').onclick = () => {
       overlay.remove();
@@ -8100,9 +7777,6 @@ const UI = {
         xfers.forEach(x => lines.push(`  ${UI.playerName(x.from)} → ${UI.playerName(x.to)} : ${Utils.fmt(x.amount)}`));
       }
 
-      lines.push('');
-      lines.push('\u26f3 Scored with Bunch Bets');
-      lines.push('\ud83c\udf7a Enjoying the app? Buy the creator a beer: https://venmo.com/BrianBunch1313');
       const txt = lines.join('\n');
       gtag('event', 'share_results', { method: 'text', player_count: State.data.players.length });
 
@@ -8637,10 +8311,10 @@ const UI = {
         if (!blob) { Err.show('Failed to generate image'); return; }
         const file = new File([blob], 'bunch-bets-scorecard.png', { type: 'image/png' });
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-          try { await navigator.share({ files: [file], title: 'Bunch Bets Scorecard', text: '\u26f3 Scored with Bunch Bets\n\n\ud83c\udf7a Enjoying the app? Buy the creator a beer: https://venmo.com/BrianBunch1313' }); }
+          try { await navigator.share({ files: [file], title: 'Bunch Bets Scorecard' }); }
           catch (e) { if (e.name !== 'AbortError') this._downloadCanvas(canvas); }
         } else {
-          this.share();
+          this._downloadCanvas(canvas);
         }
       }, 'image/png');
     } catch(e) {
@@ -8834,12 +8508,9 @@ if (!State.load() || !State.data.games.length) {
 
 State.data.games = State.data.games.map(Game.sanitize);
 
-document.getElementById('historyMenuBtn').onclick = () => { UI.closeMenu(); History.show(); };
-
 document.getElementById('resetBtn').onclick = () => {
   UI.closeMenu();
   if (!confirm('New round? Same players, new game setup. Scores will be cleared.')) return;
-  History.archiveCurrent();
   // Keep players and course, clear games/scores
   State.data.games = [];
   State.data.roundCompleteShown = false;
@@ -8900,7 +8571,6 @@ document.getElementById('joinBtn').onclick = () => { UI.closeMenu(); LiveSync.sh
 // Wizard button
 document.getElementById('startWizardBtn').onclick = () => {
   if (!confirm('Start a new game?\n\nThis will erase all players, scores, and settings.')) return;
-  History.archiveCurrent();
   UI.closeMenu();
   // Keep course and presets, wipe everything else — behave like a fresh session
   const keepCourse = Utils.clone(State.data.course);
@@ -8997,15 +8667,9 @@ const IOS_SHARE_SVG = `<svg class="share-icon" viewBox="0 0 24 24" fill="none" s
 const INSTALL_ICON_SVG = `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="200" height="200" rx="38" fill="#0d3a1a"/><rect x="0" y="0" width="200" height="200" rx="38" fill="url(#iiBg)"/><rect x="4" y="4" width="192" height="192" rx="36" fill="none" stroke="rgba(22,163,74,0.3)" stroke-width="1"/><rect x="0" y="0" width="200" height="200" rx="38" fill="url(#iiGlow)" opacity="0.4"/><ellipse cx="100" cy="150" rx="58" ry="14" fill="#16a34a" opacity="0.4"/><ellipse cx="100" cy="150" rx="40" ry="9" fill="#16a34a" opacity="0.3"/><ellipse cx="100" cy="150" rx="7" ry="3" fill="#000" opacity="0.7"/><line x1="100" y1="150" x2="100" y2="36" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><path d="M100,36 L100,74 Q122,60 150,53 Q122,44 100,36Z" fill="#ffdd00"/><circle cx="124" cy="140" r="18" fill="#f5f5f5"/><circle cx="124" cy="140" r="18" fill="url(#iiBallGrad)"/><text x="124" y="145" text-anchor="middle" font-size="16" font-weight="800" font-family="Inter,system-ui,sans-serif" fill="#16a34a" opacity="0.8">$</text><circle cx="118" cy="132" r="5" fill="rgba(255,255,255,0.25)"/><defs><linearGradient id="iiBg" x1="0" y1="0" x2="200" y2="200" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#0a2e14"/><stop offset="50%" stop-color="#061a0b"/><stop offset="100%" stop-color="#030d06"/></linearGradient><radialGradient id="iiBallGrad" cx="118" cy="132" r="18" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="rgba(255,255,255,0.5)"/><stop offset="50%" stop-color="rgba(255,255,255,0)"/><stop offset="100%" stop-color="rgba(0,0,0,0.2)"/></radialGradient><radialGradient id="iiGlow" cx="100" cy="80" r="100" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#16a34a"/><stop offset="100%" stop-color="#16a34a" stop-opacity="0"/></radialGradient></defs></svg>`;
 
 function confirmInstalled() {
-  const isNew = localStorage.getItem(INSTALL_KEY) !== 'true';
   localStorage.setItem(INSTALL_KEY, 'true');
   const gate = document.getElementById('installGate');
   if (gate) gate.classList.remove('show');
-  if (isNew) {
-    gtag('event', 'pwa_installed', {
-      method: isStandalone() ? 'standalone' : 'prompt'
-    });
-  }
 }
 
 function showInstallGate() {

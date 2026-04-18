@@ -1,0 +1,20 @@
+{
+  "name": "Bunch Bets V7.1",
+  "short_name": "Bunch Bets",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#1a1a1a",
+  "theme_color": "#1a1a1a",
+  "icons": [
+    {
+      "src": "BunchBets180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "BunchBets1024.png",
+      "sizes": "1024x1024",
+      "type": "image/png"
+    }
+  ]
+}
