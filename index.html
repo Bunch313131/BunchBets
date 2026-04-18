@@ -612,7 +612,6 @@ const State = {
   },
   presets: {
     'El Macero': { hcp:[7,15,9,1,11,3,17,13,5,4,2,10,8,12,14,18,6,16], par:[4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5] },
-    'El Macero New': { hcp:[15,13,9,1,7,3,17,11,5,8,2,16,6,10,12,18,4,14], par:[4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5] },
     'Del Paso': { hcp:[11,17,1,7,15,9,3,5,13,12,10,18,8,16,6,2,14,4], par:[5,3,4,5,3,4,4,4,4,4,4,3,5,3,5,4,3,4] }
   },
   locks: 0,
@@ -792,7 +791,7 @@ const Game = {
       while (ja.length < 18) ja.push(0);
       g.junkCounts[p.id] = ja.map(v => Math.max(0, parseInt(v)||0));
       
-      g.strokesCount[p.id] = parseInt(g.strokesCount[p.id])||0;
+      g.strokesCount[p.id] = Math.max(0, parseInt(g.strokesCount[p.id])||0);
     });
     return g;
   },
@@ -800,12 +799,10 @@ const Game = {
   strokes(g, pid, hole) {
     const total = g.strokesCount[pid] || 0;
     if (!total) return 0;
-    const abs = Math.abs(total);
-    const sign = total > 0 ? 1 : -1;
-    const base = Math.floor(abs / 18);
-    const rem = abs % 18;
+    const base = Math.floor(total / 18);
+    const rem = total % 18;
     const rank = State.data.course.hcp[hole] || 0;
-    return sign * (base + (rank > 0 && rank <= rem ? 1 : 0));
+    return base + (rank > 0 && rank <= rem ? 1 : 0);
   },
 
   net(gross, strokes) {
@@ -868,13 +865,11 @@ const Game = {
           }
           if (!ok) return;
           const k = Math.floor(Math.abs(cum) / 2);
-          if (k > line.pressesTriggered) {
-            if (!pressed) {
-              const next = h + 1;
-              if (!lines.some(l => l.start === next)) {
-                lines.push({start:next, end, stake, pressedBy:cum<0?'A':'B', pressesTriggered:0});
-                pressed = true;
-              }
+          if (k > line.pressesTriggered && !pressed) {
+            const next = h + 1;
+            if (!lines.some(l => l.start === next)) {
+              lines.push({start:next, end, stake, pressedBy:cum<0?'A':'B', pressesTriggered:0});
+              pressed = true;
             }
             line.pressesTriggered = k;
           }
@@ -1309,7 +1304,10 @@ const Game = {
         if (gross == null || gross === '') {
           allScored = false;
         } else {
-          scores[pid] = { gross, net: this.net(gross, this.strokes(g, pid, h)) };
+          const strokes = g.strokesCount[pid] || 0;
+          const hdcpHoles = State.data.course.hdcp || [];
+          const getsStroke = hdcpHoles[h] <= strokes;
+          scores[pid] = { gross, net: gross - (getsStroke ? 1 : 0) };
         }
       });
 
@@ -1341,17 +1339,19 @@ const Game = {
       const holeDollars = totalPoints * pointValue;
 
       if (wolfBest < otherBest) {
+        // Wolf team wins - each winner gets full points, each loser loses full points
         detail.winner = 'wolf';
         detail.points = totalPoints;
-        wolfTeam.forEach(p => { playerDollars[p] += holeDollars * otherTeam.length; });
-        otherTeam.forEach(p => { playerDollars[p] -= holeDollars * wolfTeam.length; });
+        wolfTeam.forEach(p => { playerDollars[p] += holeDollars; });
+        otherTeam.forEach(p => { playerDollars[p] -= holeDollars; });
         carryover = 0;
         carryMultiplier = 1;
       } else if (otherBest < wolfBest) {
+        // Other team wins - each winner gets full points, each loser loses full points
         detail.winner = 'others';
         detail.points = totalPoints;
-        otherTeam.forEach(p => { playerDollars[p] += holeDollars * wolfTeam.length; });
-        wolfTeam.forEach(p => { playerDollars[p] -= holeDollars * otherTeam.length; });
+        otherTeam.forEach(p => { playerDollars[p] += holeDollars; });
+        wolfTeam.forEach(p => { playerDollars[p] -= holeDollars; });
         carryover = 0;
         carryMultiplier = 1;
       } else {
@@ -1365,34 +1365,37 @@ const Game = {
       holeDetails.push(detail);
     }
 
+    // Calculate final standings (pay up the ladder) - using dollars
     const standings = players.map(pid => ({
       pid,
       dollars: playerDollars[pid]
     })).sort((a, b) => b.dollars - a.dollars);
 
-    const playerNet = {};
-    players.forEach(pid => { playerNet[pid] = playerDollars[pid]; });
-
-    // Least-cash settlement from net positions
+    // Calculate transactions (pay up the ladder)
+    // Divide diff by 2 because each player's dollars include their side of each bet
+    // e.g., A at +$1 and C at -$1 means diff of $2, but actual bet was $1
     const transactions = [];
-    const debt = [], cred = [];
-    players.forEach(pid => {
-      const amt = playerDollars[pid];
-      if (amt < -0.005) debt.push({pid, amount: -amt});
-      else if (amt > 0.005) cred.push({pid, amount: amt});
-    });
-    debt.sort((a,b) => b.amount - a.amount);
-    cred.sort((a,b) => b.amount - a.amount);
-    let di = 0, ci = 0;
-    while (di < debt.length && ci < cred.length) {
-      const d = debt[di], c = cred[ci];
-      const pay = Math.min(d.amount, c.amount);
-      transactions.push({from: d.pid, to: c.pid, amount: pay});
-      d.amount -= pay;
-      c.amount -= pay;
-      if (d.amount <= 0.005) di++;
-      if (c.amount <= 0.005) ci++;
+    for (let i = 0; i < standings.length; i++) {
+      for (let j = i + 1; j < standings.length; j++) {
+        const diff = standings[i].dollars - standings[j].dollars;
+        if (diff > 0) {
+          const amount = diff / 2;
+          transactions.push({
+            from: standings[j].pid,
+            to: standings[i].pid,
+            amount: amount
+          });
+        }
+      }
     }
+
+    // Calculate per-player net from transactions (pay-up-the-ladder)
+    const playerNet = {};
+    players.forEach(pid => { playerNet[pid] = 0; });
+    transactions.forEach(t => {
+      playerNet[t.to] += t.amount;
+      playerNet[t.from] -= t.amount;
+    });
 
     return {
       holeDetails,
@@ -2039,7 +2042,7 @@ const Wizard = {
     const playersHtml = this.data.players.map((p, i) => `
       <div class="wizard-player-row">
         <input type="text" placeholder="Player ${i+1} name" value="${p.name}" data-idx="${i}" data-field="name">
-        <input type="number" placeholder="HCP" value="${p.handicap != null ? p.handicap : ''}" data-idx="${i}" data-field="handicap" min="-10" max="54">
+        <input type="number" placeholder="HCP" value="${p.handicap || ''}" data-idx="${i}" data-field="handicap" min="0" max="54">
         ${i >= 2 ? `<button class="delete-btn" data-idx="${i}">&times;</button>` : '<div></div>'}
       </div>
     `).join('');
@@ -3147,10 +3150,10 @@ const UI = {
             grid.appendChild(h('div',{style:'display:flex;flex-direction:column;gap:6px;'},[
               h('div',{class:'muted',style:'text-align:center;font-size:12px;'},this.playerName(pid)),
               h('input',{
-                type:'number',value:g.strokesCount[pid]||0,
+                type:'tel',inputmode:'numeric',value:g.strokesCount[pid]||0,
                 style:'width:100%;text-align:center;padding:8px 10px;',
-                min:-10,max:54,
                 onfocus:()=>State.begin(),
+                oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},
                 onblur:(e)=>{
                   g.strokesCount[pid]=parseInt(e.target.value)||0;
                   e.target.value=String(g.strokesCount[pid]);
@@ -4906,9 +4909,8 @@ const UI = {
   },
 
   transactions() {
-    const shareBtn = h('div',{style:'margin-bottom:12px;display:flex;gap:8px;'},[
-      h('button',{class:'btn small share',onclick:()=>this.shareImage()},'Share Image'),
-      h('button',{class:'btn small',onclick:()=>this.share(),style:'background:var(--border);color:var(--txt);'},'Share Text')
+    const shareBtn = h('div',{style:'margin-bottom:12px;'},[
+      h('button',{class:'btn small share',onclick:()=>this.share()},'Share Results')
     ]);
 
     const net = {};
@@ -5249,8 +5251,7 @@ const UI = {
           ${transfersHtml}
         </div>
         <div class="modal-actions" style="flex-direction:column;gap:8px;">
-          <button class="btn share" id="shareImageBtn" style="width:100%;">Share Image</button>
-          <button class="btn primary" id="shareResultsBtn" style="width:100%;">Share Text</button>
+          <button class="btn primary" id="shareResultsBtn" style="width:100%;">Share Results</button>
           <button class="btn" id="viewPaymentsBtn" style="width:100%;">View Full Details</button>
           <button class="btn secondary" id="dismissCompleteBtn" style="width:100%;">Dismiss</button>
         </div>
@@ -5258,10 +5259,6 @@ const UI = {
     `;
     document.body.appendChild(overlay);
 
-    document.getElementById('shareImageBtn').onclick = () => {
-      overlay.remove();
-      this.shareImage();
-    };
     document.getElementById('shareResultsBtn').onclick = () => {
       overlay.remove();
       this.share();
@@ -5351,381 +5348,6 @@ const UI = {
     } catch(e) {
       Err.show('Share failed: ' + e.message);
     }
-  },
-
-  async shareImage() {
-    try {
-      const players = State.data.players;
-      const games = State.data.games;
-      const course = State.data.course;
-      const par = course.par;
-      const g0 = games[0];
-      if (!g0) { Err.toast('No game data to share'); return; }
-
-      // Gather player scores
-      const playerData = players.map(p => {
-        const arr = (g0.gross[p.id]) || [];
-        const scores = [];
-        for (let i = 0; i < 18; i++) scores.push(arr[i] ?? null);
-        const f = Utils.sumRange(arr, 0, 8);
-        const b = Utils.sumRange(arr, 9, 17);
-        const t = (f == null && b == null) ? null : ((f||0) + (b||0));
-        return { name: p.name, id: p.id, scores, front: f, back: b, total: t };
-      });
-
-      // Gather game results
-      const gameThemes = ['#16a34a','#dc2626','#d97706','#6366f1','#14b8a6','#db2777'];
-      const gameLines = [];
-      games.forEach((g, gi) => {
-        if (!Game.hasAnyScores(g)) return;
-        const color = gameThemes[gi % 6];
-        if (g.gameType === 'vegas') {
-          const res = Game.computeVegasResult(g);
-          gameLines.push({ label: this.gameLabel(g), color, values: [
-            `Front: ${Utils.fmt(res.frontValue)}`, `Back: ${Utils.fmt(res.backValue)}`,
-            `Junk: ${Utils.fmt(res.junkValue)}`, `Total: ${Utils.fmt(res.totalValue)}`
-          ]});
-        } else if (g.gameType === 'skins') {
-          const res = Game.computeSkinsResult(g);
-          const top = (g.skinsPlayers||[]).reduce((best, pid) => {
-            const pr = res.playerResults[pid];
-            return pr && pr.profit > (best?.profit ?? -Infinity) ? {name:this.playerName(pid), profit:pr.profit} : best;
-          }, null);
-          gameLines.push({ label: this.gameLabel(g), color, values: [
-            `Skins Won: ${res.totalSkinsWon}`, top ? `Leader: ${top.name} ${Utils.fmt(top.profit)}` : ''
-          ].filter(Boolean)});
-        } else if (g.gameType === 'wolf') {
-          const res = Game.computeWolfResult(g);
-          gameLines.push({ label: this.gameLabel(g), color, values: [`Total Pot: ${Utils.fmt(res.totalMoney)}`]});
-        } else {
-          const res = Game.computeResult(g);
-          const t = res.teamTotals;
-          gameLines.push({ label: this.gameLabel(g), color, values: [
-            `Front: ${Utils.fmt(t.front)}`, `Back: ${Utils.fmt(t.back)}`,
-            `Overall: ${Utils.fmt(t.overall)}`, `Junk: ${Utils.fmt(t.junk)}`, `Total: ${Utils.fmt(t.total)}`
-          ]});
-        }
-      });
-
-      // Compute per-player net (same logic as transactions tab)
-      const net = {};
-      players.forEach(p => net[p.id] = 0);
-      games.forEach(g => {
-        if (!Game.hasAnyScores(g)) return;
-        if (g.gameType === 'skins') {
-          const res = Game.computeSkinsResult(g);
-          (g.skinsPlayers||[]).forEach(pid => { const pr = res.playerResults[pid]; if (pr) net[pid] += pr.profit; });
-          return;
-        }
-        if (g.gameType === 'wolf') {
-          const res = Game.computeWolfResult(g);
-          (g.wolfPlayers||[]).forEach(pid => { net[pid] += res.playerNet[pid] || 0; });
-          return;
-        }
-        if (g.gameType === 'ninepoint') {
-          const res = Game.computeNinePointResult(g);
-          (g.ninePointPlayers||[]).forEach(pid => { net[pid] += res.playerNet[pid] || 0; });
-          return;
-        }
-        let tot;
-        if (g.gameType === 'vegas') { tot = Game.computeVegasResult(g).totalValue; }
-        else { tot = Game.computeResult(g).teamTotals.total; }
-        const szA = (g.teamA||[]).length || 1;
-        const szB = (g.teamB||[]).length || 1;
-        (g.teamA||[]).forEach(id => net[id] += (szA ? tot/szA : 0));
-        (g.teamB||[]).forEach(id => net[id] += (szB ? -tot/szB : 0));
-      });
-      const xfers = this.calcTransfers(net);
-
-      // --- Canvas Setup ---
-      const scale = 2;
-      const pad = 24;
-      const colW = 44;
-      const nameW = 96;
-      const rowH = 34;
-      const font = '-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif';
-
-      const C = {
-        bg:'#0b0e13', card:'#141a26', text:'#ecf0f6', muted:'#8890a0',
-        border:'#1e2633', headerBg:'#0f1420', parBg:'#111827',
-        birdie:'#16a34a', bogey:'#dc2626', accent:'#3b82f6'
-      };
-
-      const back9Cols = 11; // 9 holes + IN + TOT
-      const tableW = nameW + back9Cols * colW;
-      const W = tableW + pad * 2;
-      const numPlayers = players.length;
-      const tableRows = 2 + numPlayers;
-
-      // Pre-calculate height
-      const titleH = 70;
-      const gap = 16;
-      const front9H = tableRows * rowH;
-      const back9H = tableRows * rowH;
-      const gameH = gameLines.length > 0 ? 28 + gameLines.length * 54 : 0;
-      const settlH = 28 + numPlayers * 24 + (xfers.length ? 28 + xfers.length * 24 : 0);
-      const footerH = 36;
-      const H = titleH + gap + front9H + gap + back9H + gap + gameH + gap + settlH + footerH;
-
-      const canvas = document.createElement('canvas');
-      canvas.width = W * scale;
-      canvas.height = H * scale;
-      const ctx = canvas.getContext('2d');
-      ctx.scale(scale, scale);
-
-      // Background
-      ctx.fillStyle = C.bg;
-      ctx.fillRect(0, 0, W, H);
-
-      // --- Title ---
-      ctx.fillStyle = C.card;
-      ctx.fillRect(0, 0, W, titleH);
-      ctx.fillStyle = C.border;
-      ctx.fillRect(0, titleH - 1, W, 1);
-      ctx.fillStyle = C.text;
-      ctx.font = `bold 22px ${font}`;
-      ctx.textAlign = 'center';
-      ctx.fillText('Bunch Bets', W/2, 32);
-      ctx.fillStyle = C.muted;
-      ctx.font = `13px ${font}`;
-      const dateStr = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-      ctx.fillText(`${course.name}  \u00b7  ${dateStr}`, W/2, 52);
-
-      let y = titleH + gap;
-
-      // --- Helper: draw scorecard table ---
-      const drawTable = (startHole, endHole, summaryLabels, yStart) => {
-        const numHoles = endHole - startHole + 1;
-        const numSumm = summaryLabels.length;
-        const numCols = numHoles + numSumm;
-        const tW = nameW + numCols * colW;
-        const tx = pad;
-        let cy = yStart;
-
-        // Par sums
-        let segParSum = 0;
-        for (let i = startHole; i <= endHole; i++) segParSum += (par[i]||0);
-        let totalPar = 0;
-        for (let i = 0; i < 18; i++) totalPar += (par[i]||0);
-
-        // Hole header row
-        ctx.fillStyle = C.headerBg;
-        ctx.fillRect(tx, cy, tW, rowH);
-        ctx.fillStyle = C.muted;
-        ctx.font = `bold 11px ${font}`;
-        ctx.textAlign = 'center';
-        ctx.fillText('Hole', tx + nameW/2, cy + 21);
-        for (let i = 0; i < numHoles; i++) {
-          ctx.fillText(String(startHole+i+1), tx + nameW + i*colW + colW/2, cy + 21);
-        }
-        ctx.fillStyle = C.text;
-        ctx.font = `bold 12px ${font}`;
-        for (let s = 0; s < numSumm; s++) {
-          ctx.fillText(summaryLabels[s], tx + nameW + (numHoles+s)*colW + colW/2, cy + 21);
-        }
-        ctx.strokeStyle = C.border;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(tx, cy, tW, rowH);
-        cy += rowH;
-
-        // Par row
-        ctx.fillStyle = C.parBg;
-        ctx.fillRect(tx, cy, tW, rowH);
-        ctx.fillStyle = C.muted;
-        ctx.font = `12px ${font}`;
-        ctx.textAlign = 'center';
-        ctx.fillText('Par', tx + nameW/2, cy + 21);
-        for (let i = 0; i < numHoles; i++) {
-          ctx.fillText(String(par[startHole+i]||''), tx + nameW + i*colW + colW/2, cy + 21);
-        }
-        ctx.fillStyle = C.text;
-        ctx.font = `bold 12px ${font}`;
-        ctx.fillText(String(segParSum), tx + nameW + numHoles*colW + colW/2, cy + 21);
-        if (numSumm > 1) ctx.fillText(String(totalPar), tx + nameW + (numHoles+1)*colW + colW/2, cy + 21);
-        ctx.strokeStyle = C.border;
-        ctx.strokeRect(tx, cy, tW, rowH);
-        cy += rowH;
-
-        // Player rows
-        playerData.forEach((p, pi) => {
-          ctx.fillStyle = pi % 2 === 0 ? C.card : C.bg;
-          ctx.fillRect(tx, cy, tW, rowH);
-
-          // Name
-          ctx.fillStyle = C.text;
-          ctx.font = `13px ${font}`;
-          ctx.textAlign = 'left';
-          const displayName = p.name.length > 10 ? p.name.substring(0,10) : p.name;
-          ctx.fillText(displayName, tx + 8, cy + 21);
-
-          // Hole scores
-          ctx.textAlign = 'center';
-          for (let i = 0; i < numHoles; i++) {
-            const hIdx = startHole + i;
-            const score = p.scores[hIdx];
-            const hp = par[hIdx] || 4;
-            const cx = tx + nameW + i*colW + colW/2;
-            const cyC = cy + rowH/2;
-
-            if (score != null) {
-              const diff = score - hp;
-              // Draw indicators
-              if (diff <= -2) {
-                ctx.strokeStyle = C.birdie; ctx.lineWidth = 1.5;
-                ctx.beginPath(); ctx.arc(cx, cyC, 11, 0, Math.PI*2); ctx.stroke();
-                ctx.beginPath(); ctx.arc(cx, cyC, 15, 0, Math.PI*2); ctx.stroke();
-              } else if (diff === -1) {
-                ctx.strokeStyle = C.birdie; ctx.lineWidth = 1.5;
-                ctx.beginPath(); ctx.arc(cx, cyC, 13, 0, Math.PI*2); ctx.stroke();
-              } else if (diff === 1) {
-                ctx.strokeStyle = C.bogey; ctx.lineWidth = 1.5;
-                ctx.strokeRect(cx-12, cyC-12, 24, 24);
-              } else if (diff >= 2) {
-                ctx.strokeStyle = C.bogey; ctx.lineWidth = 1.5;
-                ctx.strokeRect(cx-10, cyC-10, 20, 20);
-                ctx.strokeRect(cx-14, cyC-14, 28, 28);
-              }
-              ctx.fillStyle = C.text;
-              ctx.font = `13px ${font}`;
-              ctx.fillText(String(score), cx, cy + 22);
-            } else {
-              ctx.fillStyle = C.muted;
-              ctx.font = `13px ${font}`;
-              ctx.fillText('\u2013', cx, cy + 22);
-            }
-          }
-
-          // Summary columns
-          ctx.fillStyle = C.text;
-          ctx.font = `bold 13px ${font}`;
-          if (summaryLabels[0] === 'OUT') {
-            ctx.fillText(p.front != null ? String(p.front) : '\u2013', tx + nameW + numHoles*colW + colW/2, cy + 22);
-          } else {
-            ctx.fillText(p.back != null ? String(p.back) : '\u2013', tx + nameW + numHoles*colW + colW/2, cy + 22);
-            if (numSumm > 1) {
-              ctx.fillText(p.total != null ? String(p.total) : '\u2013', tx + nameW + (numHoles+1)*colW + colW/2, cy + 22);
-            }
-          }
-
-          // Row border
-          ctx.strokeStyle = C.border;
-          ctx.lineWidth = 0.5;
-          ctx.strokeRect(tx, cy, tW, rowH);
-          cy += rowH;
-        });
-
-        // Summary column separator line
-        ctx.strokeStyle = C.border;
-        ctx.lineWidth = 1.5;
-        const sepX = tx + nameW + numHoles * colW;
-        ctx.beginPath(); ctx.moveTo(sepX, yStart); ctx.lineTo(sepX, cy); ctx.stroke();
-
-        // Name column separator
-        ctx.beginPath(); ctx.moveTo(tx + nameW, yStart); ctx.lineTo(tx + nameW, cy); ctx.stroke();
-
-        return cy;
-      };
-
-      // Draw Front 9
-      y = drawTable(0, 8, ['OUT'], y);
-      y += gap;
-
-      // Draw Back 9
-      y = drawTable(9, 17, ['IN','TOT'], y);
-      y += gap;
-
-      // --- Game Results ---
-      if (gameLines.length > 0) {
-        ctx.fillStyle = C.muted;
-        ctx.font = `bold 11px ${font}`;
-        ctx.textAlign = 'left';
-        ctx.fillText('GAME RESULTS', pad, y + 16);
-        y += 28;
-
-        gameLines.forEach(game => {
-          const boxH = 44;
-          ctx.fillStyle = C.card;
-          ctx.fillRect(pad, y, tableW, boxH);
-          // Colored left accent
-          ctx.fillStyle = game.color;
-          ctx.fillRect(pad, y, 4, boxH);
-          // Border
-          ctx.strokeStyle = C.border;
-          ctx.lineWidth = 0.5;
-          ctx.strokeRect(pad, y, tableW, boxH);
-          // Label
-          ctx.fillStyle = C.text;
-          ctx.font = `bold 12px ${font}`;
-          ctx.textAlign = 'left';
-          ctx.fillText(game.label, pad + 14, y + 17);
-          // Values
-          ctx.fillStyle = C.muted;
-          ctx.font = `11px ${font}`;
-          ctx.fillText(game.values.join('  \u00b7  '), pad + 14, y + 34);
-          y += boxH + 6;
-        });
-      }
-
-      y += gap;
-
-      // --- Settlements ---
-      ctx.fillStyle = C.muted;
-      ctx.font = `bold 11px ${font}`;
-      ctx.textAlign = 'left';
-      ctx.fillText('SETTLEMENTS', pad, y + 16);
-      y += 28;
-
-      // Per-player net in a row
-      players.forEach(p => {
-        const val = net[p.id];
-        ctx.fillStyle = val > 0.005 ? C.birdie : val < -0.005 ? C.bogey : C.text;
-        ctx.font = `13px ${font}`;
-        ctx.textAlign = 'left';
-        ctx.fillText(`${p.name}: ${Utils.fmt(val)}`, pad + 12, y + 14);
-        y += 24;
-      });
-
-      if (xfers.length) {
-        y += 4;
-        ctx.fillStyle = C.muted;
-        ctx.font = `bold 11px ${font}`;
-        ctx.fillText('TRANSFERS', pad + 12, y + 14);
-        y += 24;
-        xfers.forEach(x => {
-          ctx.fillStyle = C.text;
-          ctx.font = `13px ${font}`;
-          ctx.fillText(`${this.playerName(x.from)}  \u2192  ${this.playerName(x.to)}: ${Utils.fmt(x.amount)}`, pad + 12, y + 14);
-          y += 24;
-        });
-      }
-
-      // --- Footer ---
-      ctx.fillStyle = C.muted;
-      ctx.font = `10px ${font}`;
-      ctx.textAlign = 'center';
-      ctx.fillText('Generated by Bunch Bets', W/2, H - 12);
-
-      // --- Share or download the image ---
-      canvas.toBlob(async (blob) => {
-        if (!blob) { Err.show('Failed to generate image'); return; }
-        const file = new File([blob], 'bunch-bets-scorecard.png', { type: 'image/png' });
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-          try { await navigator.share({ files: [file], title: 'Bunch Bets Scorecard' }); }
-          catch (e) { if (e.name !== 'AbortError') this._downloadCanvas(canvas); }
-        } else {
-          this._downloadCanvas(canvas);
-        }
-      }, 'image/png');
-    } catch(e) {
-      Err.show('Share image failed: ' + e.message);
-    }
-  },
-
-  _downloadCanvas(canvas) {
-    const link = document.createElement('a');
-    link.download = 'bunch-bets-scorecard.png';
-    link.href = canvas.toDataURL('image/png');
-    link.click();
   },
 
   highlights() {
