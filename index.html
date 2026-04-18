@@ -1476,7 +1476,7 @@ const Game = {
       while (ja.length < 18) ja.push(0);
       g.junkCounts[p.id] = ja.map(v => Math.max(0, parseInt(v)||0));
       
-      g.strokesCount[p.id] = Math.max(0, parseInt(g.strokesCount[p.id])||0);
+      g.strokesCount[p.id] = parseInt(g.strokesCount[p.id])||0;
     });
     return g;
   },
@@ -1519,10 +1519,12 @@ const Game = {
   strokes(g, pid, hole) {
     const total = g.strokesCount[pid] || 0;
     if (!total) return 0;
-    const base = Math.floor(total / 18);
-    const rem = total % 18;
+    const abs = Math.abs(total);
+    const sign = total > 0 ? 1 : -1;
+    const base = Math.floor(abs / 18);
+    const rem = abs % 18;
     const rank = State.data.course.hcp[hole] || 0;
-    return base + (rank > 0 && rank <= rem ? 1 : 0);
+    return sign * (base + (rank > 0 && rank <= rem ? 1 : 0));
   },
 
   net(gross, strokes) {
@@ -2467,19 +2469,17 @@ const Game = {
       const holeDollars = totalPoints * pointValue;
 
       if (wolfBest < otherBest) {
-        // Wolf team wins - each winner gets full points, each loser loses full points
         detail.winner = 'wolf';
         detail.points = totalPoints;
-        wolfTeam.forEach(p => { playerDollars[p] += holeDollars; });
-        otherTeam.forEach(p => { playerDollars[p] -= holeDollars; });
+        wolfTeam.forEach(p => { playerDollars[p] += holeDollars * otherTeam.length; });
+        otherTeam.forEach(p => { playerDollars[p] -= holeDollars * wolfTeam.length; });
         carryover = 0;
         carryMultiplier = 1;
       } else if (otherBest < wolfBest) {
-        // Other team wins - each winner gets full points, each loser loses full points
         detail.winner = 'others';
         detail.points = totalPoints;
-        otherTeam.forEach(p => { playerDollars[p] += holeDollars; });
-        wolfTeam.forEach(p => { playerDollars[p] -= holeDollars; });
+        otherTeam.forEach(p => { playerDollars[p] += holeDollars * wolfTeam.length; });
+        wolfTeam.forEach(p => { playerDollars[p] -= holeDollars * otherTeam.length; });
         carryover = 0;
         carryMultiplier = 1;
       } else {
@@ -2493,37 +2493,34 @@ const Game = {
       holeDetails.push(detail);
     }
 
-    // Calculate final standings (pay up the ladder) - using dollars
     const standings = players.map(pid => ({
       pid,
       dollars: playerDollars[pid]
     })).sort((a, b) => b.dollars - a.dollars);
 
-    // Calculate transactions (pay up the ladder)
-    // Divide diff by 2 because each player's dollars include their side of each bet
-    // e.g., A at +$1 and C at -$1 means diff of $2, but actual bet was $1
-    const transactions = [];
-    for (let i = 0; i < standings.length; i++) {
-      for (let j = i + 1; j < standings.length; j++) {
-        const diff = standings[i].dollars - standings[j].dollars;
-        if (diff > 0) {
-          const amount = diff / 2;
-          transactions.push({
-            from: standings[j].pid,
-            to: standings[i].pid,
-            amount: amount
-          });
-        }
-      }
-    }
-
-    // Calculate per-player net from transactions (pay-up-the-ladder)
     const playerNet = {};
-    players.forEach(pid => { playerNet[pid] = 0; });
-    transactions.forEach(t => {
-      playerNet[t.to] += t.amount;
-      playerNet[t.from] -= t.amount;
+    players.forEach(pid => { playerNet[pid] = playerDollars[pid]; });
+
+    // Least-cash settlement from net positions
+    const transactions = [];
+    const debt = [], cred = [];
+    players.forEach(pid => {
+      const amt = playerDollars[pid];
+      if (amt < -0.005) debt.push({pid, amount: -amt});
+      else if (amt > 0.005) cred.push({pid, amount: amt});
     });
+    debt.sort((a,b) => b.amount - a.amount);
+    cred.sort((a,b) => b.amount - a.amount);
+    let di = 0, ci = 0;
+    while (di < debt.length && ci < cred.length) {
+      const d = debt[di], c = cred[ci];
+      const pay = Math.min(d.amount, c.amount);
+      transactions.push({from: d.pid, to: c.pid, amount: pay});
+      d.amount -= pay;
+      c.amount -= pay;
+      if (d.amount <= 0.005) di++;
+      if (c.amount <= 0.005) ci++;
+    }
 
     return {
       holeDetails,
@@ -3429,7 +3426,7 @@ const Wizard = {
     const playersHtml = this.data.players.map((p, i) => `
       <div class="wizard-player-row" style="position:relative;">
         <input type="text" placeholder="Player ${i+1} name" value="${p.name}" data-idx="${i}" data-field="name" autocomplete="off">
-        <input type="number" placeholder="HCP" value="${p.handicap || ''}" data-idx="${i}" data-field="handicap" min="0" max="54">
+        <input type="number" placeholder="HCP" value="${p.handicap != null ? p.handicap : ''}" data-idx="${i}" data-field="handicap" min="-10" max="54">
         ${i >= 2 ? `<button class="delete-btn" data-idx="${i}">&times;</button>` : '<div></div>'}
         <div class="roster-dropdown" data-idx="${i}" style="display:none;position:absolute;top:100%;left:0;right:72px;z-index:20;background:var(--card);border:1px solid var(--border);border-radius:8px;max-height:150px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.3);"></div>
       </div>
@@ -4841,10 +4838,10 @@ const UI = {
             grid.appendChild(h('div',{style:'display:flex;flex-direction:column;gap:6px;'},[
               h('div',{class:'muted',style:'text-align:center;font-size:12px;'},this.playerName(pid)),
               h('input',{
-                type:'tel',inputmode:'numeric',value:g.strokesCount[pid]||0,
+                type:'number',value:g.strokesCount[pid]||0,
                 style:'width:100%;text-align:center;padding:8px 10px;',
+                min:-10,max:54,
                 onfocus:()=>State.begin(),
-                oninput:(e)=>{e.target.value=Utils.sanitize(e.target.value);},
                 onblur:(e)=>{
                   g.strokesCount[pid]=parseInt(e.target.value)||0;
                   e.target.value=String(g.strokesCount[pid]);
