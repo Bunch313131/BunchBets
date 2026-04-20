@@ -1520,11 +1520,16 @@ const Game = {
     const total = g.strokesCount[pid] || 0;
     if (!total) return 0;
     const abs = Math.abs(total);
-    const sign = total > 0 ? 1 : -1;
     const base = Math.floor(abs / 18);
     const rem = abs % 18;
     const rank = State.data.course.hcp[hole] || 0;
-    return sign * (base + (rank > 0 && rank <= rem ? 1 : 0));
+    if (total > 0) {
+      // Positive handicap: receive strokes on hardest holes (rank 1, 2, 3...)
+      return base + (rank > 0 && rank <= rem ? 1 : 0);
+    } else {
+      // Plus handicap: give strokes back on easiest holes (rank 18, 17, 16...)
+      return -(base + (rank > 0 && rank > 18 - rem ? 1 : 0));
+    }
   },
 
   net(gross, strokes) {
