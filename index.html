@@ -22,7 +22,7 @@
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="BunchBets180.png">
 <link rel="manifest" href="manifest.webmanifest">
-<title>Bunch Bets V7.2</title>
+<title>Bunch Bets V7.3</title>
 <!-- Viewport height fix — must run before body renders to avoid flash -->
 <script>
 (function(){
@@ -627,9 +627,13 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.2';
+const APP_VERSION = '7.3';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.3': [
+    'Starting Hole — support for shotgun starts and back-9-first rounds',
+    'Set starting hole in wizard or advanced settings, all bets and scoring adapt automatically',
+  ],
   '7.2': [
     'Round History — completed rounds are auto-saved and browsable from the wizard or menu',
     'View old scorecards, settlements, and player nets anytime',
@@ -1010,7 +1014,8 @@ const State = {
     roundCompleteShown: false,
     pressWizardShown: false,
     scoringHole: 0,
-    scoringView: 'hole'
+    scoringView: 'hole',
+    startingHole: 0
   },
   presets: new Date() >= new Date('2026-03-01') ? {
     'El Macero': { hcp:[15,13,9,1,7,3,17,11,5,8,2,16,6,10,12,18,4,14], par:[4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5] },
@@ -1096,6 +1101,7 @@ const State = {
       this.data.debugStatus = !!obj.debugStatus;
       this.data.scoringHole = obj.scoringHole || 0;
       this.data.scoringView = 'hole'; // Always start on hole view
+      this.data.startingHole = parseInt(obj.startingHole) || 0;
       this.data._clearedHoles = obj._clearedHoles || {};
       // Migration: if _scoredHoles not saved yet, infer from existing scores
       if (obj._scoredHoles) {
@@ -1170,7 +1176,8 @@ const History = {
       course: Utils.clone(State.data.course),
       players: Utils.clone(State.data.players),
       games: Utils.clone(State.data.games),
-      playerNet: Utils.clone(net)
+      playerNet: Utils.clone(net),
+      startingHole: State.data.startingHole || 0
     };
 
     rounds.unshift(snapshot);
@@ -1257,11 +1264,16 @@ const History = {
     let scoresHtml = '';
     if (r.games.length && players.length) {
       const g = r.games[0]; // Primary game for scores
+      const sh = r.startingHole || 0;
+      const ch = pos => (pos + sh) % 18; // local courseHole for this snapshot
       const pids = players.map(p => p.id);
+      // Build mapped par array for display (position-ordered)
+      const mappedPar = [];
+      for (let i = 0; i < 18; i++) mappedPar.push(r.course.par[ch(i)] || 4);
       let headerRow = '<th>Hole</th><th>Par</th>' + players.map(p => `<th>${p.name}</th>`).join('');
       let rows = '';
       for (let h = 0; h < 18; h++) {
-        rows += `<tr><td style="font-weight:600;">${h+1}</td><td>${r.course.par[h]||''}</td>`;
+        rows += `<tr><td style="font-weight:600;">${ch(h)+1}</td><td>${mappedPar[h]||''}</td>`;
         players.forEach(p => {
           const s = g.gross[p.id];
           const val = s ? s[h] : null;
@@ -1270,7 +1282,7 @@ const History = {
         rows += '</tr>';
         if (h === 8) {
           // Front 9 totals
-          rows += '<tr style="font-weight:700;border-top:2px solid var(--border);"><td>OUT</td><td>' + Utils.sumRange(r.course.par,0,8) + '</td>';
+          rows += '<tr style="font-weight:700;border-top:2px solid var(--border);"><td>OUT</td><td>' + Utils.sumRange(mappedPar,0,8) + '</td>';
           players.forEach(p => {
             const s = g.gross[p.id];
             const tot = s ? Utils.sumRange(s,0,8) : null;
@@ -1280,14 +1292,14 @@ const History = {
         }
       }
       // Back 9 + total
-      rows += '<tr style="font-weight:700;border-top:2px solid var(--border);"><td>IN</td><td>' + Utils.sumRange(r.course.par,9,17) + '</td>';
+      rows += '<tr style="font-weight:700;border-top:2px solid var(--border);"><td>IN</td><td>' + Utils.sumRange(mappedPar,9,17) + '</td>';
       players.forEach(p => {
         const s = r.games[0].gross[p.id];
         const tot = s ? Utils.sumRange(s,9,17) : null;
         rows += `<td>${tot !== null ? tot : '-'}</td>`;
       });
       rows += '</tr>';
-      rows += '<tr style="font-weight:700;"><td>TOT</td><td>' + Utils.sumRange(r.course.par,0,17) + '</td>';
+      rows += '<tr style="font-weight:700;"><td>TOT</td><td>' + Utils.sumRange(mappedPar,0,17) + '</td>';
       players.forEach(p => {
         const s = r.games[0].gross[p.id];
         const f = s ? Utils.sumRange(s,0,8) : null;
@@ -1369,6 +1381,13 @@ const History = {
 
 // === GAME LOGIC ===
 const Game = {
+  // Map playing position (0-17) to course hole index (0-17)
+  courseHole(pos) { return (pos + (State.data.startingHole || 0)) % 18; },
+  // Display label for a playing position
+  holeLabel(pos) { return this.courseHole(pos) + 1; },
+  // Range label e.g. "1–9" or "10–18" for a span of positions
+  rangeLabel(startPos, endPos) { return `${this.holeLabel(startPos)}\u2013${this.holeLabel(endPos)}`; },
+
   create(clone = false) {
     const g = {
       id: Utils.uid(),
@@ -1522,7 +1541,7 @@ const Game = {
     const abs = Math.abs(total);
     const base = Math.floor(abs / 18);
     const rem = abs % 18;
-    const rank = State.data.course.hcp[hole] || 0;
+    const rank = State.data.course.hcp[this.courseHole(hole)] || 0;
     if (total > 0) {
       // Positive handicap: receive strokes on hardest holes (rank 1, 2, 3...)
       return base + (rank > 0 && rank <= rem ? 1 : 0);
@@ -1644,9 +1663,13 @@ const Game = {
   },
 
   // === KP LOGIC ===
-  // Get par 3 hole indices for the course
+  // Get par 3 playing positions (respects startingHole rotation)
   getPar3Holes() {
-    return State.data.course.par.map((p,i) => p === 3 ? i : -1).filter(i => i >= 0);
+    const result = [];
+    for (let pos = 0; pos < 18; pos++) {
+      if (State.data.course.par[this.courseHole(pos)] === 3) result.push(pos);
+    }
+    return result;
   },
 
   // Compute KP results for a specific game (match)
@@ -1676,7 +1699,7 @@ const Game = {
         if (allPlayers.includes(pid)) {
           // Check if player made par or better on this hole
           const gross = g.gross[pid] && g.gross[pid][hole];
-          const par = State.data.course.par[hole] || 3;
+          const par = State.data.course.par[this.courseHole(hole)] || 3;
           const net = gross != null ? gross - this.strokes(g, pid, hole) : null;
           if (net != null && net <= par) {
             matchWinner = pid;
@@ -1927,7 +1950,7 @@ const Game = {
       for (const pid of kpEntry.ranking) {
         if (allPlayers.includes(pid)) {
           const gross = g.gross[pid] && g.gross[pid][hole];
-          const par = State.data.course.par[hole] || 3;
+          const par = State.data.course.par[this.courseHole(hole)] || 3;
           const net = gross != null ? gross - this.strokes(g, pid, hole) : null;
           if (net != null && net <= par) { matchWinner = pid; break; }
         }
@@ -2096,7 +2119,7 @@ const Game = {
   computeVegasHole(g, hole) {
     // Skip holes the user hasn't actually touched
     if (State.data._scoredHoles && !State.data._scoredHoles[hole]) return null;
-    const par = State.data.course.par[hole] || 4;
+    const par = State.data.course.par[this.courseHole(hole)] || 4;
     const maxNet = par + 3; // Triple bogey max for Vegas
 
     const getTeamScores = (team) => {
@@ -2223,7 +2246,7 @@ const Game = {
     const holeDetails = [];
 
     for (let h = 0; h < 18; h++) {
-      const detail = { hole: h + 1, grossWinner: null, netWinner: null, grossCarry: 0, netCarry: 0, grossSkins: 0, netSkins: 0 };
+      const detail = { hole: this.courseHole(h) + 1, grossWinner: null, netWinner: null, grossCarry: 0, netCarry: 0, grossSkins: 0, netSkins: 0 };
 
       // Skip holes the user hasn't actually touched
       const holeConfirmed = State.data._scoredHoles && State.data._scoredHoles[h];
@@ -2370,7 +2393,7 @@ const Game = {
 
     for (let h = 0; h < 18; h++) {
       const detail = {
-        hole: h + 1,
+        hole: this.courseHole(h) + 1,
         wolf: null,
         selection: null,
         multiplier: 1,
@@ -2554,7 +2577,7 @@ const Game = {
 
     for (let h = 0; h < 18; h++) {
       const detail = {
-        hole: h + 1,
+        hole: this.courseHole(h) + 1,
         scores: {},
         points: {},
         winner: null,
@@ -2590,7 +2613,7 @@ const Game = {
 
       // Sort by score (lowest first)
       scores.sort((a, b) => a.score - b.score);
-      const par = State.data.course.par[h] || 4;
+      const par = State.data.course.par[this.courseHole(h)] || 4;
 
       // Determine points based on ties
       const s1 = scores[0].score, s2 = scores[1].score, s3 = scores[2].score;
@@ -2738,7 +2761,8 @@ const Wizard = {
     this.data = {
       players: [{name:'', handicap:0}, {name:'', handicap:0}],
       selectedCourse: null,
-      games: []
+      games: [],
+      startingHole: 0
     };
     this.currentGameIndex = 0;
     this.data.games.push(this.createGameData());
@@ -3374,6 +3398,15 @@ const Wizard = {
             <span>Save as course preset</span>
           </label>
         </div>
+        <div class="wizard-section">
+          <div class="wizard-section-title">Starting Hole</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <select id="wizardStartingHole" style="padding:8px 12px;border-radius:8px;background:var(--card);color:var(--txt);border:1px solid var(--border);font-size:14px;">
+              ${Array.from({length:18},(_,i) => `<option value="${i}"${(this.data.startingHole||0)===i?' selected':''}>Hole ${i+1}</option>`).join('')}
+            </select>
+            <span style="color:var(--muted);font-size:12px;">For shotgun or back-9-first starts</span>
+          </div>
+        </div>
       </div>
       <div class="wizard-footer">
         <button class="btn secondary" id="wizardCourseSetupBack">Back</button>
@@ -3397,6 +3430,10 @@ const Wizard = {
         };
       });
 
+      document.getElementById('wizardStartingHole').onchange = (e) => {
+        this.data.startingHole = parseInt(e.target.value) || 0;
+      };
+
       document.getElementById('wizardCourseSetupBack').onclick = () => {
         this.step = 'course';
         this.render();
@@ -3407,6 +3444,7 @@ const Wizard = {
         State.data.course.name = this.data.newCourse.name || 'New Course';
         State.data.course.par = [...this.data.newCourse.par];
         State.data.course.hcp = [...this.data.newCourse.hcp];
+        State.data.startingHole = this.data.startingHole || 0;
 
         // Save as preset if checked
         if (document.getElementById('wizardSavePreset').checked && this.data.newCourse.name.trim()) {
@@ -4760,7 +4798,19 @@ const UI = {
         State.scheduleSave();
         State.scheduleRender();
         Err.toast('Preset saved');
-      }},'Save as New Preset')
+      }},'Save as New Preset'),
+      h('div',{style:'margin-top:12px;display:flex;align-items:center;gap:10px;'},[
+        h('span',{style:'font-size:13px;font-weight:600;'},'Starting Hole:'),
+        h('select',{
+          style:'padding:6px 10px;border-radius:8px;background:var(--card);color:var(--txt);border:1px solid var(--border);font-size:14px;',
+          onchange:(e)=>{
+            State.data.startingHole = parseInt(e.target.value) || 0;
+            State.scheduleSave();
+            State.scheduleRender();
+          }
+        }, Array.from({length:18},(_,i) => h('option',{value:i, selected:i===(State.data.startingHole||0)},`Hole ${i+1}`))),
+        h('span',{style:'font-size:11px;color:var(--muted);'},'Shotgun / back-9-first')
+      ])
     ]);
 
     // Games
@@ -5244,8 +5294,8 @@ const UI = {
     if (!g) return h('div',{class:'card'},'No game. Add one in Setup.');
 
     const hole = State.data.scoringHole || 0;
-    const par = State.data.course.par[hole] || 4;
-    const hcp = State.data.course.hcp[hole] || 0;
+    const par = State.data.course.par[Game.courseHole(hole)] || 4;
+    const hcp = State.data.course.hcp[Game.courseHole(hole)] || 0;
     const isPar3 = par === 3;
     const junkVal = hole <= 8 ? (g.junkValue.front||0) : (g.junkValue.back||0);
     const allPlayers = State.data.players;
@@ -5286,7 +5336,7 @@ const UI = {
     const navBar = h('div',{class:'hole-scoring-nav'},[
       h('button',{class:'hole-nav-btn', disabled:hole===0, onclick:()=>goToHole(hole-1)},'\u2039'),
       h('div',{class:'hole-nav-info'},[
-        h('div',{class:'hole-num'},`Hole ${hole+1}`),
+        h('div',{class:'hole-num'},`Hole ${Game.holeLabel(hole)}`),
         h('div',{class:'hole-details'},`Par ${par}  \u00B7  HCP ${hcp}`)
       ]),
       hole === 17
@@ -5439,7 +5489,7 @@ const UI = {
       let cumDiff = 0, hasAnyScore = false;
       for (let i = 0; i <= 17; i++) {
         const s = g.gross[p.id] && g.gross[p.id][i];
-        if (s != null) { cumDiff += s - (State.data.course.par[i]||4); hasAnyScore = true; }
+        if (s != null) { cumDiff += s - (State.data.course.par[Game.courseHole(i)]||4); hasAnyScore = true; }
       }
       const cumStr = !hasAnyScore ? '' : cumDiff > 0 ? `+${cumDiff}` : cumDiff < 0 ? String(cumDiff) : 'E';
       const cumColor = !hasAnyScore ? 'var(--muted)' : cumDiff < 0 ? 'var(--success)' : cumDiff > 0 ? 'var(--danger)' : 'var(--muted)';
@@ -5478,13 +5528,13 @@ const UI = {
     // Hole strip (bottom navigation dots)
     const holeDots = [];
     for (let i = 0; i < 18; i++) {
-      const iPar = State.data.course.par[i] || 4;
+      const iPar = State.data.course.par[Game.courseHole(i)] || 4;
       const hasScores = allPlayers.some(p => g.gross[p.id] && g.gross[p.id][i] != null);
       let cls = 'hole-dot';
       if (i === hole) cls += ' current';
       if (hasScores) cls += ' has-scores';
       if (iPar === 3) cls += ' par3';
-      holeDots.push(h('div',{class:cls, onclick:()=>goToHole(i)},String(i+1)));
+      holeDots.push(h('div',{class:cls, onclick:()=>goToHole(i)},String(Game.holeLabel(i))));
     }
     const holeStrip = h('div',{class:'hole-strip'},holeDots);
 
@@ -5761,7 +5811,7 @@ const UI = {
   // KP Wizard Modal
   showKPWizard(hole) {
     const allPlayers = State.data.players;
-    const par = State.data.course.par[hole] || 3;
+    const par = State.data.course.par[Game.courseHole(hole)] || 3;
     const existingRanking = Game.getKPRanking(hole);
 
     // Build the wizard step by step
@@ -5804,7 +5854,7 @@ const UI = {
         ? 'Who was closest to the pin and made par or better?'
         : 'Next closest to the pin and made par or better?';
 
-      const subtitle = `Hole ${hole+1} \u2022 Par ${par}`;
+      const subtitle = `Hole ${Game.holeLabel(hole)} \u2022 Par ${par}`;
 
       const content = document.createElement('div');
       content.className = 'kp-modal-content';
@@ -5907,7 +5957,7 @@ const UI = {
       content.appendChild(titleEl);
       const subEl = document.createElement('div');
       subEl.className = 'subtitle';
-      subEl.textContent = `Hole ${hole+1} \u2022 Par ${par}`;
+      subEl.textContent = `Hole ${Game.holeLabel(hole)} \u2022 Par ${par}`;
       content.appendChild(subEl);
       eligible.forEach(p => {
         const btn = document.createElement('button');
@@ -6062,11 +6112,11 @@ const UI = {
     };
 
     const head = [h('th',{class:'sticky'},'Hole')];
-    for (let i = 0; i < 18; i++) head.push(h('th',{id:`col_h_${i}`},String(i+1)));
+    for (let i = 0; i < 18; i++) head.push(h('th',{id:`col_h_${i}`},String(Game.holeLabel(i))));
     head.push(h('th',{},'F'),h('th',{},'B'),h('th',{},'TOT'));
 
     const parRow = [h('th',{class:'sticky'},'Par')];
-    for (let i = 0; i < 18; i++) parRow.push(h('th',{},String(State.data.course.par[i]||'')));
+    for (let i = 0; i < 18; i++) parRow.push(h('th',{},String(State.data.course.par[Game.courseHole(i)]||'')));
     parRow.push(h('th',{}),h('th',{}),h('th',{}));
 
     // Get score indicator class based on gross score vs par
@@ -6087,7 +6137,7 @@ const UI = {
       for (let hole = 0; hole < 18; hole++) {
         const tabIdx = (hole * State.data.players.length) + ri + 1;
         const score = g.gross[p.id][hole];
-        const par = State.data.course.par[hole] || 4;
+        const par = State.data.course.par[Game.courseHole(hole)] || 4;
         const scoreClass = getScoreClass(score, par);
         cells.push(h('td',{},[
           h('div',{class:'cellWrap' + (scoreClass ? ' ' + scoreClass : '')},[
@@ -6920,9 +6970,9 @@ const UI = {
             h('div',{class:'note'},'Positive = Team A')
           ]),
           h('div',{class:'note'},`A: ${aN||'—'}  |  B: ${bN||'—'}`),
-          renderSeg('Front (1–9)',0,8,'front'),
-          renderSeg('Back (10–18)',9,17,'back'),
-          renderSeg('Overall (1–18)',0,17,'overall')
+          renderSeg(`Front (${Game.rangeLabel(0,8)})`,0,8,'front'),
+          renderSeg(`Back (${Game.rangeLabel(9,17)})`,9,17,'back'),
+          renderSeg(`Overall (${Game.rangeLabel(0,17)})`,0,17,'overall')
         ])
       ]);
     });
@@ -6964,7 +7014,7 @@ const UI = {
             const detail = result.holeDetails[hole];
             if (!detail) {
               rows.push(h('div',{style:'padding:6px 0;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;'},
-                `Hole ${hole+1}: No scores`));
+                `Hole ${Game.holeLabel(hole)}: No scores`));
               continue;
             }
 
@@ -6993,7 +7043,7 @@ const UI = {
 
             rows.push(h('div',{style:'padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;'},[
               h('div',{style:'display:flex;justify-content:space-between;align-items:center;'},[
-                h('span',{style:'font-weight:600;'},`#${hole+1}`),
+                h('span',{style:'font-weight:600;'},`#${Game.holeLabel(hole)}`),
                 h('span',{class:ptClass,style:'font-weight:600;'},`${fmtPts(detail.pointsToA)} pts`)
               ]),
               h('div',{style:'margin-top:4px;color:var(--muted);'},[
@@ -7080,7 +7130,7 @@ const UI = {
             const detail = result.holeDetails[hole];
             if (!detail) {
               rows.push(h('div',{style:'padding:6px 0;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;'},
-                `Hole ${hole+1}: No scores`));
+                `Hole ${Game.holeLabel(hole)}: No scores`));
               continue;
             }
 
@@ -7106,7 +7156,7 @@ const UI = {
 
             rows.push(h('div',{style:'padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;'},[
               h('div',{style:'display:flex;justify-content:space-between;align-items:center;'},[
-                h('span',{style:'font-weight:600;'},`#${hole+1}`),
+                h('span',{style:'font-weight:600;'},`#${Game.holeLabel(hole)}`),
                 h('div',{style:'text-align:right;'},winnerLines.length > 0 ? winnerLines.map((w,i) => h('div',{key:i},w)) : h('span',{class:'muted'},'Carry'))
               ])
             ]));
@@ -7181,7 +7231,7 @@ const UI = {
               const wolfPid = detail ? detail.wolf : null;
               const wolfName = wolfPid ? UI.playerName(wolfPid) : '?';
               rows.push(h('div',{style:'padding:6px 0;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;'},
-                `Hole ${hole+1}: Wolf=${wolfName} - No selection`));
+                `Hole ${Game.holeLabel(hole)}: Wolf=${wolfName} - No selection`));
               continue;
             }
 
@@ -7213,7 +7263,7 @@ const UI = {
 
             rows.push(h('div',{style:'padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;'},[
               h('div',{style:'display:flex;justify-content:space-between;align-items:center;'},[
-                h('span',{style:'font-weight:600;'},`#${hole+1}${catchUpText}`),
+                h('span',{style:'font-weight:600;'},`#${Game.holeLabel(hole)}${catchUpText}`),
                 h('span',{class:resultClass,style:'font-weight:600;'},resultText)
               ]),
               h('div',{style:'margin-top:4px;color:var(--muted);'},[
@@ -7353,7 +7403,7 @@ const UI = {
             const detail = result.holeDetails[hole];
             if (!detail || Object.keys(detail.scores).length !== 3) {
               rows.push(h('div',{style:'padding:6px 0;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;'},
-                `Hole ${hole+1}: No scores`));
+                `Hole ${Game.holeLabel(hole)}: No scores`));
               continue;
             }
 
@@ -7374,7 +7424,7 @@ const UI = {
 
             rows.push(h('div',{style:'padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;'},[
               h('div',{style:'display:flex;justify-content:space-between;align-items:center;'},[
-                h('span',{style:'font-weight:600;'},`#${hole+1}`),
+                h('span',{style:'font-weight:600;'},`#${Game.holeLabel(hole)}`),
                 h('span',{style:'font-weight:600;'},`${ptsText}${specialText}`)
               ]),
               h('div',{style:'margin-top:4px;color:var(--muted);'},scoreText)
@@ -7462,7 +7512,7 @@ const UI = {
           const allScored = aNets.every(p => p.net !== null) && bNets.every(p => p.net !== null);
           if (!allScored) {
             rows.push(h('div',{style:'padding:6px 0;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;'},
-              `Hole ${hole+1}: Incomplete`));
+              `Hole ${Game.holeLabel(hole)}: Incomplete`));
             continue;
           }
 
@@ -7517,7 +7567,7 @@ const UI = {
 
           rows.push(h('div',{style:'padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;'},[
             h('div',{style:'display:flex;justify-content:space-between;align-items:center;'},[
-              h('span',{style:'font-weight:600;'},`#${hole+1}`),
+              h('span',{style:'font-weight:600;'},`#${Game.holeLabel(hole)}`),
               h('span',{class:statusClass,style:'font-weight:600;'},betStatusTxt)
             ]),
             h('div',{style:'margin-top:4px;color:var(--muted);'},[
@@ -8172,7 +8222,8 @@ const UI = {
       const players = State.data.players;
       const games = State.data.games;
       const course = State.data.course;
-      const par = course.par;
+      const par = [];
+      for (let i = 0; i < 18; i++) par.push(course.par[Game.courseHole(i)] || 4);
       const g0 = games[0];
       if (!g0) { Err.toast('No game data to share'); return; }
 
@@ -8517,9 +8568,9 @@ const UI = {
 
       const rowDefs = [];
       for (let h = 0; h < 9; h++) rowDefs.push({ type: 'hole', idx: h });
-      rowDefs.push({ type: 'sum', label: 'OUT', key: 'front' });
+      rowDefs.push({ type: 'sum', label: State.data.startingHole ? Game.rangeLabel(0,8) : 'OUT', key: 'front' });
       for (let h = 9; h < 18; h++) rowDefs.push({ type: 'hole', idx: h });
-      rowDefs.push({ type: 'sum', label: 'IN', key: 'back' });
+      rowDefs.push({ type: 'sum', label: State.data.startingHole ? Game.rangeLabel(9,17) : 'IN', key: 'back' });
       rowDefs.push({ type: 'sum', label: 'TOT', key: 'total' });
 
       let fPar = 0, bPar = 0;
@@ -8551,7 +8602,7 @@ const UI = {
         ctx.fillStyle = P.ink;
         ctx.font = isSum ? `bold 13px ${fS}` : `13px ${fS}`;
         ctx.textAlign = 'center';
-        ctx.fillText(isSum ? row.label : String(row.idx + 1), tx + holeW/2, cy + 18);
+        ctx.fillText(isSum ? row.label : String(Game.holeLabel(row.idx)), tx + holeW/2, cy + 18);
 
         // Par — INTER
         ctx.fillStyle = isSum ? P.ink : P.inkLight;
@@ -8776,7 +8827,7 @@ const UI = {
       const tied = rel.filter(pc => Math.abs(Math.abs(pc.delta) - maxD) < 0.001);
 
       const labelFor = (pid) => {
-        const parVal = State.data.course.par[hole];
+        const parVal = State.data.course.par[Game.courseHole(hole)];
         const gross = top.game.gross[pid] && top.game.gross[pid][hole];
         if (parVal == null || gross == null) return '';
         const d = gross - parVal;
@@ -8819,7 +8870,7 @@ const UI = {
         hole,
         value:Math.abs(swing),
         swing,
-        text:`Hole ${hole+1}: ${whoText} swung ${Utils.fmt(swingPP)}/ea toward ${toward}`
+        text:`Hole ${Game.holeLabel(hole)}: ${whoText} swung ${Utils.fmt(swingPP)}/ea toward ${toward}`
       });
     }
 
@@ -8910,7 +8961,7 @@ document.getElementById('startWizardBtn').onclick = () => {
   localStorage.removeItem(STORAGE_KEY);
   // Save just course/presets so reload picks them up
   try {
-    const fresh = {course: keepCourse, presets: keepPresets};
+    const fresh = {course: keepCourse, presets: keepPresets, startingHole: State.data.startingHole || 0};
     localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
   } catch(e) {}
   location.reload();
