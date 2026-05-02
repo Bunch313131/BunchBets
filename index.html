@@ -3165,6 +3165,12 @@ const Wizard = {
         <div class="wizard-course-locating">Loading courses...</div>
       </div>
       <div class="wizard-footer">
+        <div style="width:100%;display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+          <span style="font-size:13px;font-weight:600;white-space:nowrap;">Starting Hole:</span>
+          <select id="wizardCourseStartHole" style="flex:1;padding:8px 10px;border-radius:8px;background:var(--card);color:var(--txt);border:1px solid var(--border);font-size:14px;">
+            ${Array.from({length:18},(_,i) => `<option value="${i}"${(this.data.startingHole||0)===i?' selected':''}>Hole ${i+1}${i===0?' (default)':''}</option>`).join('')}
+          </select>
+        </div>
         <button class="btn primary" id="wizardCourseNext">Next</button>
         <div class="wizard-skip">
           <a id="wizardSkip">Skip to Advanced Setup</a>
@@ -3302,7 +3308,12 @@ const Wizard = {
       // Build list immediately with presets + alphabetical DB — no geolocation
       buildList(null, null);
 
+      document.getElementById('wizardCourseStartHole').onchange = (e) => {
+        this.data.startingHole = parseInt(e.target.value) || 0;
+      };
+
       document.getElementById('wizardCourseNext').onclick = () => {
+        State.data.startingHole = this.data.startingHole || 0;
         if (this.data.selectedCourse === '__new__') {
           this.step = 'courseSetup';
           this.render();
