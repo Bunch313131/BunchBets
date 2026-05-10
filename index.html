@@ -995,7 +995,11 @@ window.Err = {
   }
 };
 
-window.addEventListener('error', ev => Err.show(`Error: ${ev.message}`));
+window.addEventListener('error', ev => {
+  // Ignore cross-origin script errors (external scripts like GA/Firebase)
+  if (!ev.message || ev.message === 'Script error.' || ev.message === 'Script error') return;
+  Err.show(`Error: ${ev.message}`);
+});
 
 // === STATE MANAGER ===
 const State = {
@@ -2010,8 +2014,13 @@ const Game = {
 
     const kp = g.withJunk ? this.computeKPThroughHole(g, maxHole) : {netA:0, grandTotal:0, results:[], hasSweeps:false, hasQuads:false};
     let kpTeam = 0;
-    if (kp.netA > 0) kpTeam = kp.netA * szB;
-    else if (kp.netA < 0) kpTeam = kp.netA * szA;
+    if (kp.hasSweeps || kp.hasQuads) {
+      const signA = kp.sweepsTeam === 'A' ? 1 : -1;
+      kpTeam = signA * kp.grandTotal * (kp.sweepsTeam === 'A' ? szB : szA);
+    } else {
+      if (kp.netA > 0) kpTeam = kp.netA * szB;
+      else if (kp.netA < 0) kpTeam = kp.netA * szA;
+    }
 
     const total = front.teamPayA + back.teamPayA + overall.teamPayA + junkTeam + kpTeam;
 
@@ -2047,8 +2056,13 @@ const Game = {
 
     const kp = g.withJunk ? this.computeKPThroughHole(g, maxHole) : {netA:0, grandTotal:0, results:[], hasSweeps:false, hasQuads:false};
     let kpTeam = 0;
-    if (kp.netA > 0) kpTeam = kp.netA * szB;
-    else if (kp.netA < 0) kpTeam = kp.netA * szA;
+    if (kp.hasSweeps || kp.hasQuads) {
+      const signA = kp.sweepsTeam === 'A' ? 1 : -1;
+      kpTeam = signA * kp.grandTotal * (kp.sweepsTeam === 'A' ? szB : szA);
+    } else {
+      if (kp.netA > 0) kpTeam = kp.netA * szB;
+      else if (kp.netA < 0) kpTeam = kp.netA * szA;
+    }
 
     return {
       holeDetails, frontPoints, backPoints, frontValue, backValue,
@@ -2215,8 +2229,13 @@ const Game = {
     // KP values
     const kp = g.withJunk ? this.computeKP(g) : {netA:0, grandTotal:0, results:[], hasSweeps:false, hasQuads:false};
     let kpTeam = 0;
-    if (kp.netA > 0) kpTeam = kp.netA * szB;
-    else if (kp.netA < 0) kpTeam = kp.netA * szA;
+    if (kp.hasSweeps || kp.hasQuads) {
+      const signA = kp.sweepsTeam === 'A' ? 1 : -1;
+      kpTeam = signA * kp.grandTotal * (kp.sweepsTeam === 'A' ? szB : szA);
+    } else {
+      if (kp.netA > 0) kpTeam = kp.netA * szB;
+      else if (kp.netA < 0) kpTeam = kp.netA * szA;
+    }
 
     return {
       holeDetails,
