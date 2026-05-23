@@ -1345,6 +1345,107 @@ const History = {
 
     const gamesHtml = r.games.map(g => `<span class="pill">${this.gameLabel(g.gameType)}</span>`).join(' ');
 
+    // Build per-game bet breakdown by temporarily swapping course/startingHole
+    const savedCourse = State.data.course;
+    const savedStartingHole = State.data.startingHole;
+    State.data.course = r.course;
+    State.data.startingHole = r.startingHole || 0;
+    let gameBreakdownHtml = '';
+    try {
+      gameBreakdownHtml = r.games.map(g => {
+        const pName = pid => (players.find(p => p.id === pid)||{}).name || pid;
+        let detail = '';
+        if (g.gameType === 'nassau') {
+          try {
+            const res = Game.computeResult(g);
+            const sz = (g.teamA||[]).length || 1;
+            const aN = (g.teamA||[]).map(pName).join('/');
+            const bN = (g.teamB||[]).map(pName).join('/');
+            const seg = (label, s) => {
+              const val = s.payA;
+              if (Math.abs(val) < 0.005) return `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>${label}</span><span class="muted">Push</span></div>`;
+              const winner = val > 0 ? aN : bN;
+              return `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>${label}</span><span style="font-weight:600;">${winner} ${Utils.fmt(Math.abs(val))}/ea</span></div>`;
+            };
+            detail = seg('Front 9', res.segments.front) + seg('Back 9', res.segments.back) + seg('Overall', res.segments.overall);
+            if (res.presses && res.presses.length) {
+              res.presses.forEach(pr => {
+                const val = pr.payA;
+                if (Math.abs(val) >= 0.005) {
+                  const winner = val > 0 ? aN : bN;
+                  detail += `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Press (${pr.label||''})</span><span style="font-weight:600;">${winner} ${Utils.fmt(Math.abs(val))}/ea</span></div>`;
+                }
+              });
+            }
+            const junkVal = res.teamTotals.junk;
+            if (Math.abs(junkVal) >= 0.005) {
+              const junkWinner = junkVal > 0 ? aN : bN;
+              detail += `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Junk</span><span style="font-weight:600;">${junkWinner} ${Utils.fmt(Math.abs(junkVal/sz))}/ea</span></div>`;
+            }
+            if (res.teamTotals.kp !== 0) {
+              const kpWinner = res.teamTotals.kp > 0 ? aN : bN;
+              detail += `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>KP</span><span style="font-weight:600;">${kpWinner} ${Utils.fmt(Math.abs(res.teamTotals.kp/sz))}/ea</span></div>`;
+            }
+            detail += `<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid var(--border);margin-top:4px;font-weight:700;"><span>Total</span><span>${Utils.fmt(Math.abs(res.teamTotals.total))}/ea</span></div>`;
+          } catch(e) { detail = '<div class="muted">Unable to compute</div>'; }
+        } else if (g.gameType === 'vegas') {
+          try {
+            const res = Game.computeVegasResult(g);
+            const sz = (g.teamA||[]).length || 1;
+            const aN = (g.teamA||[]).map(pName).join('/');
+            const bN = (g.teamB||[]).map(pName).join('/');
+            const frontVal = res.frontPoints * (g.pointValue.front||0);
+            const backVal = res.backPoints * (g.pointValue.back||0);
+            const fmtSeg = (label, val) => {
+              if (Math.abs(val) < 0.005) return `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>${label}</span><span class="muted">Push</span></div>`;
+              const winner = val > 0 ? aN : bN;
+              return `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>${label}</span><span style="font-weight:600;">${winner} ${Utils.fmt(Math.abs(val/sz))}/ea</span></div>`;
+            };
+            detail = fmtSeg('Front 9', frontVal) + fmtSeg('Back 9', backVal);
+            if (Math.abs(res.junkValue) >= 0.005) {
+              const jw = res.junkValue > 0 ? aN : bN;
+              detail += `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Junk</span><span style="font-weight:600;">${jw} ${Utils.fmt(Math.abs(res.junkValue/sz))}/ea</span></div>`;
+            }
+            detail += `<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid var(--border);margin-top:4px;font-weight:700;"><span>Total</span><span>${Utils.fmt(Math.abs(res.totalValue/sz))}/ea</span></div>`;
+          } catch(e) { detail = '<div class="muted">Unable to compute</div>'; }
+        } else if (g.gameType === 'skins') {
+          try {
+            const res = Game.computeSkinsResult(g);
+            (g.skinsPlayers||[]).forEach(pid => {
+              const pr = res.playerResults[pid];
+              if (!pr) return;
+              const skinCount = (pr.grossSkins||0) + (pr.netSkins||0);
+              detail += `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>${pName(pid)}</span><span style="font-weight:600;color:${pr.profit > 0.005 ? 'var(--success)' : pr.profit < -0.005 ? 'var(--danger)' : 'var(--muted)'};">${skinCount} skin${skinCount!==1?'s':''} = ${Utils.fmt(pr.profit)}</span></div>`;
+            });
+          } catch(e) { detail = '<div class="muted">Unable to compute</div>'; }
+        } else if (g.gameType === 'wolf') {
+          try {
+            const res = Game.computeWolfResult(g);
+            (g.wolfPlayers||[]).forEach(pid => {
+              const val = res.playerNet[pid] || 0;
+              detail += `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>${pName(pid)}</span><span style="font-weight:600;color:${val > 0.005 ? 'var(--success)' : val < -0.005 ? 'var(--danger)' : 'var(--muted)'};">${val > 0 ? '+' : ''}${Utils.fmt(val)}</span></div>`;
+            });
+          } catch(e) { detail = '<div class="muted">Unable to compute</div>'; }
+        } else if (g.gameType === 'ninepoint') {
+          try {
+            const res = Game.computeNinePointResult(g);
+            (g.ninePointPlayers||[]).forEach(pid => {
+              const val = res.playerNet[pid] || 0;
+              detail += `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>${pName(pid)}</span><span style="font-weight:600;color:${val > 0.005 ? 'var(--success)' : val < -0.005 ? 'var(--danger)' : 'var(--muted)'};">${val > 0 ? '+' : ''}${Utils.fmt(val)}</span></div>`;
+            });
+          } catch(e) { detail = '<div class="muted">Unable to compute</div>'; }
+        }
+        return `<div class="history-detail-section">
+          <h3>${this.gameLabel(g.gameType)}</h3>
+          ${detail}
+        </div>`;
+      }).join('');
+    } catch(e) {
+      gameBreakdownHtml = '';
+    }
+    State.data.course = savedCourse;
+    State.data.startingHole = savedStartingHole;
+
     detailEl.className = 'history-detail';
     detailEl.innerHTML = `
       <div class="history-detail-section">
@@ -1352,6 +1453,7 @@ const History = {
         <div style="margin-bottom:8px;">${gamesHtml}</div>
         <div style="color:var(--muted);font-size:13px;">${players.map(p => p.name).join(', ')}</div>
       </div>
+      ${gameBreakdownHtml}
       <div class="history-detail-section">
         <h3>Settlement</h3>
         ${xferHtml}
@@ -8092,7 +8194,8 @@ const UI = {
         <div class="modal-actions" style="flex-direction:column;gap:8px;">
           <button class="btn share" id="shareImageBtn" style="width:100%;">Share Results</button>
           <button class="btn" id="viewPaymentsBtn" style="width:100%;">View Full Details</button>
-          <button class="btn secondary" id="dismissCompleteBtn" style="width:100%;">Dismiss</button>
+          <button class="btn primary" id="closeRoundBtn" style="width:100%;">Close Round</button>
+          <button class="btn secondary" id="dismissCompleteBtn" style="width:100%;background:transparent;border:none;font-size:13px;color:var(--muted);">Keep Editing</button>
         </div>
       </div>
     `;
@@ -8106,6 +8209,37 @@ const UI = {
       overlay.remove();
       State.data.tab = 'settle';
       State.scheduleRender();
+    };
+    document.getElementById('closeRoundBtn').onclick = () => {
+      overlay.remove();
+      History.archiveCurrent();
+      const rounds = History.load();
+      // Reset to wizard for next round
+      State.data.games = [];
+      State.data.roundCompleteShown = false;
+      State.data.pressWizardShown = false;
+      State.data._scoredHoles = {};
+      State.data._clearedHoles = {};
+      State.data.scoringHole = 0;
+      State.data.tab = 'setup';
+      try {
+        const saveData = {...State.data, presets: State.presets};
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
+      } catch(e) {}
+      Wizard.data.players = State.data.players.map(p => ({name: p.name, handicap: p.handicap || 0}));
+      Wizard.active = true;
+      Wizard.step = 'game';
+      Wizard.currentGameIndex = 0;
+      Wizard.data.games = [Wizard.createGameData()];
+      Wizard.data.selectedCourse = State.data.course.name;
+      Wizard.render();
+      // Show the just-saved round in history
+      if (rounds.length) {
+        setTimeout(() => {
+          History.show();
+          setTimeout(() => History.showDetail(rounds[0].id, document.querySelector('.history-overlay')), 100);
+        }, 200);
+      }
     };
     document.getElementById('dismissCompleteBtn').onclick = () => overlay.remove();
     overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
