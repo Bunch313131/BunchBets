@@ -1610,12 +1610,12 @@ const Game = {
         let pressed = false;
         lines.forEach(line => {
           if (line.start > h || h >= end) return;
-          let cum = 0, ok = true;
+          // Skip unscored holes rather than bailing, so a single un-touched
+          // hole mid-segment doesn't wipe out all subsequent presses.
+          let cum = 0;
           for (let i = line.start; i <= h; i++) {
-            if (diffs[i] == null) { ok = false; break; }
-            cum += diffs[i];
+            if (diffs[i] != null) cum += diffs[i];
           }
-          if (!ok) return;
           const k = Math.floor(Math.abs(cum) / 2);
           if (k > line.pressesTriggered) {
             if (!pressed) {
@@ -1868,12 +1868,12 @@ const Game = {
         let pressed = false;
         lines.forEach(line => {
           if (line.start > h || h >= line.end) return;
-          let cum = 0, ok = true;
+          // Skip unscored holes rather than bailing, so a single un-touched
+          // hole mid-segment doesn't wipe out all subsequent presses.
+          let cum = 0;
           for (let i = line.start; i <= h; i++) {
-            if (diffs[i] == null) { ok = false; break; }
-            cum += diffs[i];
+            if (diffs[i] != null) cum += diffs[i];
           }
-          if (!ok) return;
           const k = Math.floor(Math.abs(cum) / 2);
           if (k > line.pressesTriggered) {
             if (!pressed) {
