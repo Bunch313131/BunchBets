@@ -24,9 +24,13 @@ const VERSION = new URL(self.location).searchParams.get('v') || 'dev';
 const CACHE = `bunchbets-${VERSION}`;
 const NET_TIMEOUT_MS = 3000;
 
+// The shell is stored under one stable key. Note './index.html' is NOT precached:
+// Cloudflare Pages 308-redirects /index.html to /, and Cache.put() rejects a
+// redirected Response, so adding it silently fails and leaves no shell at all.
+const SHELL = './';
+
 const PRECACHE = [
   './',
-  './index.html',
   './manifest.webmanifest',
   './manifest.beta.webmanifest',
   './BunchBets180.png',
@@ -58,6 +62,11 @@ self.addEventListener('install', (event) => {
     // Added one at a time: a single unreachable CDN URL must not fail the install
     // and leave the app with no offline shell at all.
     await Promise.all(PRECACHE.map((url) => cache.add(url).catch(() => {})));
+    // The shell is the one entry that actually matters. If cache.add could not
+    // store it (redirect, offline, quota) fetch and store it the hard way.
+    if (!(await cache.match(SHELL))) {
+      try { await store(cache, SHELL, await fetch(SHELL, { cache: 'reload' })); } catch (e) {}
+    }
   })());
 });
 
@@ -86,6 +95,18 @@ self.addEventListener('message', (event) => {
   // fetches and re-creating the cache. Doing it in here is the only ordering that
   // holds — stop intercepting, drop caches, unregister, then send clients to a clean
   // URL where they will come up uncontrolled.
+  if (data.type === 'STATUS' && event.ports && event.ports[0]) {
+    event.waitUntil((async () => {
+      const cache = await caches.open(CACHE);
+      const keys = await cache.keys();
+      event.ports[0].postMessage({
+        version: VERSION,
+        shellCached: !!(await cache.match(SHELL)),
+        entries: keys.length,
+      });
+    })());
+  }
+
   if (data.type === 'KILL') {
     event.waitUntil((async () => {
       KILLED = true;
@@ -104,6 +125,21 @@ function neverCache(url) {
   return NEVER_CACHE.some((host) => url.hostname === host || url.hostname.endsWith('.' + host));
 }
 
+// Cache.put() throws on a redirected Response, which is exactly what a request for
+// /index.html returns on Cloudflare Pages. Rebuild those as a plain 200 so they can
+// be stored — otherwise the shell silently never caches.
+async function store(cache, key, response) {
+  if (!response || !response.ok) return;
+  try {
+    if (response.redirected || response.type === 'opaqueredirect') {
+      const body = await response.clone().blob();
+      await cache.put(key, new Response(body, { status: 200, statusText: 'OK', headers: response.headers }));
+    } else {
+      await cache.put(key, response.clone());
+    }
+  } catch (e) { /* quota, opaque response, etc. — never break the response itself */ }
+}
+
 async function networkFirst(request, cacheKey) {
   const cache = await caches.open(CACHE);
   try {
@@ -111,13 +147,13 @@ async function networkFirst(request, cacheKey) {
       fetch(request),
       new Promise((_, reject) => setTimeout(() => reject(new Error('sw-timeout')), NET_TIMEOUT_MS)),
     ]);
-    if (response && response.ok) cache.put(cacheKey || request, response.clone());
+    await store(cache, cacheKey || request, response);
     return response;
   } catch (err) {
     // Offline, or the network is slower than the timeout. Serve the shell.
     const hit = (await cache.match(cacheKey || request)) ||
-                (await cache.match('./index.html')) ||
-                (await cache.match('./'));
+                (await cache.match(SHELL)) ||
+                (await cache.match('./index.html'));
     if (hit) return hit;
     throw err;
   }
@@ -128,11 +164,11 @@ async function cacheFirst(request) {
   const hit = await cache.match(request);
   if (hit) {
     // Refresh in the background so the next launch is current.
-    fetch(request).then((r) => { if (r && r.ok) cache.put(request, r.clone()); }).catch(() => {});
+    fetch(request).then((r) => store(cache, request, r)).catch(() => {});
     return hit;
   }
   const response = await fetch(request);
-  if (response && response.ok) cache.put(request, response.clone());
+  await store(cache, request, response);
   return response;
 }
 
@@ -151,9 +187,10 @@ self.addEventListener('fetch', (event) => {
                    (url.pathname === '/' || url.pathname.endsWith('/index.html')));
 
   if (isShell) {
-    // Always cache the shell under a stable key — navigations carry query strings
-    // (?dev=1, ?join=CODE, cache-busters) that would otherwise fragment the cache.
-    event.respondWith(networkFirst(request, './index.html'));
+    // Always cache the shell under one stable key — navigations carry query strings
+    // (?dev=1, ?join=CODE, cache-busters) and the host may redirect /index.html to /,
+    // either of which would otherwise fragment or defeat the cache.
+    event.respondWith(networkFirst(request, SHELL));
     return;
   }
 

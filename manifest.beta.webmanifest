@@ -1,7 +1,7 @@
 {
   "name": "Bunch Bets BETA",
   "short_name": "BB BETA",
-  "start_url": "./index.html",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#1a1a1a",
   "theme_color": "#7f1d1d",

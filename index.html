@@ -642,6 +642,10 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
     <button class="menu-item danger" id="factoryBtn">Factory Reset</button>
   </div>
   <div class="menu-section">
+    <div class="menu-section-title">Offline</div>
+    <div class="menu-item" id="swStatus" style="cursor:default;font-size:13px;line-height:1.4;">Checking…</div>
+  </div>
+  <div class="menu-section">
     <a class="menu-item" href="https://docs.google.com/forms/d/e/1FAIpQLSd42m1QbKIdydDACKVW5JHOlTDWbRMbloKPMlkW36_8Pzy_6g/viewform" target="_blank" rel="noopener" style="text-decoration:none;">Feedback & Corrections</a>
   </div>
 </div>
@@ -9332,6 +9336,42 @@ window.addEventListener('appinstalled', () => {
       updateAccepted = false;
       location.reload();
     });
+
+    // clients.claim() fires this on the very first install too, so only reload
+    // when the user actually asked for the update.
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (!updateAccepted) return;
+      updateAccepted = false;
+      location.reload();
+    });
+
+    // Menu readout: is this device actually able to play offline right now?
+    // Guessing at that from the outside is how the first phone test got wasted.
+    function refreshOfflineStatus() {
+      const el = document.getElementById('swStatus');
+      if (!el) return;
+      if (!('serviceWorker' in navigator)) { el.textContent = 'Not supported on this browser'; return; }
+      navigator.serviceWorker.getRegistration().then(function (reg) {
+        if (!reg) { el.textContent = 'Not installed yet — open once with a signal'; return; }
+        const ctrl = navigator.serviceWorker.controller;
+        if (!ctrl) { el.textContent = 'Installing — close and reopen the app to finish'; return; }
+        const ch = new MessageChannel();
+        let answered = false;
+        ch.port1.onmessage = function (e) {
+          answered = true;
+          const d = e.data || {};
+          el.textContent = d.shellCached
+            ? 'Ready to play offline (v' + d.version + ', ' + d.entries + ' files cached)'
+            : 'Active, but the offline copy is missing — reopen with a signal';
+        };
+        try { ctrl.postMessage({ type: 'STATUS' }, [ch.port2]); } catch (e) {}
+        setTimeout(function () { if (!answered) el.textContent = 'Active, but not responding'; }, 2500);
+      }).catch(function () { el.textContent = 'Status unavailable'; });
+    }
+    window._bbOfflineStatus = refreshOfflineStatus;
+    setTimeout(refreshOfflineStatus, 1500);
+    const menuBtn = document.getElementById('menuToggle');
+    if (menuBtn) menuBtn.addEventListener('click', function () { setTimeout(refreshOfflineStatus, 100); });
   });
 })();
 
