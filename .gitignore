@@ -5,6 +5,8 @@
 
 # Secrets — never commit
 *creds*
+*token*
+.gh-token
 *credential*
 *secret*
 *.pem

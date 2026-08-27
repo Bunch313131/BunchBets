@@ -5681,6 +5681,9 @@ const UI = {
         const mode = game.skinsMode || 'net';
         const players = game.skinsPlayers || [];
         const carry = mode === 'gross' ? result.grossCarry : mode === 'net' ? result.netCarry : (result.grossCarry + result.netCarry);
+        // Junk is settled pay-up-the-ladder alongside skins; surface the pot so the
+        // card's skins/winnings figures aren't mistaken for the full settlement.
+        const totalJunkMoney = Game.computeJunkLadder(game, players).totalJunkMoney;
 
         // Each player: name, skins, take
         const playerLines = players.map(pid => {
@@ -5702,7 +5705,8 @@ const UI = {
           h('span',{},UI.gameLabel(game)),
           h('span',{style:'display:flex;align-items:center;gap:6px;'},[
             thruLabel ? h('span',{style:'font-size:10px;font-weight:400;color:var(--muted);'},thruLabel) : '',
-            carry > 0 ? h('span',{style:'font-weight:400;font-size:11px;color:var(--muted);'},`Carry: ${carry}`) : ''
+            carry > 0 ? h('span',{style:'font-weight:400;font-size:11px;color:var(--muted);'},`Carry: ${carry}`) : '',
+            totalJunkMoney > 0 ? h('span',{style:'font-size:10px;font-weight:400;color:var(--muted);'},`Junk: ${Utils.fmt(totalJunkMoney)}`) : ''
           ].filter(Boolean))
         ]));
         lines.push(...playerLines);
@@ -6455,6 +6459,9 @@ const UI = {
         const mode = game.skinsMode || 'net';
         const players = game.skinsPlayers || [];
         const carry = mode === 'gross' ? result.grossCarry : mode === 'net' ? result.netCarry : (result.grossCarry + result.netCarry);
+        // Junk is settled pay-up-the-ladder alongside skins; surface the pot so the
+        // card's skins/winnings figures aren't mistaken for the full settlement.
+        const totalJunkMoney = Game.computeJunkLadder(game, players).totalJunkMoney;
 
         const playerLines = players.map(pid => {
           const name = UI.playerName(pid);
@@ -6472,7 +6479,8 @@ const UI = {
         const lines = [];
         lines.push(h('div',{style:'display:flex;justify-content:space-between;font-weight:700;font-size:12px;'},[
           h('span',{},UI.gameLabel(game)),
-          carry > 0 ? h('span',{style:'font-weight:400;font-size:11px;color:var(--muted);'},`Carry: ${carry}`) : ''
+          carry > 0 ? h('span',{style:'font-weight:400;font-size:11px;color:var(--muted);'},`Carry: ${carry}`) : '',
+          totalJunkMoney > 0 ? h('span',{style:'font-size:10px;font-weight:400;color:var(--muted);'},`Junk: ${Utils.fmt(totalJunkMoney)}`) : ''
         ].filter(Boolean)));
         lines.push(...playerLines);
 
