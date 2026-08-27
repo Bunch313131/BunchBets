@@ -3,10 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test rules.test.js"
+    "test": "node --test rules.test.js",
+    "seed": "node seed.js"
   },
   "dependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",
-    "firebase": "^12.18.0"
+    "firebase": "^12.18.0",
+    "firebase-admin": "^13.0.0"
   }
 }

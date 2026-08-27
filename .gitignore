@@ -34,3 +34,8 @@ backend/package-lock.json
 firebase-debug.log
 firestore-debug.log
 ui-debug.log
+
+# Rosters contain real emails and GHIN numbers — never commit them
+roster*.csv
+backend/roster*.csv
+*First_Users*
