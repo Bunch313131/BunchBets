@@ -1,0 +1,197 @@
+rules_version = '2';
+
+// Bunch Bets — Firestore security rules.
+//
+// These rules ARE the privacy model. Stats scoping, group visibility and who may
+// see whom are enforced here, not in the client. See project docs 08/09/10.
+//
+// Core distinction: a USER is an account; a GOLFER is someone who gets scored.
+// Most people in a group pool have no account and never will.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function uid()      { return request.auth.uid; }
+
+    // Admin is a custom claim in the signed token, never a Firestore field —
+    // a field can be rewritten by anything able to write the document.
+    // This bypasses every other protection in this file. One account only.
+    function isAdmin() {
+      return signedIn() && request.auth.token.get('admin', false) == true;
+    }
+
+    function userDoc()  { return get(/databases/$(database)/documents/users/$(uid())).data; }
+    function myGroups() { return userDoc().get('groupIds', []); }
+
+    function isMember(gid) {
+      return signedIn() &&
+             uid() in get(/databases/$(database)/documents/groups/$(gid)).data.memberUids;
+    }
+
+    // Shares a group pool with the caller. Basis for reading and maintaining a
+    // golfer who has no account and will never claim their own record.
+    function sharesPool(data) {
+      return signedIn() && data.get('poolGroupIds', []).hasAny(myGroups());
+    }
+
+    // Only a verified address may be used to match invitations. Google supplies
+    // one; email-link sign-in verifies by construction.
+    function verifiedEmail() {
+      return request.auth.token.get('email_verified', false) == true
+             ? request.auth.token.get('email', '')
+             : '';
+    }
+
+    // ---------------------------------------------------------------- users
+    // Private. Nothing here is readable by anyone else; the public face of a
+    // person is their golfer document.
+    match /users/{userId} {
+      allow read, write: if isAdmin() || (signedIn() && uid() == userId);
+    }
+
+    // -------------------------------------------------------------- golfers
+    match /golfers/{golferId} {
+      // Readable if it's yours, if it opted into discovery, or if it sits in the
+      // pool of a group you belong to. The third clause is what makes a group's
+      // pool browsable — a read permission, not a search feature.
+      allow get: if isAdmin() || (signedIn() && (
+        resource.data.get('claimedByUid', null) == uid() ||
+        resource.data.get('discoverable', false) == true ||
+        sharesPool(resource.data)
+      ));
+
+      // Listing is only permitted over a group pool you belong to. The query
+      // must therefore be constrained by poolGroupIds; an unconstrained query
+      // is denied outright rather than silently filtered.
+      allow list: if isAdmin() || (signedIn() && sharesPool(resource.data));
+
+      // A newly created golfer may never arrive already discoverable.
+      allow create: if isAdmin() || (signedIn() &&
+        request.resource.data.get('discoverable', false) == false);
+
+      allow update: if isAdmin() || (signedIn() && (
+        // the owner may change anything, including turning discovery on
+        resource.data.get('claimedByUid', null) == uid() ||
+
+        // CLAIMING. Deliberately NOT open to any signed-in user: at the rules
+        // layer, "Mike claims his own record" and "Mike seizes Dave's record"
+        // are byte-identical writes. A client-side name check is not
+        // enforcement — anyone can write straight to Firestore with the SDK.
+        //
+        // So a claim must carry proof. The proof is an invitation that (a) names
+        // this exact golfer and (b) is addressed to an email address the caller
+        // has verified. A group member asserted the mapping; the caller proved
+        // control of the mailbox. No Cloud Function required.
+        (resource.data.get('claimedByUid', null) == null &&
+         request.resource.data.get('claimedByUid', null) == uid() &&
+         verifiedEmail() != '' &&
+         request.resource.data.get('claimedViaInviteId', '') != '' &&
+         exists(/databases/$(database)/documents/invites/$(request.resource.data.claimedViaInviteId)) &&
+         get(/databases/$(database)/documents/invites/$(request.resource.data.claimedViaInviteId)).data.email == verifiedEmail() &&
+         get(/databases/$(database)/documents/invites/$(request.resource.data.claimedViaInviteId)).data.get('golferId', '') == golferId) ||
+
+        // group-mates may MAINTAIN an unclaimed golfer — fix a typo, attach a
+        // GHIN — but may not publish them, may not seize the record, and may not
+        // grant themselves access by rewriting the pool list.
+        (resource.data.get('claimedByUid', null) == null &&
+         sharesPool(resource.data) &&
+         request.resource.data.get('discoverable', false) == false &&
+         request.resource.data.get('claimedByUid', null) == null &&
+         request.resource.data.get('poolGroupIds', []) == resource.data.get('poolGroupIds', []))
+      ));
+
+      allow delete: if isAdmin();   // golfers are referenced by rounds forever
+    }
+
+    // --------------------------------------------------------------- groups
+    match /groups/{groupId} {
+      allow get, list: if isAdmin() || (signedIn() && uid() in resource.data.memberUids);
+
+      allow create: if isAdmin() || (signedIn()
+                    && request.resource.data.ownerUid == uid()
+                    && request.resource.data.memberUids == [uid()]);
+
+      allow update: if isAdmin() || (signedIn() && (
+        // members may edit the pool and the name, but not the membership list
+        (uid() in resource.data.memberUids &&
+         request.resource.data.memberUids == resource.data.memberUids) ||
+        // the owner may change membership
+        uid() == resource.data.ownerUid ||
+        // anyone may append exactly themselves — the invite acceptance path.
+        // Everything else about the document must be untouched.
+        (request.resource.data.memberUids == resource.data.memberUids.concat([uid()]) &&
+         request.resource.data.ownerUid == resource.data.ownerUid &&
+         request.resource.data.name == resource.data.name)
+      ));
+
+      allow delete: if isAdmin() || (signedIn() && uid() == resource.data.ownerUid);
+
+      // Contact details for texting results. Keyed by golferId, NOT uid, so a
+      // regular with no account still has a phone number here.
+      match /contacts/{golferId} {
+        allow read:  if isAdmin() || isMember(groupId);
+        allow write: if isAdmin() || isMember(groupId);
+      }
+    }
+
+    // ---------------------------------------------------------- inviteCodes
+    // The code IS the secret; knowing it is the grant. No Cloud Function needed.
+    match /inviteCodes/{code} {
+      allow get:   if signedIn();
+      allow list:  if isAdmin();      // never enumerable
+      allow write: if isAdmin();
+    }
+
+    // -------------------------------------------------------------- invites
+    // The durable half of onboarding: survives redirects, installs and the
+    // loss of a query string when iOS launches at start_url.
+    match /invites/{inviteId} {
+      allow get, list: if isAdmin() || (signedIn() && (
+        (verifiedEmail() != '' && resource.data.email == verifiedEmail()) ||
+        resource.data.invitedByUid == uid()
+      ));
+
+      allow create: if isAdmin() || (signedIn()
+                    && isMember(request.resource.data.groupId)
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.invitedByUid == uid());
+
+      allow update: if isAdmin() || (signedIn() && (
+        // the invitee may only accept
+        (verifiedEmail() != '' && resource.data.email == verifiedEmail() &&
+         request.resource.data.status == 'accepted') ||
+        // the sender may only revoke
+        (resource.data.invitedByUid == uid() &&
+         request.resource.data.status == 'revoked')
+      ));
+
+      allow delete: if isAdmin();
+    }
+
+    // --------------------------------------------------------------- rounds
+    // Two distinct read paths, deliberately separate: Firestore evaluates list
+    // rules against the QUERY, which must be provably safe, so an OR across
+    // "mine" and "my group's" cannot be expressed in one clause. Clients issue
+    // two queries; each matches one clause below.
+    match /rounds/{roundId} {
+      allow get: if isAdmin() || (signedIn() && (
+        resource.data.createdByUid == uid() ||
+        (resource.data.get('groupId', null) != null && isMember(resource.data.groupId))
+      ));
+
+      allow list: if isAdmin() || (signedIn() && (
+        resource.data.createdByUid == uid() ||
+        (resource.data.get('groupId', null) != null && isMember(resource.data.groupId))
+      ));
+
+      allow create: if isAdmin() || (signedIn()
+                    && request.resource.data.createdByUid == uid()
+                    && (request.resource.data.get('groupId', null) == null ||
+                        isMember(request.resource.data.groupId)));
+
+      allow update, delete: if isAdmin() ||
+                    (signedIn() && resource.data.createdByUid == uid());
+    }
+  }
+}
