@@ -1,0 +1,19 @@
+# Local editor / tooling
+.claude/
+.vscode/
+.DS_Store
+
+# Secrets — never commit
+.ghin-creds
+*.creds
+.env
+.env.*
+
+# Removed from the repo 2026-08-27 (see SPEC.md / project docs).
+# Still present in git history; local copies on disk are safe to delete by hand.
+redesign/
+test/
+index_old_archive.html
+
+# Stray scratch file created while probing filesystem permissions — safe to delete
+_deltest.tmp

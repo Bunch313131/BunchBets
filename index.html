@@ -5695,28 +5695,85 @@ const UI = {
       if (game.gameType === 'wolf') {
         const res = Game.computeWolfResult(game);
         const players = game.wolfPlayers || [];
+
+        // Junk pay-up-the-ladder (mirrors results page so live status matches payout)
+        const sumJunkPid = (pid) => {
+          const arr = game.junkCounts[pid] || [];
+          let f = 0, b = 0;
+          for (let hh = 0; hh <= 8; hh++) f += (arr[hh]||0);
+          for (let hh = 9; hh <= 17; hh++) b += (arr[hh]||0);
+          return f * (game.junkValue.front||0) + b * (game.junkValue.back||0);
+        };
+        const junkNet = {};
+        players.forEach(pid => { junkNet[pid] = 0; });
+        let totalJunkMoney = 0;
+        if (game.withJunk) {
+          const js = players.map(pid => ({ pid, junkVal: sumJunkPid(pid) })).sort((a, b) => b.junkVal - a.junkVal);
+          for (let i = 0; i < js.length; i++) {
+            for (let j = i + 1; j < js.length; j++) {
+              const diff = js[i].junkVal - js[j].junkVal;
+              if (diff > 0) { junkNet[js[i].pid] += diff; junkNet[js[j].pid] -= diff; totalJunkMoney += diff; }
+            }
+          }
+        }
+
         const playerLines = players.map(pid => {
-          const val = res.playerNet[pid] || 0;
+          const val = (res.playerNet[pid] || 0) + (junkNet[pid] || 0);
           return h('span',{style:'font-size:11px;' + (val > 0 ? 'color:var(--success);' : val < 0 ? 'color:var(--danger);' : '')},
             `${UI.playerName(pid)}: ${val > 0 ? '+' : ''}${Utils.fmt(val)}`);
         });
         return h('div',{class:`${theme} game-status-card`,style:'margin-bottom:4px;'},[
           h('div',{class:'card',style:'padding:6px 10px;'},[
-            h('div',{style:'font-weight:700;font-size:12px;margin-bottom:4px;'},UI.gameLabel(game)),
+            h('div',{style:'display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:12px;margin-bottom:4px;'},[
+              h('span',{},UI.gameLabel(game)),
+              h('span',{style:'display:flex;align-items:center;gap:6px;'},[
+                thruLabel ? h('span',{style:'font-size:10px;font-weight:400;color:var(--muted);'},thruLabel) : '',
+                totalJunkMoney > 0 ? h('span',{style:'font-size:10px;font-weight:400;color:var(--muted);'},`Junk: ${Utils.fmt(totalJunkMoney)}`) : ''
+              ].filter(Boolean))
+            ]),
             h('div',{style:'display:flex;flex-wrap:wrap;gap:6px 12px;'},playerLines)
           ])
         ]);
       } else if (game.gameType === 'ninepoint') {
         const res = Game.computeNinePointResult(game);
         const players = game.ninePointPlayers || [];
+
+        // Junk pay-up-the-ladder (mirrors computeGamePlayerNet + results page so
+        // the live status matches the actual payout)
+        const sumJunkPid = (pid) => {
+          const arr = game.junkCounts[pid] || [];
+          let f = 0, b = 0;
+          for (let hh = 0; hh <= 8; hh++) f += (arr[hh]||0);
+          for (let hh = 9; hh <= 17; hh++) b += (arr[hh]||0);
+          return f * (game.junkValue.front||0) + b * (game.junkValue.back||0);
+        };
+        const junkNet = {};
+        players.forEach(pid => { junkNet[pid] = 0; });
+        let totalJunkMoney = 0;
+        if (game.withJunk) {
+          const js = players.map(pid => ({ pid, junkVal: sumJunkPid(pid) })).sort((a, b) => b.junkVal - a.junkVal);
+          for (let i = 0; i < js.length; i++) {
+            for (let j = i + 1; j < js.length; j++) {
+              const diff = js[i].junkVal - js[j].junkVal;
+              if (diff > 0) { junkNet[js[i].pid] += diff; junkNet[js[j].pid] -= diff; totalJunkMoney += diff; }
+            }
+          }
+        }
+
         const playerLines = players.map(pid => {
-          const val = res.playerNet[pid] || 0;
+          const val = (res.playerNet[pid] || 0) + (junkNet[pid] || 0);
           return h('span',{style:'font-size:11px;' + (val > 0 ? 'color:var(--success);' : val < 0 ? 'color:var(--danger);' : '')},
             `${UI.playerName(pid)}: ${val > 0 ? '+' : ''}${Utils.fmt(val)}`);
         });
         return h('div',{class:`${theme} game-status-card`,style:'margin-bottom:4px;'},[
           h('div',{class:'card',style:'padding:6px 10px;'},[
-            h('div',{style:'font-weight:700;font-size:12px;margin-bottom:4px;'},UI.gameLabel(game)),
+            h('div',{style:'display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:12px;margin-bottom:4px;'},[
+              h('span',{},UI.gameLabel(game)),
+              h('span',{style:'display:flex;align-items:center;gap:6px;'},[
+                thruLabel ? h('span',{style:'font-size:10px;font-weight:400;color:var(--muted);'},thruLabel) : '',
+                totalJunkMoney > 0 ? h('span',{style:'font-size:10px;font-weight:400;color:var(--muted);'},`Junk: ${Utils.fmt(totalJunkMoney)}`) : ''
+              ].filter(Boolean))
+            ]),
             h('div',{style:'display:flex;flex-wrap:wrap;gap:6px 12px;'},playerLines)
           ])
         ]);
