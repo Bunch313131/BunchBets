@@ -9089,7 +9089,7 @@ function showInstallGate() {
 
   if (isIOS_install()) {
     gate.innerHTML = `
-      <div class="install-gate-title">Bunch Bets</div>
+      <div class="install-gate-title">${IS_BETA ? 'Bunch Bets BETA' : 'Bunch Bets'}</div>
       <div class="install-gate-card">
         <h3>Add to Home Screen</h3>
         <div class="install-gate-steps">
@@ -9101,7 +9101,7 @@ function showInstallGate() {
       <div style="margin-top:20px;font-size:12px;color:rgba(255,255,255,0.35);max-width:340px;line-height:1.5;">For the best experience, add Bunch Bets to your Home Screen and launch it from there.</div>`;
   } else if (deferredInstallPrompt) {
     gate.innerHTML = `
-      <div class="install-gate-title">Bunch Bets</div>
+      <div class="install-gate-title">${IS_BETA ? 'Bunch Bets BETA' : 'Bunch Bets'}</div>
       <div class="install-gate-card">
         <h3>Install the App</h3>
         <div class="install-gate-steps">
@@ -9113,7 +9113,7 @@ function showInstallGate() {
       </div>`;
   } else {
     gate.innerHTML = `
-      <div class="install-gate-title">Bunch Bets</div>
+      <div class="install-gate-title">${IS_BETA ? 'Bunch Bets BETA' : 'Bunch Bets'}</div>
       <div class="install-gate-card">
         <h3>Add to Home Screen</h3>
         <div class="install-gate-steps">
@@ -9254,12 +9254,24 @@ window.addEventListener('appinstalled', () => {
   // Escape hatch. Load the app with ?nosw=1 to tear the worker out and drop its
   // caches — recovers a bad deploy without needing another deploy.
   if (new URLSearchParams(location.search).has('nosw')) {
-    navigator.serviceWorker.getRegistrations()
-      .then(regs => Promise.all(regs.map(r => r.unregister())))
-      .then(() => window.caches && caches.keys())
-      .then(keys => Promise.all((keys || []).filter(k => k.indexOf('bunchbets-') === 0).map(k => caches.delete(k))))
-      .then(() => { try { Err.toast('Service worker removed'); } catch (e) {} })
-      .catch(() => {});
+    (async function tearDown() {
+      const flag = 'bb-nosw-pass2';
+      const mark = (v) => { try { v ? sessionStorage.setItem(flag,'1') : sessionStorage.removeItem(flag); } catch (e) {} };
+      const marked = () => { try { return !!sessionStorage.getItem(flag); } catch (e) { return false; } };
+      try {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(r => r.unregister()));
+        // Unregistering does not stop the already-active worker from controlling
+        // THIS page, and its fetch handler re-creates any cache we delete. One
+        // reload releases it; on the second pass we are uncontrolled and the
+        // delete sticks.
+        if (navigator.serviceWorker.controller && !marked()) { mark(true); location.reload(); return; }
+        mark(false);
+        const keys = (window.caches ? await caches.keys() : []) || [];
+        await Promise.all(keys.filter(k => k.indexOf('bunchbets-') === 0).map(k => caches.delete(k)));
+        try { Err.toast('Service worker removed'); } catch (e) {}
+      } catch (e) {}
+    })();
     return;
   }
 
