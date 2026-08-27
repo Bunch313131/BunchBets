@@ -4,8 +4,10 @@
 .DS_Store
 
 # Secrets — never commit
-.ghin-creds
-*.creds
+*creds*
+*credential*
+*secret*
+*.pem
 .env
 .env.*
 
