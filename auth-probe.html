@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1e3a8a">
+<title>Bunch Bets — Auth Probe</title>
+<link rel="apple-touch-icon" sizes="180x180" href="BunchBetsBeta180.png">
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; padding:16px calc(16px + env(safe-area-inset-left)) calc(24px + env(safe-area-inset-bottom));
+    background:#0b0e13; color:#e5e5e5; font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial; }
+  h1 { font-size:17px; margin:0 0 2px; }
+  .sub { color:#8b949e; font-size:12px; margin-bottom:16px; }
+  .card { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:12px 14px; margin-bottom:12px; }
+  .card h2 { font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#8b949e; margin:0 0 8px; font-weight:700; }
+  .kv { display:flex; justify-content:space-between; gap:12px; padding:3px 0; font-size:13px; border-bottom:1px solid #21262d; }
+  .kv:last-child { border-bottom:none; }
+  .kv span:first-child { color:#8b949e; flex-shrink:0; }
+  .kv span:last-child { text-align:right; word-break:break-word; font-family:ui-monospace,Menlo,monospace; font-size:12px; }
+  .yes { color:#3fb950; } .no { color:#f85149; }
+  button { width:100%; border:none; border-radius:10px; padding:13px; font-size:15px; font-weight:700;
+    margin-bottom:8px; cursor:pointer; background:#1f6feb; color:#fff; }
+  button.alt { background:#238636; } button.ghost { background:transparent; color:#8b949e; border:1px solid #30363d; font-weight:500; font-size:13px; padding:9px; }
+  #log { font-family:ui-monospace,Menlo,monospace; font-size:11px; line-height:1.5; white-space:pre-wrap;
+    word-break:break-word; max-height:45vh; overflow:auto; }
+  .t { color:#8b949e; } .ok { color:#3fb950; } .err { color:#f85149; } .info { color:#58a6ff; }
+</style>
+</head>
+<body>
+<h1>Auth Probe</h1>
+<div class="sub">Does Google sign-in survive an installed iOS PWA? Not part of the app.</div>
+
+<div class="card">
+  <h2>Environment</h2>
+  <div id="env"></div>
+</div>
+
+<div class="card">
+  <h2>Try it</h2>
+  <button id="btnRedirect">Sign in with Google — redirect</button>
+  <button id="btnPopup" class="alt">Sign in with Google — popup</button>
+  <button id="btnOut" class="ghost">Sign out</button>
+</div>
+
+<div class="card">
+  <h2>Log</h2>
+  <div id="log"></div>
+  <button id="btnCopy" class="ghost" style="margin-top:10px;">Copy log</button>
+  <button id="btnClear" class="ghost">Clear log</button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script>
+(function () {
+  'use strict';
+  var LOG_KEY = 'bb-auth-probe-log';
+
+  function read() { try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch (e) { return []; } }
+  function write(l) { try { localStorage.setItem(LOG_KEY, JSON.stringify(l.slice(-120))); } catch (e) {} }
+  function log(msg, kind) {
+    var l = read();
+    l.push({ t: new Date().toISOString().slice(11, 19), m: String(msg), k: kind || '' });
+    write(l); render();
+  }
+  function render() {
+    document.getElementById('log').innerHTML = read().map(function (e) {
+      return '<span class="t">' + e.t + '</span> <span class="' + e.k + '">' +
+        e.m.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</span>';
+    }).join('\n') || '<span class="t">empty</span>';
+  }
+
+  var standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  var CONFIG = {
+    apiKey: "AIzaSyCSt28t8rV5taevsl6iVI9QlOV-XR1wrCE",
+    authDomain: "bunchbets-test.firebaseapp.com",
+    databaseURL: "https://bunchbets-test-default-rtdb.firebaseio.com",
+    projectId: "bunchbets-test",
+    storageBucket: "bunchbets-test.firebasestorage.app",
+    messagingSenderId: "820215666223",
+    appId: "1:820215666223:web:48501679a5540306a998da"
+  };
+
+  var rows = [
+    ['installed (standalone)', standalone ? 'YES' : 'no — open from the home screen icon', standalone ? 'yes' : 'no'],
+    ['origin', location.origin, ''],
+    ['authDomain', CONFIG.authDomain, ''],
+    ['cross-origin auth', location.hostname.indexOf('firebaseapp.com') === -1 ? 'YES — the risky case' : 'no', ''],
+    ['cookies enabled', navigator.cookieEnabled ? 'yes' : 'no', navigator.cookieEnabled ? 'yes' : 'no'],
+    ['firebase SDK', (typeof firebase !== 'undefined') ? 'loaded' : 'FAILED TO LOAD', (typeof firebase !== 'undefined') ? 'yes' : 'no'],
+    ['user agent', navigator.userAgent, '']
+  ];
+  document.getElementById('env').innerHTML = rows.map(function (r) {
+    return '<div class="kv"><span>' + r[0] + '</span><span class="' + r[2] + '">' + r[1] + '</span></div>';
+  }).join('');
+
+  if (typeof firebase === 'undefined') { log('Firebase SDK did not load — no network, or the CDN is blocked.', 'err'); render(); return; }
+
+  firebase.initializeApp(CONFIG);
+  var auth = firebase.auth();
+  var provider = new firebase.auth.GoogleAuthProvider();
+
+  log('--- page load --- standalone=' + standalone, 'info');
+
+  // This is the whole question: after a redirect round-trip, does the result come back?
+  auth.getRedirectResult()
+    .then(function (res) {
+      if (res && res.user) log('REDIRECT RESULT: signed in as ' + res.user.email, 'ok');
+      else log('redirect result: none (normal on a fresh load)', 't');
+    })
+    .catch(function (e) { log('REDIRECT RESULT FAILED: ' + e.code + ' — ' + e.message, 'err'); });
+
+  auth.onAuthStateChanged(function (u) {
+    log(u ? 'auth state: SIGNED IN as ' + u.email : 'auth state: signed out', u ? 'ok' : 't');
+  });
+
+  document.getElementById('btnRedirect').onclick = function () {
+    log('calling signInWithRedirect…', 'info');
+    auth.signInWithRedirect(provider).catch(function (e) { log('REDIRECT START FAILED: ' + e.code + ' — ' + e.message, 'err'); });
+  };
+  document.getElementById('btnPopup').onclick = function () {
+    log('calling signInWithPopup…', 'info');
+    auth.signInWithPopup(provider)
+      .then(function (r) { log('POPUP OK: ' + r.user.email, 'ok'); })
+      .catch(function (e) { log('POPUP FAILED: ' + e.code + ' — ' + e.message, 'err'); });
+  };
+  document.getElementById('btnOut').onclick = function () {
+    auth.signOut().then(function () { log('signed out', 't'); });
+  };
+  document.getElementById('btnCopy').onclick = function () {
+    var text = read().map(function (e) { return e.t + ' ' + e.m; }).join('\n') + '\n\nUA: ' + navigator.userAgent + '\nstandalone: ' + standalone;
+    navigator.clipboard.writeText(text).then(function () { log('log copied to clipboard', 'ok'); },
+      function () { log('clipboard blocked — screenshot instead', 'err'); });
+  };
+  document.getElementById('btnClear').onclick = function () { write([]); render(); };
+
+  render();
+})();
+</script>
+</body>
+</html>

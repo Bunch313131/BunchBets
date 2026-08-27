@@ -172,10 +172,15 @@ async function cacheFirst(request) {
   return response;
 }
 
+// Auth flows and the auth probe must never be served from cache: a stale page or a
+// cached redirect handler breaks sign-in in ways that are miserable to diagnose.
+const BYPASS_PATHS = ['/auth-probe', '/__/auth'];
+
 self.addEventListener('fetch', (event) => {
   if (KILLED) return;
   const request = event.request;
   if (request.method !== 'GET') return;
+  if (BYPASS_PATHS.some((p) => request.url.indexOf(p) !== -1)) return;
 
   let url;
   try { url = new URL(request.url); } catch (e) { return; }
