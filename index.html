@@ -9254,22 +9254,30 @@ window.addEventListener('appinstalled', () => {
   // Escape hatch. Load the app with ?nosw=1 to tear the worker out and drop its
   // caches — recovers a bad deploy without needing another deploy.
   if (new URLSearchParams(location.search).has('nosw')) {
-    (async function tearDown() {
-      try {
-        const ctrl = navigator.serviceWorker.controller;
-        if (ctrl) {
-          // The worker tears itself down and navigates us to ?swremoved=1.
-          ctrl.postMessage({ type: 'KILL' });
-          return;
-        }
-        // No controller (already gone, or it never registered) — clean up directly.
-        const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map((r) => r.unregister()));
-        const keys = (window.caches ? await caches.keys() : []) || [];
-        await Promise.all(keys.filter((k) => k.indexOf('bunchbets-') === 0).map((k) => caches.delete(k)));
-        try { Err.toast('Service worker removed'); } catch (e) {}
-      } catch (e) {}
-    })();
+    // Must wait for load: a service worker cannot navigate() a client whose
+    // document is still loading, so firing this during parse silently does nothing.
+    window.addEventListener('load', function () {
+      (async function tearDown() {
+        try {
+          const ctrl = navigator.serviceWorker.controller;
+          if (ctrl) {
+            ctrl.postMessage({ type: 'KILL' });
+            // Fallback: if the worker cannot navigate us, go there ourselves.
+            setTimeout(function () {
+              if (navigator.serviceWorker.controller) {
+                location.replace(location.pathname + '?swremoved=1');
+              }
+            }, 3000);
+            return;
+          }
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+          const keys = (window.caches ? await caches.keys() : []) || [];
+          await Promise.all(keys.filter((k) => k.indexOf('bunchbets-') === 0).map((k) => caches.delete(k)));
+          try { Err.toast('Service worker removed'); } catch (e) {}
+        } catch (e) {}
+      })();
+    });
     return;
   }
 
