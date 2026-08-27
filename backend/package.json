@@ -4,11 +4,16 @@
   "type": "module",
   "scripts": {
     "test": "node --test rules.test.js",
+    "test:cloud": "node --test cloud.test.mjs",
     "seed": "node seed.js"
   },
   "dependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",
     "firebase": "^12.18.0",
-    "firebase-admin": "^13.0.0"
+    "firebase-admin": "^14.3.0",
+    "playwright": "^1.62.1"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.0"
   }
 }

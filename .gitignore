@@ -39,3 +39,7 @@ ui-debug.log
 roster*.csv
 backend/roster*.csv
 *First_Users*
+
+# Local emulator harness scratch
+backend/vendor/
+apptest/

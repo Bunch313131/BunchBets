@@ -31,6 +31,14 @@ service cloud.firestore {
 
     // Shares a group pool with the caller. Basis for reading and maintaining a
     // golfer who has no account and will never claim their own record.
+    // NOTE ON A ROUGH EDGE: when the caller belongs to no groups at all,
+    // hasAny() over the empty list raises an evaluation error rather than
+    // returning false. Several guard forms were tried against the emulator —
+    // size(), != [], typed field access — and each broke the working case.
+    // The behaviour FAILS CLOSED: the client still receives permission-denied,
+    // identical to a clean false, so this is a diagnostics wart and not a
+    // security hole. Worth revisiting if the rules language grows a way to
+    // express it; not worth weakening the rule to tidy the log.
     function sharesPool(data) {
       return signedIn() && data.get('poolGroupIds', []).hasAny(myGroups());
     }
