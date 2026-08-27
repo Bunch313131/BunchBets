@@ -520,6 +520,16 @@ html:has(.install-gate.show) { background:#050d08; }
 .bottom-nav-btn svg { width:22px; height:22px; }
 .bottom-nav-dark-toggle { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:10px 4px 6px; background:none; border:none; color:var(--muted); font-size:11px; cursor:pointer; transition:color 0.2s; }
 .bottom-nav-dark-toggle .toggle-icon { font-size:20px; line-height:22px; height:22px; }
+/* Service-worker update banner — sits above the bottom nav, never auto-dismisses */
+.sw-update { position:fixed; left:12px; right:12px; bottom:calc(72px + env(safe-area-inset-bottom,0px));
+  z-index:9998; display:none; align-items:center; justify-content:space-between; gap:12px;
+  background:var(--card,#161b22); color:var(--txt,#e5e5e5); border:1px solid var(--acc,#16a34a);
+  border-radius:12px; padding:12px 14px; box-shadow:0 8px 30px rgba(0,0,0,0.5); font-size:13px; }
+.sw-update.show { display:flex; }
+.sw-update button { background:var(--acc,#16a34a); color:#fff; border:none; border-radius:8px;
+  padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer; flex-shrink:0; }
+.sw-update .sw-dismiss { background:transparent; color:var(--muted,#8b949e); font-weight:500; padding:8px; }
+
 /* === INSTALL GATE === */
 .install-gate { display:none; position:fixed; top:calc(-1 * env(safe-area-inset-top, 0px)); left:0; right:0; bottom:calc(-1 * env(safe-area-inset-bottom, 0px)); z-index:9999; background:#050d08; color:#e5e5e5; flex-direction:column; align-items:center; justify-content:center; padding:32px 24px; text-align:center; font-family:'Inter',system-ui,sans-serif; }
 .install-gate.show { display:flex; }
@@ -9233,6 +9243,71 @@ window.addEventListener('appinstalled', () => {
     Wizard.start();
     setTimeout(() => showWhatsNew(), 10000);
   }
+})();
+
+// === SERVICE WORKER ===
+// Offline shell. Without this an installed PWA cannot cold-start with no signal,
+// which is the situation this app exists for. See sw.js for the caching strategy.
+(function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+
+  // Escape hatch. Load the app with ?nosw=1 to tear the worker out and drop its
+  // caches — recovers a bad deploy without needing another deploy.
+  if (new URLSearchParams(location.search).has('nosw')) {
+    navigator.serviceWorker.getRegistrations()
+      .then(regs => Promise.all(regs.map(r => r.unregister())))
+      .then(() => window.caches && caches.keys())
+      .then(keys => Promise.all((keys || []).filter(k => k.indexOf('bunchbets-') === 0).map(k => caches.delete(k))))
+      .then(() => { try { Err.toast('Service worker removed'); } catch (e) {} })
+      .catch(() => {});
+    return;
+  }
+
+  let updateAccepted = false;
+
+  function showUpdateBanner(waitingWorker) {
+    if (document.getElementById('swUpdate')) return;
+    const bar = document.createElement('div');
+    bar.className = 'sw-update show';
+    bar.id = 'swUpdate';
+    bar.innerHTML = '<span>A new version of Bunch Bets is ready.</span>' +
+                    '<span style="display:flex;align-items:center;gap:4px;">' +
+                    '<button class="sw-dismiss" id="swLater">Later</button>' +
+                    '<button id="swReload">Reload</button></span>';
+    document.body.appendChild(bar);
+    document.getElementById('swLater').onclick = () => bar.remove();
+    document.getElementById('swReload').onclick = () => {
+      updateAccepted = true;
+      bar.remove();
+      // Ask the waiting worker to take over; controllerchange then reloads us.
+      if (waitingWorker) waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+    };
+  }
+
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js?v=' + APP_VERSION).then(function (reg) {
+      // A worker already waiting from a previous visit.
+      if (reg.waiting && navigator.serviceWorker.controller) showUpdateBanner(reg.waiting);
+      reg.addEventListener('updatefound', function () {
+        const incoming = reg.installing;
+        if (!incoming) return;
+        incoming.addEventListener('statechange', function () {
+          // controller present => this is an update, not the first install.
+          if (incoming.state === 'installed' && navigator.serviceWorker.controller) {
+            showUpdateBanner(incoming);
+          }
+        });
+      });
+    }).catch(function () { /* offline first load, or SW unsupported — app still works */ });
+
+    // clients.claim() fires this on the very first install too, so only reload
+    // when the user actually asked for the update.
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (!updateAccepted) return;
+      updateAccepted = false;
+      location.reload();
+    });
+  });
 })();
 
 })();
