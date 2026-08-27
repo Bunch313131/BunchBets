@@ -2072,24 +2072,46 @@ const Game = {
   },
 
   // Compute per-player net $ for any game type (used by transactions, share, round-complete modal)
-  computeGamePlayerNet(g) {
-    const net = {};
-    const addJunkLadder = (players) => {
-      const sumJunk = (pid, s, e) => {
-        let tot = 0; const arr = g.junkCounts[pid] || [];
-        for (let h = s; h <= e; h++) tot += (arr[h]||0);
-        return tot;
-      };
-      const standings = players.map(pid => {
-        const fj = sumJunk(pid, 0, 8), bj = sumJunk(pid, 9, 17);
-        return { pid, junkVal: fj * (g.junkValue.front||0) + bj * (g.junkValue.back||0) };
-      }).sort((a, b) => b.junkVal - a.junkVal);
+  // Junk "pay up the ladder" — INDIVIDUAL games only (Skins, Wolf, 9-Point).
+  // Every player collects, from each player below them, the difference in junk value.
+  // Team games (Nassau, Vegas) settle junk as a single team-vs-team net and must NOT
+  // use this. Single source of truth for every display and for the actual payout.
+  computeJunkLadder(g, playerIds) {
+    const players = playerIds || [];
+    const junkNet = {};
+    players.forEach(pid => { junkNet[pid] = 0; });
+    const front = (g.junkValue && g.junkValue.front) || 0;
+    const back  = (g.junkValue && g.junkValue.back)  || 0;
+    const standings = players.map(pid => {
+      const arr = (g.junkCounts && g.junkCounts[pid]) || [];
+      let frontJunk = 0, backJunk = 0;
+      for (let hh = 0; hh <= 8; hh++)  frontJunk += (arr[hh] || 0);
+      for (let hh = 9; hh <= 17; hh++) backJunk  += (arr[hh] || 0);
+      return { pid, junkVal: frontJunk * front + backJunk * back, frontJunk, backJunk };
+    }).sort((a, b) => b.junkVal - a.junkVal);
+    let totalJunkMoney = 0;
+    const txns = [];
+    if (g.withJunk) {
       for (let i = 0; i < standings.length; i++) {
         for (let j = i + 1; j < standings.length; j++) {
           const diff = standings[i].junkVal - standings[j].junkVal;
-          if (diff > 0) { net[standings[i].pid] += diff; net[standings[j].pid] -= diff; }
+          if (diff > 0) {
+            junkNet[standings[i].pid] += diff;
+            junkNet[standings[j].pid] -= diff;
+            totalJunkMoney += diff;
+            txns.push({ from: standings[j].pid, to: standings[i].pid, amount: diff });
+          }
         }
       }
+    }
+    return { standings, junkNet, totalJunkMoney, txns };
+  },
+
+  computeGamePlayerNet(g) {
+    const net = {};
+    const addJunkLadder = (players) => {
+      const jl = Game.computeJunkLadder(g, players);
+      players.forEach(pid => { net[pid] = (net[pid]||0) + (jl.junkNet[pid]||0); });
     };
 
     if (g.gameType === 'skins') {
@@ -5696,26 +5718,9 @@ const UI = {
         const res = Game.computeWolfResult(game);
         const players = game.wolfPlayers || [];
 
-        // Junk pay-up-the-ladder (mirrors results page so live status matches payout)
-        const sumJunkPid = (pid) => {
-          const arr = game.junkCounts[pid] || [];
-          let f = 0, b = 0;
-          for (let hh = 0; hh <= 8; hh++) f += (arr[hh]||0);
-          for (let hh = 9; hh <= 17; hh++) b += (arr[hh]||0);
-          return f * (game.junkValue.front||0) + b * (game.junkValue.back||0);
-        };
-        const junkNet = {};
-        players.forEach(pid => { junkNet[pid] = 0; });
-        let totalJunkMoney = 0;
-        if (game.withJunk) {
-          const js = players.map(pid => ({ pid, junkVal: sumJunkPid(pid) })).sort((a, b) => b.junkVal - a.junkVal);
-          for (let i = 0; i < js.length; i++) {
-            for (let j = i + 1; j < js.length; j++) {
-              const diff = js[i].junkVal - js[j].junkVal;
-              if (diff > 0) { junkNet[js[i].pid] += diff; junkNet[js[j].pid] -= diff; totalJunkMoney += diff; }
-            }
-          }
-        }
+        const __jl = Game.computeJunkLadder(game, players);
+        const junkNet = __jl.junkNet;
+        const totalJunkMoney = __jl.totalJunkMoney;
 
         const playerLines = players.map(pid => {
           const val = (res.playerNet[pid] || 0) + (junkNet[pid] || 0);
@@ -5738,27 +5743,9 @@ const UI = {
         const res = Game.computeNinePointResult(game);
         const players = game.ninePointPlayers || [];
 
-        // Junk pay-up-the-ladder (mirrors computeGamePlayerNet + results page so
-        // the live status matches the actual payout)
-        const sumJunkPid = (pid) => {
-          const arr = game.junkCounts[pid] || [];
-          let f = 0, b = 0;
-          for (let hh = 0; hh <= 8; hh++) f += (arr[hh]||0);
-          for (let hh = 9; hh <= 17; hh++) b += (arr[hh]||0);
-          return f * (game.junkValue.front||0) + b * (game.junkValue.back||0);
-        };
-        const junkNet = {};
-        players.forEach(pid => { junkNet[pid] = 0; });
-        let totalJunkMoney = 0;
-        if (game.withJunk) {
-          const js = players.map(pid => ({ pid, junkVal: sumJunkPid(pid) })).sort((a, b) => b.junkVal - a.junkVal);
-          for (let i = 0; i < js.length; i++) {
-            for (let j = i + 1; j < js.length; j++) {
-              const diff = js[i].junkVal - js[j].junkVal;
-              if (diff > 0) { junkNet[js[i].pid] += diff; junkNet[js[j].pid] -= diff; totalJunkMoney += diff; }
-            }
-          }
-        }
+        const __jl = Game.computeJunkLadder(game, players);
+        const junkNet = __jl.junkNet;
+        const totalJunkMoney = __jl.totalJunkMoney;
 
         const playerLines = players.map(pid => {
           const val = (res.playerNet[pid] || 0) + (junkNet[pid] || 0);
@@ -6497,31 +6484,10 @@ const UI = {
         const players = game.wolfPlayers || [];
 
         // Calculate junk pay-up-the-ladder for Wolf
-        const sumWolfJunkPid = (pid, start, end) => {
-          let tot = 0;
-          const arr = game.junkCounts[pid] || [];
-          for (let h = start; h <= end; h++) tot += (arr[h]||0);
-          return tot;
-        };
-        const junkStandings = players.map(pid => {
-          const frontJunk = sumWolfJunkPid(pid, 0, 8);
-          const backJunk = sumWolfJunkPid(pid, 9, 17);
-          const junkVal = frontJunk * (game.junkValue.front||0) + backJunk * (game.junkValue.back||0);
-          return { pid, junkVal };
-        }).sort((a, b) => b.junkVal - a.junkVal);
-        const junkNet = {};
-        players.forEach(pid => { junkNet[pid] = 0; });
-        let totalJunkMoney = 0;
-        for (let i = 0; i < junkStandings.length; i++) {
-          for (let j = i + 1; j < junkStandings.length; j++) {
-            const diff = junkStandings[i].junkVal - junkStandings[j].junkVal;
-            if (diff > 0) {
-              junkNet[junkStandings[i].pid] += diff;
-              junkNet[junkStandings[j].pid] -= diff;
-              totalJunkMoney += diff;
-            }
-          }
-        }
+        const __jl = Game.computeJunkLadder(game, players);
+        const junkStandings = __jl.standings;
+        const junkNet = __jl.junkNet;
+        const totalJunkMoney = __jl.totalJunkMoney;
 
         // Build player net $ standings (Wolf + junk pay-up-the-ladder)
         const playerAmts = players.map(pid => {
@@ -6540,31 +6506,10 @@ const UI = {
         const players = game.ninePointPlayers || [];
 
         // Calculate junk for 9-Point
-        const sumNinePointJunkPid = (pid, start, end) => {
-          let tot = 0;
-          const arr = game.junkCounts[pid] || [];
-          for (let h = start; h <= end; h++) tot += (arr[h]||0);
-          return tot;
-        };
-        const junkStandings = players.map(pid => {
-          const frontJunk = sumNinePointJunkPid(pid, 0, 8);
-          const backJunk = sumNinePointJunkPid(pid, 9, 17);
-          const junkVal = frontJunk * (game.junkValue.front||0) + backJunk * (game.junkValue.back||0);
-          return { pid, junkVal };
-        }).sort((a, b) => b.junkVal - a.junkVal);
-        const junkNet = {};
-        players.forEach(pid => { junkNet[pid] = 0; });
-        let totalJunkMoney9 = 0;
-        for (let i = 0; i < junkStandings.length; i++) {
-          for (let j = i + 1; j < junkStandings.length; j++) {
-            const diff = junkStandings[i].junkVal - junkStandings[j].junkVal;
-            if (diff > 0) {
-              junkNet[junkStandings[i].pid] += diff;
-              junkNet[junkStandings[j].pid] -= diff;
-              totalJunkMoney9 += diff;
-            }
-          }
-        }
+        const __jl = Game.computeJunkLadder(game, players);
+        const junkStandings = __jl.standings;
+        const junkNet = __jl.junkNet;
+        const totalJunkMoney9 = __jl.totalJunkMoney;
 
         const playerAmts = players.map(pid => {
           const name = UI.playerName(pid);
@@ -6890,32 +6835,10 @@ const UI = {
         const pointValue = g.wolfPointValue || 1;
 
         // Calculate junk pay-up-the-ladder for Wolf
-        const sumJunkPid = (pid, start, end) => {
-          let tot = 0;
-          const arr = g.junkCounts[pid] || [];
-          for (let h = start; h <= end; h++) tot += (arr[h]||0);
-          return tot;
-        };
-        const junkStandings = players.map(pid => {
-          const frontJunk = sumJunkPid(pid, 0, 8);
-          const backJunk = sumJunkPid(pid, 9, 17);
-          const junkVal = frontJunk * (g.junkValue.front||0) + backJunk * (g.junkValue.back||0);
-          return { pid, junkVal };
-        }).sort((a, b) => b.junkVal - a.junkVal);
-        // Calculate junk net per player (pay up the ladder)
-        const junkNet = {};
-        players.forEach(pid => { junkNet[pid] = 0; });
-        let totalJunkMoney = 0;
-        for (let i = 0; i < junkStandings.length; i++) {
-          for (let j = i + 1; j < junkStandings.length; j++) {
-            const diff = junkStandings[i].junkVal - junkStandings[j].junkVal;
-            if (diff > 0) {
-              junkNet[junkStandings[i].pid] += diff;
-              junkNet[junkStandings[j].pid] -= diff;
-              totalJunkMoney += diff;
-            }
-          }
-        }
+        const __jl = Game.computeJunkLadder(g, players);
+        const junkStandings = __jl.standings;
+        const junkNet = __jl.junkNet;
+        const totalJunkMoney = __jl.totalJunkMoney;
         const hasJunk = totalJunkMoney > 0;
 
         // Player standings with Wolf + junk net amounts
@@ -6946,31 +6869,10 @@ const UI = {
         const pointValue = g.ninePointValue || 1;
 
         // Calculate junk pay-up-the-ladder for 9-Point
-        const sumJunkPid = (pid, start, end) => {
-          let tot = 0;
-          const arr = g.junkCounts[pid] || [];
-          for (let h = start; h <= end; h++) tot += (arr[h]||0);
-          return tot;
-        };
-        const junkStandings = players.map(pid => {
-          const frontJunk = sumJunkPid(pid, 0, 8);
-          const backJunk = sumJunkPid(pid, 9, 17);
-          const junkVal = frontJunk * (g.junkValue.front||0) + backJunk * (g.junkValue.back||0);
-          return { pid, junkVal };
-        }).sort((a, b) => b.junkVal - a.junkVal);
-        const junkNet = {};
-        players.forEach(pid => { junkNet[pid] = 0; });
-        let totalJunkMoney = 0;
-        for (let i = 0; i < junkStandings.length; i++) {
-          for (let j = i + 1; j < junkStandings.length; j++) {
-            const diff = junkStandings[i].junkVal - junkStandings[j].junkVal;
-            if (diff > 0) {
-              junkNet[junkStandings[i].pid] += diff;
-              junkNet[junkStandings[j].pid] -= diff;
-              totalJunkMoney += diff;
-            }
-          }
-        }
+        const __jl = Game.computeJunkLadder(g, players);
+        const junkStandings = __jl.standings;
+        const junkNet = __jl.junkNet;
+        const totalJunkMoney = __jl.totalJunkMoney;
         const hasJunk = totalJunkMoney > 0;
 
         // Player standings
@@ -7365,34 +7267,11 @@ const UI = {
         const holeRows = buildWolfHoleRows();
 
         // Calculate junk pay-up-the-ladder
-        const sumJunkPid = (pid, start, end) => {
-          let tot = 0;
-          const arr = g.junkCounts[pid] || [];
-          for (let h = start; h <= end; h++) tot += (arr[h]||0);
-          return tot;
-        };
-        const junkStandings = players.map(pid => {
-          const frontJunk = sumJunkPid(pid, 0, 8);
-          const backJunk = sumJunkPid(pid, 9, 17);
-          const junkVal = frontJunk * (g.junkValue.front||0) + backJunk * (g.junkValue.back||0);
-          return { pid, junkVal, frontJunk, backJunk };
-        }).sort((a, b) => b.junkVal - a.junkVal);
-        // Calculate junk net per player (pay up the ladder)
-        const junkNet = {};
-        players.forEach(pid => { junkNet[pid] = 0; });
-        let totalJunkMoney = 0;
-        const junkTxns = [];
-        for (let i = 0; i < junkStandings.length; i++) {
-          for (let j = i + 1; j < junkStandings.length; j++) {
-            const diff = junkStandings[i].junkVal - junkStandings[j].junkVal;
-            if (diff > 0) {
-              junkNet[junkStandings[i].pid] += diff;
-              junkNet[junkStandings[j].pid] -= diff;
-              totalJunkMoney += diff;
-              junkTxns.push({ from: junkStandings[j].pid, to: junkStandings[i].pid, amount: diff });
-            }
-          }
-        }
+        const __jl = Game.computeJunkLadder(g, players);
+        const junkStandings = __jl.standings;
+        const junkNet = __jl.junkNet;
+        const totalJunkMoney = __jl.totalJunkMoney;
+        const junkTxns = __jl.txns;
         const hasJunk = totalJunkMoney > 0;
 
         // Wolf per-player summary
