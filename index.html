@@ -9255,20 +9255,18 @@ window.addEventListener('appinstalled', () => {
   // caches — recovers a bad deploy without needing another deploy.
   if (new URLSearchParams(location.search).has('nosw')) {
     (async function tearDown() {
-      const flag = 'bb-nosw-pass2';
-      const mark = (v) => { try { v ? sessionStorage.setItem(flag,'1') : sessionStorage.removeItem(flag); } catch (e) {} };
-      const marked = () => { try { return !!sessionStorage.getItem(flag); } catch (e) { return false; } };
       try {
+        const ctrl = navigator.serviceWorker.controller;
+        if (ctrl) {
+          // The worker tears itself down and navigates us to ?swremoved=1.
+          ctrl.postMessage({ type: 'KILL' });
+          return;
+        }
+        // No controller (already gone, or it never registered) — clean up directly.
         const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map(r => r.unregister()));
-        // Unregistering does not stop the already-active worker from controlling
-        // THIS page, and its fetch handler re-creates any cache we delete. One
-        // reload releases it; on the second pass we are uncontrolled and the
-        // delete sticks.
-        if (navigator.serviceWorker.controller && !marked()) { mark(true); location.reload(); return; }
-        mark(false);
+        await Promise.all(regs.map((r) => r.unregister()));
         const keys = (window.caches ? await caches.keys() : []) || [];
-        await Promise.all(keys.filter(k => k.indexOf('bunchbets-') === 0).map(k => caches.delete(k)));
+        await Promise.all(keys.filter((k) => k.indexOf('bunchbets-') === 0).map((k) => caches.delete(k)));
         try { Err.toast('Service worker removed'); } catch (e) {}
       } catch (e) {}
     })();
@@ -9294,6 +9292,13 @@ window.addEventListener('appinstalled', () => {
       // Ask the waiting worker to take over; controllerchange then reloads us.
       if (waitingWorker) waitingWorker.postMessage({ type: 'SKIP_WAITING' });
     };
+  }
+
+  if (new URLSearchParams(location.search).has('swremoved')) {
+    window.addEventListener('load', function () {
+      setTimeout(function () { try { Err.toast('Service worker removed'); } catch (e) {} }, 600);
+    });
+    return;
   }
 
   window.addEventListener('load', function () {

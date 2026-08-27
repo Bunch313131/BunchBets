@@ -71,9 +71,33 @@ self.addEventListener('activate', (event) => {
   })());
 });
 
-// The page sends this only after the user taps "Reload" on the update banner.
+// Once true, this worker stops intercepting anything. Set by the KILL teardown so
+// its own fetch handler cannot re-create the caches it is in the middle of deleting.
+let KILLED = false;
+
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+  const data = event.data || {};
+
+  // Sent only after the user taps "Reload" on the update banner.
+  if (data.type === 'SKIP_WAITING') self.skipWaiting();
+
+  // Full teardown (?nosw=1). Page-side teardown cannot win this race: unregistering
+  // does not stop the active worker from controlling open pages, so it keeps serving
+  // fetches and re-creating the cache. Doing it in here is the only ordering that
+  // holds — stop intercepting, drop caches, unregister, then send clients to a clean
+  // URL where they will come up uncontrolled.
+  if (data.type === 'KILL') {
+    event.waitUntil((async () => {
+      KILLED = true;
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((k) => k.startsWith('bunchbets-')).map((k) => caches.delete(k)));
+      await self.registration.unregister();
+      const clients = await self.clients.matchAll({ type: 'window' });
+      clients.forEach((c) => {
+        try { c.navigate(c.url.split('?')[0] + '?swremoved=1'); } catch (e) {}
+      });
+    })());
+  }
 });
 
 function neverCache(url) {
@@ -113,6 +137,7 @@ async function cacheFirst(request) {
 }
 
 self.addEventListener('fetch', (event) => {
+  if (KILLED) return;
   const request = event.request;
   if (request.method !== 'GET') return;
 
