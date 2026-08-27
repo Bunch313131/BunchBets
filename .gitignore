@@ -21,3 +21,6 @@ index_old_archive.html
 
 # Stray scratch file created while probing filesystem permissions — safe to delete
 _deltest.tmp
+
+# Local push helper (reads the gitignored token file)
+.push.sh
