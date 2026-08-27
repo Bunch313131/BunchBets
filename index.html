@@ -23,6 +23,26 @@
 <link rel="apple-touch-icon" sizes="180x180" href="BunchBets180.png">
 <link rel="manifest" href="manifest.webmanifest">
 <title>Bunch Bets V7.3</title>
+<!-- Environment switch — anything that is not the production host is BETA.
+     Runs before render so the manifest/icon are correct at install time. -->
+<script>
+(function(){
+  window._bbBeta = location.hostname !== 'bunchbets.com';
+  if (!window._bbBeta) return;
+  document.title = 'Bunch Bets BETA';
+  var m = document.querySelector('link[rel="manifest"]');
+  if (m) m.href = 'manifest.beta.webmanifest';
+  var a = document.querySelector('link[rel="apple-touch-icon"]');
+  if (a) a.href = 'BunchBetsBeta180.png';
+  var t = document.querySelector('meta[name="theme-color"]');
+  if (t) t.content = '#7f1d1d';
+  document.addEventListener('DOMContentLoaded', function(){
+    document.body.classList.add('is-beta');
+    var logo = document.querySelector('.header-brand img');
+    if (logo) logo.src = 'BunchBetsBeta180.png';
+  });
+})();
+</script>
 <!-- Viewport height fix — must run before body renders to avoid flash -->
 <script>
 (function(){
@@ -258,6 +278,9 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 
 /* Hamburger Menu Styles */
 .header-brand { display:flex; align-items:center; gap:10px; flex:1; min-width:0; }
+.beta-badge { display:none; }
+body.is-beta .beta-badge { display:inline-flex; align-items:center; background:#dc2626; color:#fff; font-size:9px; font-weight:800; letter-spacing:1.5px; padding:2px 6px; border-radius:4px; flex-shrink:0; }
+body.is-beta header { box-shadow: inset 0 3px 0 #dc2626; }
 .header-brand img { width:36px; height:36px; border-radius:8px; flex-shrink:0; }
 .header-info { display:flex; flex-direction:column; gap:1px; flex:1; text-align:center; }
 .header-date { font-size:14px; font-weight:600; letter-spacing:0.3px; }
@@ -554,6 +577,7 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
   <div class="row" style="align-items:center; justify-content:space-between;">
     <div class="header-brand">
       <img src="BunchBets180.png" alt="Bunch Bets">
+      <span class="beta-badge">BETA</span>
       <div class="header-info">
         <div class="header-date" id="headerDate"></div>
         <div class="header-weather" id="headerWeather"></div>
@@ -691,9 +715,17 @@ function haversineMi(lat1,lon1,lat2,lon2){
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
+// === ENVIRONMENT ===
+// Production is bunchbets.com (GitHub Pages). Everything else — the Cloudflare
+// beta origin, localhost, branch previews — is treated as BETA.
+const IS_BETA = !!window._bbBeta;
+
 // === FIREBASE CONFIG ===
-// TEST ENVIRONMENT - Separate Firebase project, does not affect live data
-const FIREBASE_CONFIG = {
+// NOTE: prod and beta currently share the bunchbets-test project because a real
+// production project does not exist yet. Live-sync writes are namespaced by
+// LIVE_PATH below so beta traffic cannot collide with live rounds. Replace
+// PROD_FIREBASE_CONFIG as soon as bunchbets-prod is stood up.
+const BETA_FIREBASE_CONFIG = {
   apiKey: "AIzaSyCSt28t8rV5taevsl6iVI9QlOV-XR1wrCE",
   authDomain: "bunchbets-test.firebaseapp.com",
   databaseURL: "https://bunchbets-test-default-rtdb.firebaseio.com",
@@ -702,6 +734,12 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "820215666223",
   appId: "1:820215666223:web:48501679a5540306a998da"
 };
+const PROD_FIREBASE_CONFIG = BETA_FIREBASE_CONFIG; // TODO: point at bunchbets-prod
+const FIREBASE_CONFIG = IS_BETA ? BETA_FIREBASE_CONFIG : PROD_FIREBASE_CONFIG;
+
+// Live-sharing namespace. Keeps beta rounds out of the production tree even
+// while the two environments share one Firebase project.
+const LIVE_PATH = IS_BETA ? 'beta_games' : 'games';
 
 // === LIVE SYNC MODULE ===
 window.LiveSync = {
@@ -744,7 +782,7 @@ window.LiveSync = {
     this.isHost = true;
     this.isViewer = false;
     gtag('event', 'live_sync', { action: 'host' });
-    this.gameRef = this.db.ref('games/' + this.shareCode);
+    this.gameRef = this.db.ref(LIVE_PATH + '/' + this.shareCode);
 
     try {
       await this.gameRef.set({
@@ -775,7 +813,7 @@ window.LiveSync = {
       return false;
     }
 
-    this.gameRef = this.db.ref('games/' + code);
+    this.gameRef = this.db.ref(LIVE_PATH + '/' + code);
 
     try {
       const snapshot = await this.gameRef.once('value');
