@@ -9313,7 +9313,12 @@ window.addEventListener('appinstalled', () => {
     return;
   }
 
-  window.addEventListener('load', function () {
+  // Register immediately rather than on 'load'. Deferring to load is the usual
+  // advice (don't compete with the first paint for bandwidth), but it means a
+  // single slow subresource — fonts, analytics, the Firebase SDK — can delay or
+  // prevent registration entirely. On a phone with one bar that is exactly the
+  // case where the offline shell matters most.
+  (function () {
     navigator.serviceWorker.register('sw.js?v=' + APP_VERSION).then(function (reg) {
       // A worker already waiting from a previous visit.
       if (reg.waiting && navigator.serviceWorker.controller) showUpdateBanner(reg.waiting);
@@ -9344,8 +9349,9 @@ window.addEventListener('appinstalled', () => {
       updateAccepted = false;
       location.reload();
     });
+  })();
 
-    // Menu readout: is this device actually able to play offline right now?
+  // Menu readout: is this device actually able to play offline right now?
     // Guessing at that from the outside is how the first phone test got wasted.
     function refreshOfflineStatus() {
       const el = document.getElementById('swStatus');
@@ -9368,7 +9374,8 @@ window.addEventListener('appinstalled', () => {
         setTimeout(function () { if (!answered) el.textContent = 'Active, but not responding'; }, 2500);
       }).catch(function () { el.textContent = 'Status unavailable'; });
     }
-    window._bbOfflineStatus = refreshOfflineStatus;
+  window._bbOfflineStatus = refreshOfflineStatus;
+  window.addEventListener('load', function () {
     setTimeout(refreshOfflineStatus, 1500);
     const menuBtn = document.getElementById('menuToggle');
     if (menuBtn) menuBtn.addEventListener('click', function () { setTimeout(refreshOfflineStatus, 100); });
