@@ -5,7 +5,9 @@
   "scripts": {
     "test": "node --test rules.test.js",
     "test:cloud": "node --test cloud.test.mjs",
-    "seed": "node seed.js"
+    "seed": "node seed.js",
+    "test:betmath": "node --test betmath.test.mjs",
+    "verify:press": "node verify-press.mjs ../index.html"
   },
   "dependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",
