@@ -472,6 +472,9 @@ body.is-beta header { box-shadow: inset 0 3px 0 #dc2626; }
 .kp-player-btn { display:block; width:100%; padding:12px 16px; margin-bottom:8px; border:1px solid var(--border); border-radius:10px; background:var(--card); color:var(--txt); font-size:15px; font-weight:500; cursor:pointer; text-align:left; transition:all 0.15s; }
 .kp-player-btn:active { background:var(--acc); color:#fff; border-color:var(--acc); }
 .kp-player-btn.no-one { color:var(--muted); font-style:italic; }
+.kp-player-btn .kp-score { float:right; font-variant-numeric:tabular-nums; color:var(--muted); font-weight:700; }
+.kp-note { border:1px solid var(--acc); border-radius:8px; padding:9px 11px; font-size:13px;
+  line-height:1.4; color:var(--txt); margin-bottom:14px; background:rgba(22,163,74,0.08); }
 
 /* Hole strip */
 .hole-strip { display:flex; gap:3px; padding:8px 12px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
@@ -1774,19 +1777,25 @@ const Game = {
         continue;
       }
 
-      // Walk the ranking to find the first player in THIS match who made par or better
+      // The CLOSEST PLAYER IN THIS MATCH decides the hole, and nobody else.
+      //
+      // kpEntry.ranking is the closest-to-pin order of everyone who hit the
+      // green, shared across every game. Players who aren't in this match are
+      // skipped outright — "closest" means closest among the people playing
+      // THIS bet, so a man who isn't in it can't block it.
+      //
+      // The first one who IS in it either converts or the hole dies. We do not
+      // walk past him to the next qualifier: if the closest man misses, there
+      // is no KP and the value rolls to the next par 3.
+      //
+      // The bar is GROSS par. Strokes do not buy a KP.
       let matchWinner = null;
       for (const pid of kpEntry.ranking) {
-        if (allPlayers.includes(pid)) {
-          // Check if player made par or better on this hole
-          const gross = g.gross[pid] && g.gross[pid][hole];
-          const par = State.data.course.par[this.courseHole(hole)] || 3;
-          const net = gross != null ? gross - this.strokes(g, pid, hole) : null;
-          if (net != null && net <= par) {
-            matchWinner = pid;
-            break;
-          }
-        }
+        if (!allPlayers.includes(pid)) continue;
+        const gross = g.gross[pid] && g.gross[pid][hole];
+        const par = State.data.course.par[this.courseHole(hole)] || 3;
+        if (gross != null && gross <= par) matchWinner = pid;
+        break;
       }
 
       if (!matchWinner) {
@@ -2033,14 +2042,16 @@ const Game = {
         continue;
       }
 
+      // Mirrors computeKP exactly — closest man in the match decides, gross par,
+      // no walking past a failure. These two must stay in lockstep or the running
+      // status bar disagrees with the final settlement.
       let matchWinner = null;
       for (const pid of kpEntry.ranking) {
-        if (allPlayers.includes(pid)) {
-          const gross = g.gross[pid] && g.gross[pid][hole];
-          const par = State.data.course.par[this.courseHole(hole)] || 3;
-          const net = gross != null ? gross - this.strokes(g, pid, hole) : null;
-          if (net != null && net <= par) { matchWinner = pid; break; }
-        }
+        if (!allPlayers.includes(pid)) continue;
+        const gross = g.gross[pid] && g.gross[pid][hole];
+        const par = State.data.course.par[this.courseHole(hole)] || 3;
+        if (gross != null && gross <= par) matchWinner = pid;
+        break;
       }
 
       if (!matchWinner) {
@@ -6084,8 +6095,38 @@ const UI = {
     const par = State.data.course.par[Game.courseHole(hole)] || 3;
     const existingRanking = Game.getKPRanking(hole);
 
+    // Scores are duplicated across games and synced on entry, but a player need
+    // not be in every game — read the union rather than trusting games[0].
+    const scoreOf = (pid) => {
+      for (const gm of State.data.games) {
+        const arr = gm.gross && gm.gross[pid];
+        if (arr && arr[hole] != null) return arr[hole];
+      }
+      return null;
+    };
+    const shortName = (pid) => {
+      const pl = allPlayers.filter(x => x.id === pid)[0];
+      const nm = pl ? String(pl.name || '').trim() : '';
+      return nm.split(/\s+/)[0] || pid;
+    };
+    const matchup = (gm) =>
+      (gm.teamA||[]).map(shortName).join(' / ') + ' vs ' + (gm.teamB||[]).map(shortName).join(' / ');
+
+    // What tapping this player actually did. The whole reason the old prompt felt
+    // strange was that it collected data whose purpose was invisible.
+    const outcomeOf = (pid) => {
+      const sc = scoreOf(pid);
+      const nm = shortName(pid);
+      if (sc == null) return nm + ' closest \u2014 the KP resolves once scores are in.';
+      if (sc <= par) return nm + ' \u00b7 ' + sc + ' \u2014 KP won.';
+      const par3s = Game.getPar3Holes();
+      const isLast = hole === par3s[par3s.length - 1];
+      return nm + ' \u00b7 ' + sc + ' on a par ' + par + ' \u2014 no KP'
+           + (isLast ? '. Last par 3, so it dies here.' : ', it carries to the next par 3.');
+    };
+
     // Build the wizard step by step
-    const buildStep = (ranking, unresolvedGames) => {
+    const buildStep = (ranking, unresolvedGames, note) => {
       // Remove any existing modal
       const existing = document.querySelector('.kp-modal');
       if (existing) existing.remove();
@@ -6120,11 +6161,15 @@ const UI = {
       const overlay = document.createElement('div');
       overlay.className = 'kp-modal';
 
+      // Ask only what the scorer actually saw. Whether it counts is a question
+      // about the scorecard, and the app already has the scorecard.
       const title = isFirst
-        ? 'Who was closest to the pin and made par or better?'
-        : 'Next closest to the pin and made par or better?';
+        ? 'Who hit it closest?'
+        : 'Who was closest in this game?';
 
-      const subtitle = `Hole ${Game.holeLabel(hole)} \u2022 Par ${par}`;
+      const subtitle = isFirst
+        ? `Hole ${Game.holeLabel(hole)} \u2022 Par ${par} \u2022 anyone who hit the green`
+        : `Hole ${Game.holeLabel(hole)} \u2022 ${unresolvedGames.map(matchup).join('  \u2022  ')}`;
 
       const content = document.createElement('div');
       content.className = 'kp-modal-content';
@@ -6138,19 +6183,36 @@ const UI = {
       subEl.textContent = subtitle;
       content.appendChild(subEl);
 
+      if (note) {
+        const noteEl = document.createElement('div');
+        noteEl.className = 'kp-note';
+        noteEl.textContent = note;
+        content.appendChild(noteEl);
+      }
+
       // Player buttons
       eligiblePlayers.forEach(p => {
         const btn = document.createElement('button');
         btn.className = 'kp-player-btn';
+        // Showing the score is what makes "tapped Gary, got no KP" self-evident
+        // rather than mysterious.
+        const sc = scoreOf(p.id);
         btn.textContent = p.name;
+        if (sc != null) {
+          const scEl = document.createElement('span');
+          scEl.className = 'kp-score';
+          scEl.textContent = String(sc);
+          btn.appendChild(scEl);
+        }
         btn.onclick = () => {
           const newRanking = [...ranking, p.id];
           overlay.remove();
 
-          // Check which games are now resolved
+          // A game is settled once ANY ranked player is in it — the closest man
+          // in a match decides it whether he converts or not, so there is never
+          // a reason to keep asking about that game.
           const stillUnresolved = unresolvedGames.filter(gm => {
             const gamePlayers = [...(gm.teamA||[]), ...(gm.teamB||[])];
-            // Is any ranked player in this game?
             return !newRanking.some(pid => gamePlayers.includes(pid));
           });
 
@@ -6158,12 +6220,16 @@ const UI = {
             Game.setKPRanking(hole, newRanking);
             State.scheduleSave();
             State.scheduleRender();
+            Err.toast(outcomeOf(p.id));
             const par3s = Game.getPar3Holes();
             if (hole === par3s[par3s.length - 1]) {
               setTimeout(() => UI.checkSweepsQuads(), 300);
             }
           } else {
-            buildStep(newRanking, stillUnresolved);
+            // Carry the consequence into the next question, so the follow-up
+            // reads as an obvious one rather than an arbitrary one.
+            buildStep(newRanking, stillUnresolved, outcomeOf(p.id)
+              + ' ' + shortName(p.id) + " isn't in this one.");
           }
         };
         content.appendChild(btn);
@@ -6172,7 +6238,7 @@ const UI = {
       // "No one" button
       const noOneBtn = document.createElement('button');
       noOneBtn.className = 'kp-player-btn no-one';
-      noOneBtn.textContent = 'No one';
+      noOneBtn.textContent = 'Nobody hit the green';
       noOneBtn.onclick = () => {
         overlay.remove();
         Game.setKPRanking(hole, ranking);
@@ -6233,12 +6299,19 @@ const UI = {
         const btn = document.createElement('button');
         btn.className = 'kp-player-btn';
         btn.textContent = p.name;
+        const sc2 = scoreOf(p.id);
+        if (sc2 != null) {
+          const scEl2 = document.createElement('span');
+          scEl2.className = 'kp-score';
+          scEl2.textContent = String(sc2);
+          btn.appendChild(scEl2);
+        }
         btn.onclick = () => { overlay.remove(); Game.setKPRanking(hole, [p.id]); State.scheduleSave(); State.scheduleRender(); };
         content.appendChild(btn);
       });
       const noOneBtn = document.createElement('button');
       noOneBtn.className = 'kp-player-btn no-one';
-      noOneBtn.textContent = 'No one';
+      noOneBtn.textContent = 'Nobody hit the green';
       noOneBtn.onclick = () => { overlay.remove(); Game.setKPRanking(hole, []); State.scheduleSave(); State.scheduleRender(); };
       content.appendChild(noOneBtn);
       if (existingRanking.length > 0) {

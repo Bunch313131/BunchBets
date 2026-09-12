@@ -1,0 +1,145 @@
+/**
+ * KP rules: extracts the SHIPPED computeKP out of index.html and runs it against
+ * the real hole that exposed the problem — Sep 19 2026, El Macero, last par 3,
+ * Gary closest and three-putting for bogey.
+ *
+ * The rule being asserted (Brian, 2026-09-19):
+ *   - the ranking is closest-to-pin order of everyone who hit the green
+ *   - per game, the closest player IN THAT GAME decides the hole and nobody else
+ *   - the bar is GROSS par; strokes do not buy a KP
+ *   - if he misses, there is no KP and the value carries to the next par 3
+ *   - a carry still dangling after the last par 3 dies, and kills sweeps/quads
+ *
+ * Usage: node backend/verify-kp.mjs index.html
+ */
+import fs from 'node:fs';
+const src = fs.readFileSync(process.argv[2] || 'index.html', 'utf8');
+
+// ---------------------------------------------------------------- extraction
+function grab(name) {
+  const i = src.indexOf('\n  ' + name + '(');
+  if (i < 0) throw new Error('not found: ' + name);
+  let d = 0, started = false, j = i;
+  for (; j < src.length; j++) {
+    const c = src[j];
+    if (c === '{') { d++; started = true; }
+    else if (c === '}') { d--; if (started && d === 0) { j++; break; } }
+  }
+  return src.slice(i, j);
+}
+
+const PAR = [4,5,3,4,5,4,3,4,4, 4,4,3,4,4,5,3,4,5];   // El Macero
+const PAR3S = [2, 6, 11, 15];                          // holes 3, 7, 12, 16
+
+globalThis.State = { data: { course: { par: PAR }, startingHole: 0, games: [] } };
+
+const Game = eval('({' + grab('computeKP') + `,
+  getPar3Holes() { return ${JSON.stringify(PAR3S)}; },
+  courseHole(pos) { return pos; },
+  strokes(g, pid, hole) { return (g.strokesCount && g.strokesCount[pid]) || 0; }
+})`);
+
+// -------------------------------------------------------------------- fixture
+// Five players. Gary is the 21-handicap who hits it stiff and three-putts.
+const mkGame = (teamA, teamB, kpData, gross, strokesCount) => ({
+  teamA, teamB, kpData, gross,
+  strokesCount: strokesCount || {},
+  junkValue: { front: 2, back: 2 },
+  quadsConfirmed: {},
+});
+
+// scores on the four par 3s only (index = hole); everything else filled so
+// allPar3sScored is satisfied
+const card = (vals) => { const a = new Array(18).fill(null); PAR3S.forEach((h, i) => a[h] = vals[i]); return a; };
+
+//                       h3 h7 h12 h16
+const GROSS = {
+  tyler: card([3, 3, 3, 3]),
+  ken:   card([3, 3, 3, 3]),
+  casey: card([3, 3, 3, 3]),
+  bunch: card([3, 3, 3, 3]),
+  gary:  card([3, 3, 3, 4]),   // <- the three-putt on the last par 3
+};
+
+let fail = 0;
+const check = (label, got, want) => {
+  const ok = JSON.stringify(got) === JSON.stringify(want);
+  if (!ok) fail++;
+  console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${label}${ok ? '' : `\n          got  ${JSON.stringify(got)}\n          want ${JSON.stringify(want)}`}`);
+};
+
+// ------------------------------------------------------------------- the case
+console.log("Saturday's hole — Gary closest on the last par 3, misses gross par\n");
+
+// Master ranking, shared across games: Gary closest, then Casey.
+const ranking16 = { ranking: ['gary', 'casey'] };
+const kp = new Array(18).fill(null);
+PAR3S.slice(0, 3).forEach(h => kp[h] = { ranking: ['tyler'] });  // Tyler wins the first three
+kp[15] = ranking16;
+
+// Game 1 contains Gary. His miss kills the hole.
+const g1 = mkGame(['tyler','ken'], ['gary','bunch'], kp, GROSS);
+const r1 = Game.computeKP(g1);
+check('game WITH Gary: last par 3 has no winner', r1.results[3].winner, null);
+check('game WITH Gary: it carries', r1.results[3].carried, true);
+check('game WITH Gary: no sweep despite Tyler/Ken winning the first three', r1.hasSweeps, false);
+check('game WITH Gary: no quads prompt', r1.hasQuads, false);
+check('game WITH Gary: Tyler/Ken still banked the first three', [r1.teamAKPs, r1.teamBKPs], [3, 0]);
+
+// Game 2 does NOT contain Gary. Casey is the closest man in it and made par.
+const g2 = mkGame(['tyler','ken'], ['casey','bunch'], kp, GROSS);
+const r2 = Game.computeKP(g2);
+check('game WITHOUT Gary: Casey is the closest man in it, and wins', r2.results[3].winner, 'casey');
+check('game WITHOUT Gary: it is not a carry', r2.results[3].carried, false);
+check('game WITHOUT Gary: so no sweep either (both teams scored)', r2.hasSweeps, false);
+
+console.log('\nThe closest man decides — we never walk past him\n');
+
+// Gary closest and missing, Casey second and making par, BOTH in the same game.
+const g3 = mkGame(['tyler','ken'], ['gary','casey'], kp, GROSS);
+const r3 = Game.computeKP(g3);
+check('closest misses, next-closest made par, same game -> still no KP', r3.results[3].winner, null);
+check('  and it carries rather than passing along', r3.results[3].carried, true);
+
+console.log('\nGross par, not net — strokes do not buy a KP\n');
+
+// Gary gets a shot on hole 16 (stroke index would give him one). Net par, gross bogey.
+const g4 = mkGame(['tyler','ken'], ['gary','bunch'], kp, GROSS, { gary: 18 });
+const r4 = Game.computeKP(g4);
+check('a stroke does not rescue a gross bogey', r4.results[3].winner, null);
+check('  so still no sweep', r4.hasSweeps, false);
+
+console.log('\nCarries and sweeps still behave\n');
+
+// Gary converts: Tyler/Ken win 1-3, Gary wins the last -> both teams score, no sweep.
+const GROSS_OK = JSON.parse(JSON.stringify(GROSS));
+GROSS_OK.gary[15] = 3;
+const g5 = mkGame(['tyler','ken'], ['gary','bunch'], kp, GROSS_OK);
+const r5 = Game.computeKP(g5);
+check('Gary converts -> he wins the last KP', r5.results[3].winner, 'gary');
+check('  both teams scored, so no sweep', r5.hasSweeps, false);
+
+// Tyler wins all four -> a real sweep, which must still be reported.
+const kpAll = new Array(18).fill(null);
+PAR3S.forEach(h => kpAll[h] = { ranking: ['tyler'] });
+const g6 = mkGame(['tyler','ken'], ['gary','bunch'], kpAll, GROSS);
+const r6 = Game.computeKP(g6);
+check('genuine sweep is still declared', [r6.hasSweeps, r6.sweepsTeam], [true, 'A']);
+check('  and it doubles the KP value', r6.sweepsBonus, r6.totalKPValue);
+
+// Nobody on the green on hole 3 -> carries into hole 7, worth double there.
+const kpCarry = new Array(18).fill(null);
+kpCarry[2] = null;                              // nobody hit the green
+[6, 11, 15].forEach(h => kpCarry[h] = { ranking: ['tyler'] });
+const g7 = mkGame(['tyler','ken'], ['gary','bunch'], kpCarry, GROSS);
+const r7 = Game.computeKP(g7);
+check('empty hole carries', r7.results[0].carried, true);
+check('  next win collects both', r7.results[1].value, 4);
+
+// Gary closest on the LAST par 3 and missing, with Tyler having swept 1-3:
+// the dangling carry must kill the sweep. (Already covered by r1, restated as
+// the regression this whole thing exists to prevent.)
+check('dangling carry on the last par 3 kills the sweep', r1.hasSweeps, false);
+
+console.log(fail ? `\n${fail} FAILURES` : '\nall checks passed');
+process.exit(fail ? 1 : 0);
