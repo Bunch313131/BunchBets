@@ -679,9 +679,16 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.3';
+const APP_VERSION = '7.4';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.4': [
+    'Bet math fix: only the most recent bet or press can start a new press — this changes some Nassau settlements',
+    'Bet math fix: sweeps and quads now require a team to actually win all four KPs',
+    'Bet math fix: junk now honors its on/off switch in team games',
+    'Works offline — launches and scores a full round with no signal',
+    'Group Score — best combination of gross and net for group-vs-group side games, live or from history',
+  ],
   '7.3': [
     'Starting Hole — support for shotgun starts and back-9-first rounds',
     'Set starting hole in wizard or advanced settings, all bets and scoring adapt automatically',
