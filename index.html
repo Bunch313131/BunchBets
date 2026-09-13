@@ -310,6 +310,10 @@ body.is-beta header { box-shadow: inset 0 3px 0 #dc2626; }
 .cloud-invite { margin:4px 12px 8px; padding:10px 12px; border:1px solid var(--acc); border-radius:10px; font-size:13px; line-height:1.45; }
 .cloud-invite button { margin-top:8px; width:100%; padding:9px; border-radius:8px; border:none; background:var(--acc); color:#fff; font-weight:700; font-size:13px; cursor:pointer; }
 .cloud-backup { margin-top:8px; padding:7px 12px; border-radius:8px; border:1px solid var(--acc); background:none; color:var(--acc); font-weight:700; font-size:12px; cursor:pointer; }
+.wiz-cloud { margin-top:14px; padding:12px; border:1px dashed var(--border); border-radius:10px; }
+.wiz-cloud-msg { font-size:12.5px; color:var(--muted); line-height:1.45; }
+.wiz-cloud-btn { margin-top:10px; width:100%; padding:11px; border-radius:8px; border:none; background:var(--acc); color:#fff; font-weight:700; font-size:14px; cursor:pointer; }
+.wiz-cloud-btn:disabled { opacity:0.5; }
 .stand-tabs { display:flex; gap:8px; margin-bottom:10px; }
 .stand-tab { flex:1; padding:9px; border-radius:8px; border:1px solid var(--border); background:none; color:var(--muted); font-weight:700; font-size:13px; cursor:pointer; }
 .stand-tab.on { border-color:var(--acc); color:var(--acc); }
@@ -711,9 +715,14 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.8';
+const APP_VERSION = '7.9';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.9': [
+    'Sign in from the player screen — your group\u2019s golfers and their current GHIN indexes are offered right where you build the round',
+    'Fixed: starting a new game opened on hole 18 and treated the whole round as already scored',
+    'Tapping a number now selects it, so typing replaces instead of landing beside the old digit',
+  ],
   '7.8': [
     'Fixed: re-filing a round after linking a name left the old entry behind, which doubled that player in the standings',
     'Tyler Bryan added to the group',
@@ -1333,6 +1342,8 @@ const Cloud = {
   },
 
   render() {
+    // The account panel is no longer the only place cloud state is visible.
+    try { Wizard.syncCloud(); } catch (e) {}
     const el = document.getElementById('menuAccount');
     if (!el) return;
     if (!CLOUD_ENABLED) { el.style.display = 'none'; return; }
@@ -3787,6 +3798,23 @@ const Wizard = {
     this.active = false;
     this.removeOverlay();
     State.data.tab = 'scores';
+
+    // A new game is a new round, and every per-round tracker has to go with it.
+    // "New Round" in the menu already cleared these before opening the wizard,
+    // but "Start New Game" does not — and finish() is the moment play actually
+    // begins, so it is the right place to guarantee it either way.
+    //
+    //   scoringHole   — left at 17, the new game opens on hole 18.
+    //   _scoredHoles  — the one that costs money. Holes are auto-populated to
+    //                   par for display, and this is what separates "shown as
+    //                   par" from "the player actually made par". Carried over,
+    //                   a brand-new round settles all 18 holes of nobody's
+    //                   scores the instant it opens.
+    //   _clearedHoles — suppresses the auto-par fill on a hole deliberately
+    //                   blanked last round.
+    State.data.scoringHole = 0;
+    State.data._scoredHoles = {};
+    State.data._clearedHoles = {};
     State.data.roundCompleteShown = false;
     State.data.pressWizardShown = false;
     State.scheduleSave();
@@ -4354,7 +4382,96 @@ const Wizard = {
     return div;
   },
 
+  /**
+   * Names offered by the picker: the group pool first, then anyone this phone
+   * has played with who is not in it.
+   *
+   * Merged rather than replaced. A guest is a first-class part of a round and
+   * will never be a group member, so dropping the local list would make the
+   * regular visitor harder to add than he is today.
+   */
+  pickerRoster() {
+    const local = (() => {
+      try { return JSON.parse(localStorage.getItem('bunchbets_roster') || '[]'); }
+      catch (e) { return []; }
+    })();
+    const norm = (t) => String(t || '').toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
+    const hcpOf = {};
+    local.forEach((r) => { hcpOf[norm(r.name)] = r.handicap; });
+
+    const out = [], seen = {};
+    if (typeof CLOUD_ENABLED !== 'undefined' && CLOUD_ENABLED && Cloud.user) {
+      Cloud.pool.forEach((g) => {
+        const k = norm(g.name);
+        if (!k || seen[k]) return;
+        seen[k] = 1;
+        // handicap stays undefined unless this phone has played him before.
+        out.push({ name: g.name, index: g.currentIndex || null, handicap: hcpOf[k] });
+      });
+    }
+    local.forEach((r) => {
+      const k = norm(r.name);
+      if (!k || seen[k]) return;
+      seen[k] = 1;
+      out.push({ name: r.name, index: null, handicap: r.handicap || 0 });
+    });
+    return out;
+  },
+
+  /**
+   * Sign-in, in the one screen that needs it.
+   *
+   * It used to live only in the pancake menu, which is three taps away from
+   * here and no part of setting up a round. This is not a gate — signed out,
+   * the step behaves exactly as it always has.
+   */
+  cloudStrip() {
+    if (typeof CLOUD_ENABLED === 'undefined' || !CLOUD_ENABLED) return '';
+    const esc = (t) => String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    if (!Cloud.user) {
+      const ready = !!Cloud.api;
+      return '<div class="wiz-cloud"><div class="wiz-cloud-msg">' +
+        'Sign in to load your group\u2019s golfers and their current GHIN indexes.' +
+        '</div><button class="wiz-cloud-btn" id="wizardSignIn"' +
+        (ready && !Cloud.busy ? '' : ' disabled') + '>' +
+        (Cloud.busy ? 'Waiting for Google\u2026' : ready ? 'Sign in with Google' : 'Preparing\u2026') +
+        '</button></div>';
+    }
+    if (!Cloud.groups.length) {
+      return '<div class="wiz-cloud"><div class="wiz-cloud-msg">Signed in as ' +
+        esc(Cloud.user.email || '') + '. You are not in a group yet, so only names from this phone are offered.</div></div>';
+    }
+    const n = Cloud.pool.length;
+    return '<div class="wiz-cloud"><div class="wiz-cloud-msg">' +
+      (n ? esc(Cloud.groups[0].name) + ' \u2014 ' + n + ' golfer(s) available, with live indexes. Tap a name box to pick one.'
+         : 'Loading ' + esc(Cloud.groups[0].name) + '\u2026') +
+      '</div></div>';
+  },
+
+  /**
+   * Re-render the player step when the cloud state behind it changes, and only
+   * then. Cloud.render() fires on every profile refresh; rebuilding this screen
+   * each time would throw away whatever is half-typed in a name box.
+   */
+  syncCloud() {
+    if (!this.active || this.step !== 'players') return;
+    const sig = (typeof CLOUD_ENABLED !== 'undefined' && CLOUD_ENABLED)
+      ? [!!Cloud.user, Cloud.groups.length, Cloud.pool.length, Cloud.busy, !!Cloud.api].join('|') : '';
+    if (sig === this._cloudSig) return;
+    this._cloudSig = sig;
+    this.render();
+  },
+
   renderPlayers() {
+    // The SDK loads on demand, so ask for it as the step that needs it opens —
+    // the sign-in popup must be opened by a live tap and cannot wait on a 470KB
+    // download, so it has to already be warm when the button is pressed.
+    if (typeof CLOUD_ENABLED !== 'undefined' && CLOUD_ENABLED) Cloud.warm();
+    this._cloudSig = (typeof CLOUD_ENABLED !== 'undefined' && CLOUD_ENABLED)
+      ? [!!Cloud.user, Cloud.groups.length, Cloud.pool.length, Cloud.busy, !!Cloud.api].join('|') : '';
+
     const div = document.createElement('div');
     div.className = 'wizard-screen';
 
@@ -4380,6 +4497,7 @@ const Wizard = {
         </div>
         <div id="wizardPlayersList">${playersHtml}</div>
         ${this.data.players.length < 5 ? '<button class="wizard-add-btn" id="wizardAddPlayer">+ Add Player</button>' : ''}
+        ${this.cloudStrip()}
       </div>
       <div class="wizard-footer">
         <button class="btn secondary" id="wizardPlayersBack">Back</button>
@@ -4388,7 +4506,7 @@ const Wizard = {
     `;
 
     setTimeout(() => {
-      const roster = JSON.parse(localStorage.getItem('bunchbets_roster') || '[]');
+      const roster = Wizard.pickerRoster();
 
       const showRosterDropdown = (input) => {
         const idx = input.dataset.idx;
@@ -4402,18 +4520,30 @@ const Wizard = {
           !usedNames.includes(r.name.toLowerCase())
         );
         if (!matches.length) { dropdown.style.display = 'none'; return; }
-        dropdown.innerHTML = matches.map(r =>
-          `<div class="roster-pick" data-name="${r.name}" data-hcp="${r.handicap||0}" style="padding:10px 12px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
-            <span>${r.name}</span><span style="color:var(--muted);font-size:12px;">HCP ${r.handicap||0}</span>
-          </div>`
-        ).join('');
+        dropdown.innerHTML = matches.map(r => {
+          // Two different numbers, never conflated. The index is what GHIN says
+          // about the golfer; HCP is what this phone last played them off. A
+          // course handicap is derived from the index and the tee, which the app
+          // cannot do yet, so neither number is presented as the other.
+          const right = r.index != null
+            ? '<span style="color:var(--acc);font-size:12px;">Index ' + r.index + '</span>'
+            : '<span style="color:var(--muted);font-size:12px;">HCP ' + (r.handicap || 0) + '</span>';
+          return '<div class="roster-pick" data-name="' + r.name + '" data-hcp="' +
+            (r.handicap == null ? '' : r.handicap) +
+            '" style="padding:10px 12px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
+            '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + r.name + '</span>' + right + '</div>';
+        }).join('');
         dropdown.style.display = 'block';
         dropdown.querySelectorAll('.roster-pick').forEach(pick => {
           pick.onmousedown = (e) => {
             e.preventDefault(); // prevent blur
             const i = parseInt(idx);
             this.data.players[i].name = pick.dataset.name;
-            this.data.players[i].handicap = parseInt(pick.dataset.hcp) || 0;
+            // Only fill a handicap we actually have. A golfer known solely from
+            // the group pool has an index and no course handicap, and guessing
+            // one from the index would be 1-2 strokes light every time.
+            const hcp = pick.dataset.hcp;
+            if (hcp !== '') this.data.players[i].handicap = parseInt(hcp) || 0;
             dropdown.style.display = 'none';
             this.render();
           };
@@ -4445,6 +4575,9 @@ const Wizard = {
           this.render();
         };
       });
+
+      const signIn = div.querySelector('#wizardSignIn');
+      if (signIn) signIn.onclick = () => Cloud.signIn();   // synchronous: the popup needs the tap
 
       const addBtn = document.getElementById('wizardAddPlayer');
       if (addBtn) {
@@ -10107,7 +10240,34 @@ document.getElementById('standingsMenuBtn').onclick = () => { UI.closeMenu(); UI
 // alternative is stubbing Firestore at the network layer, which would mean a
 // leaderboard test that mostly tests Firestore — slower, and it would pass or
 // fail for reasons that have nothing to do with the arithmetic on screen.
-if (window._bbDev) window._bb = { Cloud, UI, State, History, Game };
+if (window._bbDev) window._bb = { Cloud, UI, State, History, Game, Wizard };
+
+/**
+ * Tapping a number field selects what is in it, so typing replaces rather than
+ * inserting beside the existing digit.
+ *
+ * Every one of these holds a short number that is almost always being replaced
+ * outright — a handicap, a par, a stake. Landing the caret next to the old digit
+ * means "8" becomes "78" or "87" depending on which side of it you happened to
+ * tap, and on a phone getting back out of that is fiddlier than it sounds.
+ *
+ * Delegated on purpose. There are two dozen of these fields, the wizard builds
+ * more on the fly, and a per-field handler is a rule that only holds until the
+ * next field is added.
+ *
+ * Deferred by a tick because iOS places the caret AFTER the focus event, which
+ * would undo a selection made synchronously. Text fields are untouched: the
+ * player-name box has a roster dropdown that filters on what is typed, and
+ * selecting its contents would make the first keystroke wipe the name.
+ */
+document.addEventListener('focusin', (e) => {
+  const el = e.target;
+  if (!el || el.tagName !== 'INPUT' || el.readOnly || el.disabled) return;
+  const numeric = el.type === 'number' || el.type === 'tel' ||
+                  (el.inputMode || '').toLowerCase() === 'numeric';
+  if (!numeric || !el.value) return;
+  setTimeout(() => { if (document.activeElement === el) { try { el.select(); } catch (err) {} } }, 0);
+});
 
 document.getElementById('resetBtn').onclick = () => {
   UI.closeMenu();
