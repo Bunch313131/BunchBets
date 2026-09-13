@@ -13,7 +13,8 @@ import fs from 'node:fs';
 const src = fs.readFileSync(process.argv[2] || 'index.html', 'utf8');
 
 function grab(name) {
-  const i = src.indexOf('\n  ' + name + '(');
+  let i = src.indexOf('\n  ' + name + '(');
+  if (i < 0) i = src.indexOf('\n  async ' + name + '(');
   if (i < 0) throw new Error('not found: ' + name);
   let d = 0, started = false, j = i;
   for (; j < src.length; j++) {
@@ -28,7 +29,7 @@ globalThis.APP_VERSION = '0.0-test';
 // The shipped methods call Cloud.norm() by name, so the object under test has
 // to BE the global Cloud. History is stubbed per-test for unlinkedNames().
 const make = (pool, groups, history) => {
-  const o = eval('({' + ['golferIdFor', 'norm', 'unlinkedNames', 'suggestFor', 'buildRound']
+  const o = eval('({' + ['golferIdFor', 'norm', 'unlinkedNames', 'suggestFor', 'buildRound', 'linkNames']
     .map(grab).join(',\n') + '})');
   o.pool = pool; o.groups = groups;
   globalThis.Cloud = o;
@@ -161,6 +162,64 @@ console.log('\nedges\n');
   const noGames = C.buildRound({ id: 'y', date: 'd', players: [{ id: 'p1', name: 'Brian Bunch' }], playerNet: {} });
   check('no games -> no gross, no crash', noGames.results['ghin:1506580'].gross, null);
   check('and money defaults to zero', noGames.results['ghin:1506580'].money, 0);
+}
+
+/**
+ * The rule under test: linking a name must re-send the rounds that name appears
+ * in. The first version of this decided what to re-send by rebuilding each round
+ * and skipping any with no "guest:" left — which, because the aliases are already
+ * applied by then, skipped every round it existed to fix. Silent: it reported
+ * "5 names linked" and changed nothing in the cloud.
+ */
+console.log('\nrelinking — the rounds that just became linkable are the ones that must be re-sent\n');
+{
+  const hist = [
+    { id: 'r1', cloudId: 'r1', date: 'd', players: [{ id: 'p1', name: 'Bunch' }, { id: 'p2', name: 'Casey' }],
+      games: [], playerNet: {} },
+    { id: 'r2', cloudId: 'r2', date: 'd', players: [{ id: 'p1', name: 'Ian Bolnik' }],
+      games: [], playerNet: {} },
+    { id: 'r3', date: 'd', players: [{ id: 'p1', name: 'Bunch' }], games: [], playerNet: {} },  // never uploaded
+  ];
+  const C = make(POOL.map((g) => ({ ...g })), GROUPS, hist);
+
+  const aliased = [], sent = [];
+  C.api = { addAlias: async (gid, alias) => { aliased.push(gid + '=' + alias); } };
+  C.user = { uid: 'u' };
+  C.saveRound = async (r) => { sent.push(r.id); return true; };
+  C.render = () => {};
+  C.diag = () => {};
+  C.refreshProfile = async () => {};
+
+  await C.linkNames([
+    { name: 'Bunch', golferId: 'ghin:1506580' },
+    { name: 'Casey', golferId: 'ghin:1236530' },
+    { name: 'Tyler', golferId: '' },            // "not in this group" — must be a no-op
+  ]);
+
+  check('aliases written for the confirmed pairs only',
+    aliased, ['ghin:1506580=Bunch', 'ghin:1236530=Casey']);
+  check('the round naming those men is re-sent', sent, ['r1']);
+  check('  a round with nobody linked is left alone', sent.indexOf('r2'), -1);
+  check('  and one never uploaded is not force-sent here', sent.indexOf('r3'), -1);
+  check('the alias lands in the pool so matching works at once',
+    C.golferIdFor('Bunch'), 'ghin:1506580');
+  check('the status says what happened', /2 name\(s\) linked, 1 round\(s\) updated/.test(C.status), true);
+}
+
+console.log('\na failed alias write must not be reported as linked\n');
+{
+  const hist = [{ id: 'r1', cloudId: 'r1', date: 'd', players: [{ id: 'p1', name: 'Bunch' }], games: [], playerNet: {} }];
+  const C = make(POOL.map((g) => ({ ...g })), GROUPS, hist);
+  C.api = { addAlias: async () => { const e = new Error('nope'); e.code = 'permission-denied'; throw e; } };
+  C.user = { uid: 'u' };
+  const sent = [];
+  C.saveRound = async (r) => { sent.push(r.id); return true; };
+  C.render = () => {}; C.diag = () => {}; C.refreshProfile = async () => {};
+
+  await C.linkNames([{ name: 'Bunch', golferId: 'ghin:1506580' }]);
+  check('counted as failed, not linked', /0 name\(s\) linked/.test(C.status), true);
+  check('  and said so', /1 failed/.test(C.status), true);
+  check('the name still resolves to nobody', C.golferIdFor('Bunch'), null);
 }
 
 console.log(fail ? `\n${fail} FAILURES` : '\nall checks passed');

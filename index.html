@@ -310,6 +310,23 @@ body.is-beta header { box-shadow: inset 0 3px 0 #dc2626; }
 .cloud-invite { margin:4px 12px 8px; padding:10px 12px; border:1px solid var(--acc); border-radius:10px; font-size:13px; line-height:1.45; }
 .cloud-invite button { margin-top:8px; width:100%; padding:9px; border-radius:8px; border:none; background:var(--acc); color:#fff; font-weight:700; font-size:13px; cursor:pointer; }
 .cloud-backup { margin-top:8px; padding:7px 12px; border-radius:8px; border:1px solid var(--acc); background:none; color:var(--acc); font-weight:700; font-size:12px; cursor:pointer; }
+.stand-tabs { display:flex; gap:8px; margin-bottom:10px; }
+.stand-tab { flex:1; padding:9px; border-radius:8px; border:1px solid var(--border); background:none; color:var(--muted); font-weight:700; font-size:13px; cursor:pointer; }
+.stand-tab.on { border-color:var(--acc); color:var(--acc); }
+.stand-seasons { display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
+.stand-season { padding:5px 10px; border-radius:999px; border:1px solid var(--border); background:none; color:var(--muted); font-size:12px; font-weight:700; cursor:pointer; }
+.stand-season.on { border-color:var(--acc); color:var(--acc); }
+.stand-table { border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+.stand-row { display:flex; align-items:center; padding:11px 10px; border-bottom:1px solid var(--border); font-size:14px; }
+.stand-row:last-child { border-bottom:none; }
+.stand-head { background:var(--card); color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.5px; font-weight:700; }
+.stand-pos { flex:0 0 22px; color:var(--muted); font-size:12px; }
+.stand-name { flex:1; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.stand-n { flex:0 0 40px; text-align:right; font-variant-numeric:tabular-nums; }
+.stand-n.wide { flex:0 0 62px; font-weight:700; }
+.stand-n.up { color:var(--success); }
+.stand-n.down { color:var(--danger, #e5484d); }
+.stand-guest { font-size:10px; font-weight:700; color:var(--muted); border:1px solid var(--border); border-radius:4px; padding:1px 4px; margin-left:5px; text-transform:uppercase; }
 .link-row { display:flex; align-items:center; gap:10px; padding:10px 4px; border-bottom:1px solid var(--border); }
 .link-name { flex:0 0 30%; font-weight:700; font-size:15px; }
 .link-pick { flex:1; padding:9px; border-radius:8px; border:1px solid var(--border); background:var(--card); color:var(--txt); font-size:14px; }
@@ -662,6 +679,7 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
   <div class="menu-section">
     <button class="menu-item" id="historyMenuBtn" style="font-weight:600;">📋 Round History</button>
     <button class="menu-item" id="comboMenuBtn" style="font-weight:600;">🎯 Group Score</button>
+    <button class="menu-item" id="standingsMenuBtn" style="font-weight:600;">🏆 Standings</button>
   </div>
   <div class="menu-section">
     <div class="menu-section-title">Actions</div>
@@ -693,9 +711,15 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.6';
+const APP_VERSION = '7.7';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.7': [
+    'Standings — season money and scoring averages for your group, from every round anyone has saved',
+    'Money is only ever counted inside one group, because that is who you actually settled with',
+    'Scoring averages count completed 18-hole rounds only',
+    'Fixed: linking a short name from your card to a real golfer now actually re-files the rounds it appears in',
+  ],
   '7.6': [
     'Live sharing moved to the production database — everyone in a shared round needs this version, or you will not see each other',
     'Tightened the live-sharing rules so a round can only be reached with its share code',
@@ -1161,14 +1185,21 @@ const Cloud = {
         failed++;
       }
     }
-    // Anything already uploaded still names guests; re-send it with the links.
+    // Re-send every already-uploaded round that mentions a name we just linked,
+    // because those docs still say guest:.
+    //
+    // Do NOT decide this by rebuilding the round and looking for a remaining
+    // "guest:" — by this point the aliases are already in the pool, so the rounds
+    // that need re-sending are exactly the ones that no longer look broken. That
+    // test skips every round it was written to fix.
+    const touched = {};
+    pairs.forEach((x) => { if (x.golferId) touched[Cloud.norm(x.name)] = 1; });
     let resent = 0;
     try {
       for (const r of History.load()) {
         if (!r.cloudId) continue;
-        const before = JSON.stringify(this.buildRound(r).golferIds);
-        r.cloudId = r.cloudId;   // keep id
-        if (before.indexOf('guest:') === -1) continue;
+        const hit = (r.players || []).some((pl) => touched[Cloud.norm(pl.name)]);
+        if (!hit) continue;
         if (await this.saveRound(r)) resent++;
       }
     } catch (e) {}
@@ -9772,6 +9803,152 @@ const UI = {
     };
   },
 
+  /**
+   * Group standings, computed on read from the rounds the cloud let us see.
+   *
+   * Money lives on its own tab and is always scoped to a single group, because
+   * money is only meaningful inside the settlement it happened in \u2014 "up $340
+   * in the Saturday group" is a fact, "up $410 across all groups" is arithmetic
+   * about people who never played each other (doc 08 \u00a73). Scoring is just golf
+   * and carries no such restriction.
+   */
+  async showStandings() {
+    const esc = (t) => String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    const overlay = document.createElement('div');
+    overlay.className = 'history-overlay';
+    overlay.innerHTML =
+      '<div class="history-header">' +
+      '<button class="history-back" id="standBack">&larr; Back</button>' +
+      '<h2>Standings</h2><div style="width:60px;"></div></div>' +
+      '<div class="history-list" id="standBody"></div>';
+    document.body.appendChild(overlay);
+    overlay.querySelector('#standBack').onclick = () => overlay.remove();
+    const body = overlay.querySelector('#standBody');
+    const msg = (t) => { body.innerHTML = '<div class="history-empty">' + t + '</div>'; };
+
+    if (!CLOUD_ENABLED) { msg('Standings are part of the beta.'); return; }
+    if (!Cloud.user)     { msg('Sign in to see your group standings.<br><br>Menu \u2192 Account \u2192 Sign in with Google.'); return; }
+    Cloud.warm();
+    if (!Cloud.api)      { msg('Still connecting\u2026 give it a second and try again.'); return; }
+    if (!Cloud.groups.length) { msg('You are not in a group yet.<br><br>A group is what makes money add up \u2014 it is the set of people who actually settle with each other.'); return; }
+
+    const group = Cloud.groups[0];
+    msg('Loading ' + esc(group.name) + '\u2026');
+
+    let rounds = [];
+    try {
+      rounds = await Cloud.api.groupRounds(group.id);
+    } catch (e) {
+      msg('Could not load standings: ' + esc(e.code || e.message));
+      return;
+    }
+    if (!rounds.length) { msg('No rounds in ' + esc(group.name) + ' yet.'); return; }
+
+    // A golfer id is not a name. Prefer the pool (current and correct), fall
+    // back to whatever the round recorded, so a standings row is never a raw id.
+    const nameCache = {};
+    rounds.forEach((r) => Object.keys(r.results || {}).forEach((gid) => {
+      if (!nameCache[gid]) nameCache[gid] = (r.results[gid] || {}).name || '';
+    }));
+    const nameFor = (gid) => {
+      const g = Cloud.pool.filter((x) => x.id === gid)[0];
+      return (g && g.name) || nameCache[gid] || gid;
+    };
+
+    const years = Object.keys(rounds.reduce((a, r) => {
+      const y = String(r.date || '').slice(0, 4);
+      if (/^\d{4}$/.test(y)) a[y] = 1;
+      return a;
+    }, {})).sort().reverse();
+
+    let season = years[0] || 'all';
+    let tab = 'money';
+
+    const money = (n) => (n < 0 ? '-$' + Math.abs(n) : '$' + n);
+
+    const draw = () => {
+      const scoped = season === 'all' ? rounds
+        : rounds.filter((r) => String(r.date || '').slice(0, 4) === season);
+      let stats = Cloud.api.aggregate(scoped);       // already sorted by money desc
+
+      if (tab === 'scoring') {
+        // Lowest average first, and anyone without a completed 18 goes last
+        // rather than sorting as a zero.
+        stats = stats.slice().sort((a, b) => {
+          if (a.scoringAvg == null) return 1;
+          if (b.scoringAvg == null) return -1;
+          return a.scoringAvg - b.scoringAvg;
+        });
+      }
+
+      const guests = stats.filter((x) => x.golferId.indexOf('guest:') === 0).length;
+
+      const tabs =
+        '<div class="stand-tabs">' +
+        '<button class="stand-tab' + (tab === 'money' ? ' on' : '') + '" data-tab="money">Money</button>' +
+        '<button class="stand-tab' + (tab === 'scoring' ? ' on' : '') + '" data-tab="scoring">Scoring</button>' +
+        '</div>';
+
+      const seasons = years.length > 1 || season !== 'all'
+        ? '<div class="stand-seasons">' +
+          years.map((y) => '<button class="stand-season' + (season === y ? ' on' : '') + '" data-season="' + y + '">' + y + '</button>').join('') +
+          '<button class="stand-season' + (season === 'all' ? ' on' : '') + '" data-season="all">All time</button></div>'
+        : '';
+
+      const head = tab === 'money'
+        ? '<div class="stand-row stand-head"><div class="stand-pos"></div><div class="stand-name">' + esc(group.name) + '</div>' +
+          '<div class="stand-n">Rds</div><div class="stand-n">Won</div><div class="stand-n wide">Net</div></div>'
+        : '<div class="stand-row stand-head"><div class="stand-pos"></div><div class="stand-name">' + esc(group.name) + '</div>' +
+          '<div class="stand-n">18s</div><div class="stand-n">Best</div><div class="stand-n wide">Avg</div></div>';
+
+      const rows = stats.map((x, i) => {
+        const guest = x.golferId.indexOf('guest:') === 0;
+        const nm = esc(nameFor(x.golferId)) + (guest ? ' <span class="stand-guest">unlinked</span>' : '');
+        const cells = tab === 'money'
+          ? '<div class="stand-n">' + x.rounds + '</div>' +
+            '<div class="stand-n">' + x.wins + '</div>' +
+            '<div class="stand-n wide ' + (x.money > 0 ? 'up' : x.money < 0 ? 'down' : '') + '">' + money(x.money) + '</div>'
+          : '<div class="stand-n">' + x.grossRounds + '</div>' +
+            '<div class="stand-n">' + (x.best == null ? '\u2014' : x.best) + '</div>' +
+            '<div class="stand-n wide">' + (x.scoringAvg == null ? '\u2014' : x.scoringAvg.toFixed(1)) + '</div>';
+        return '<div class="stand-row"><div class="stand-pos">' + (i + 1) + '</div>' +
+               '<div class="stand-name">' + nm + '</div>' + cells + '</div>';
+      }).join('');
+
+      // The money column is the whole reason the group exists, so say plainly
+      // what it does and does not include.
+      const foot = tab === 'money'
+        ? '<div class="cloud-note" style="margin-top:14px;">Money is only counted inside <b>' + esc(group.name) +
+          '</b> \u2014 rounds played with anyone else are not in this column, because that is not who you settled with.</div>'
+        : '<div class="cloud-note" style="margin-top:14px;">Scoring average counts completed 18-hole rounds only. Nine holes would flatter everybody.</div>';
+
+      const nudge = guests
+        ? '<div class="cloud-note"><b>' + guests + ' player(s) above are not linked to anyone in the group.</b><br>' +
+          'Their rounds count, but they will not merge with the real record until you link the names.' +
+          '<br><button class="cloud-backup" id="standLink">Link them</button></div>'
+        : '';
+
+      body.innerHTML = tabs + seasons +
+        '<div class="stand-table">' + head + rows + '</div>' +
+        nudge + foot +
+        '<div class="cloud-note" style="opacity:.7;">' + scoped.length + ' round(s)' +
+        (season === 'all' ? '' : ' in ' + season) + '.</div>';
+
+      body.querySelectorAll('.stand-tab').forEach((b) => {
+        b.onclick = () => { tab = b.getAttribute('data-tab'); draw(); };
+      });
+      body.querySelectorAll('.stand-season').forEach((b) => {
+        b.onclick = () => { season = b.getAttribute('data-season'); draw(); };
+      });
+      const ln = body.querySelector('#standLink');
+      if (ln) ln.onclick = () => { overlay.remove(); UI.showLinkNames(); };
+    };
+
+    draw();
+  },
+
   showComboCalc(round, label) {
     const src = Game.comboSource(round);
     const OPTIONS = [[1,1],[1,2],[2,1],[2,2],[1,3]];
@@ -9906,6 +10083,16 @@ State.data.games = State.data.games.map(Game.sanitize);
 
 document.getElementById('historyMenuBtn').onclick = () => { UI.closeMenu(); History.show(); };
 document.getElementById('comboMenuBtn').onclick = () => { UI.closeMenu(); UI.showComboCalc(State.data, null); };
+document.getElementById('standingsMenuBtn').onclick = () => { UI.closeMenu(); UI.showStandings(); };
+
+// Dev-only test surface, gated on _bbDev (localhost, or ?dev). It does not
+// exist on bunchbets.com or on beta.
+//
+// The browser harness needs to hand Standings a known set of rounds. The only
+// alternative is stubbing Firestore at the network layer, which would mean a
+// leaderboard test that mostly tests Firestore — slower, and it would pass or
+// fail for reasons that have nothing to do with the arithmetic on screen.
+if (window._bbDev) window._bb = { Cloud, UI, State, History, Game };
 
 document.getElementById('resetBtn').onclick = () => {
   UI.closeMenu();
