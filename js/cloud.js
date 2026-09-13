@@ -241,6 +241,24 @@ BB.cloud = {
     return qs.docs.map((d) => ({ id: d.id, ...d.data() }));
   },
 
+  /**
+   * Record what this group actually calls someone. Aliases live on the golfer
+   * record rather than on one phone, so linking a name once helps everybody and
+   * survives a lost device.
+   *
+   * The rules permit this two ways: you may change your own claimed record, and
+   * a group-mate may MAINTAIN an unclaimed one — which an alias is, since it
+   * touches neither `discoverable`, `claimedByUid`, nor `poolGroupIds` (doc 11).
+   */
+  async addAlias(golferId, alias) {
+    requireUser();
+    const name = String(alias || '').trim();
+    if (!name) return;
+    await state.db.doc(`golfers/${golferId}`).update({
+      aliases: firebase.firestore.FieldValue.arrayUnion(name),
+    });
+  },
+
   async myGroups() {
     const doc = await BB.cloud.myUserDoc();
     const ids = doc?.groupIds || [];

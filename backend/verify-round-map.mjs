@@ -25,9 +25,14 @@ function grab(name) {
 }
 
 globalThis.APP_VERSION = '0.0-test';
-const make = (pool, groups) => {
-  const o = eval('({' + [grab('golferIdFor'), grab('buildRound')].join(',\n') + '})');
+// The shipped methods call Cloud.norm() by name, so the object under test has
+// to BE the global Cloud. History is stubbed per-test for unlinkedNames().
+const make = (pool, groups, history) => {
+  const o = eval('({' + ['golferIdFor', 'norm', 'unlinkedNames', 'suggestFor', 'buildRound']
+    .map(grab).join(',\n') + '})');
   o.pool = pool; o.groups = groups;
+  globalThis.Cloud = o;
+  globalThis.History = { load: () => history || [] };
   return o;
 };
 
@@ -60,6 +65,35 @@ console.log('name matching — exact only, and ambiguity is not a match\n');
 
   const dupes = make(POOL.concat([{ id: 'ghin:999', name: 'Brian Bunch' }]), GROUPS);
   check('two golfers with one name -> no match, never a guess', dupes.golferIdFor('Brian Bunch'), null);
+}
+
+console.log('\nsuggestions — ranked, never applied without a tap\n');
+{
+  const C = make(POOL, GROUPS);
+  const names = (n) => C.suggestFor(n).map((g) => g.name);
+  check('surname is the strongest signal', names('Bunch')[0], 'Brian Bunch');
+  check('  because it is what the card says', names('Casey')[0], 'Brian Casey');
+  check('first name next', names('Gary')[0], 'Gary Nunes');
+  check('prefix last — Ken/Kenneth', names('Ken')[0], 'Kenneth Bernard');
+  check('a name with no pool entry suggests nothing', names('Tyler'), []);
+  check('an ambiguous first name still offers both, ranked', names('Brian').length, 2);
+
+  const withAlias = make(POOL.map((g) =>
+    g.id === 'ghin:8311822' ? { ...g, aliases: ['Ken'] } : g), GROUPS);
+  check('a confirmed alias resolves outright', withAlias.golferIdFor('Ken'), 'ghin:8311822');
+  check('  and outranks everything as a suggestion', withAlias.suggestFor('Ken')[0].name, 'Kenneth Bernard');
+}
+
+console.log('\nunlinked names, scanned out of local history\n');
+{
+  const hist = [
+    { players: [{ id: 'p1', name: 'Bunch' }, { id: 'p2', name: 'Brian Casey' }] },
+    { players: [{ id: 'p1', name: 'bunch' }, { id: 'p3', name: 'Tyler' }] },
+    { players: [{ id: 'p4', name: '  ' }] },
+  ];
+  const C = make(POOL, GROUPS, hist);
+  check('only the ones that resolve to nobody', C.unlinkedNames(), ['Bunch', 'Tyler']);
+  check('  deduped case-insensitively, first spelling kept', C.unlinkedNames().indexOf('bunch'), -1);
 }
 
 console.log('\nbuilding the round\n');

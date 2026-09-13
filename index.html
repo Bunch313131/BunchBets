@@ -310,6 +310,9 @@ body.is-beta header { box-shadow: inset 0 3px 0 #dc2626; }
 .cloud-invite { margin:4px 12px 8px; padding:10px 12px; border:1px solid var(--acc); border-radius:10px; font-size:13px; line-height:1.45; }
 .cloud-invite button { margin-top:8px; width:100%; padding:9px; border-radius:8px; border:none; background:var(--acc); color:#fff; font-weight:700; font-size:13px; cursor:pointer; }
 .cloud-backup { margin-top:8px; padding:7px 12px; border-radius:8px; border:1px solid var(--acc); background:none; color:var(--acc); font-weight:700; font-size:12px; cursor:pointer; }
+.link-row { display:flex; align-items:center; gap:10px; padding:10px 4px; border-bottom:1px solid var(--border); }
+.link-name { flex:0 0 30%; font-weight:700; font-size:15px; }
+.link-pick { flex:1; padding:9px; border-radius:8px; border:1px solid var(--border); background:var(--card); color:var(--txt); font-size:14px; }
 
 /* Wizard Styles */
 .wizard-overlay { position:fixed; top:calc(-1 * env(safe-area-inset-top, 0px)); left:0; right:0; bottom:calc(-1 * env(safe-area-inset-bottom, 0px)); z-index:200; display:flex; flex-direction:column; overflow:hidden; background:#000; padding-top:env(safe-area-inset-top, 0px); padding-bottom:env(safe-area-inset-bottom, 0px); }
@@ -1086,11 +1089,93 @@ const Cloud = {
    * who is not an unambiguous hit stays a guest.
    */
   golferIdFor(name) {
-    const norm = (t) => String(t || '').toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
-    const want = norm(name);
+    const want = Cloud.norm(name);
     if (!want) return null;
-    const hits = this.pool.filter((g) => norm(g.name) === want);
+    // A confirmed alias is as good as the real name — better, in fact, since it
+    // is what this group actually writes on the card.
+    const hits = this.pool.filter((g) =>
+      Cloud.norm(g.name) === want || (g.aliases || []).some((a) => Cloud.norm(a) === want));
     return hits.length === 1 ? hits[0].id : null;   // ambiguous counts as no match
+  },
+
+  norm(t) {
+    return String(t || '').toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
+  },
+
+  /** Every name in local history that still resolves to nobody. */
+  unlinkedNames() {
+    const seen = {};
+    let rounds = [];
+    try { rounds = History.load(); } catch (e) {}
+    rounds.forEach((r) => (r.players || []).forEach((p) => {
+      const nm = String(p.name || '').trim();
+      if (!nm || this.golferIdFor(nm)) return;
+      const key = Cloud.norm(nm);
+      if (!(key in seen)) seen[key] = nm;   // keep the FIRST spelling seen
+    }));
+    return Object.keys(seen).map((k) => seen[k]).sort();
+  },
+
+  /**
+   * Ranked candidates for an unlinked name. Surname first, because that is what
+   * this group actually writes ("Bunch", "Casey", "Bridges"); then first name
+   * ("Gary"); then a prefix, which is where Ken/Kenneth and Tim/Timothy live.
+   * Prefixes are last precisely because they are the weakest signal.
+   */
+  suggestFor(name) {
+    const want = Cloud.norm(name);
+    if (!want) return [];
+    const scored = this.pool.map((g) => {
+      const toks = Cloud.norm(g.name).split(' ');
+      const last = toks[toks.length - 1], first = toks[0];
+      let score = 0;
+      if (Cloud.norm(g.name) === want) score = 100;
+      else if ((g.aliases || []).some((a) => Cloud.norm(a) === want)) score = 95;
+      else if (last === want) score = 80;
+      else if (first === want) score = 70;
+      else if (want.length >= 3 && (first.indexOf(want) === 0 || last.indexOf(want) === 0)) score = 50;
+      else if (want.length >= 3 && (want.indexOf(first) === 0 || want.indexOf(last) === 0)) score = 40;
+      return { g, score };
+    }).filter((x) => x.score > 0).sort((a, b) => b.score - a.score);
+    return scored.map((x) => x.g);
+  },
+
+  /**
+   * Write the confirmed aliases, then re-upload every round they affect so the
+   * stored rounds stop pointing at guests. Re-saving overwrites in place because
+   * the doc id is the local round id.
+   */
+  async linkNames(pairs) {
+    if (!this.api || !this.user) return;
+    this.syncing = true; this.status = 'Linking…'; this.render();
+    let linked = 0, failed = 0;
+    for (const { name, golferId } of pairs) {
+      if (!golferId) continue;
+      try {
+        await this.api.addAlias(golferId, name);
+        const g = this.pool.filter((x) => x.id === golferId)[0];
+        if (g) g.aliases = (g.aliases || []).concat([name]);
+        linked++;
+      } catch (e) {
+        this.diag('alias failed ' + golferId + ' ' + (e.code || e.message));
+        failed++;
+      }
+    }
+    // Anything already uploaded still names guests; re-send it with the links.
+    let resent = 0;
+    try {
+      for (const r of History.load()) {
+        if (!r.cloudId) continue;
+        const before = JSON.stringify(this.buildRound(r).golferIds);
+        r.cloudId = r.cloudId;   // keep id
+        if (before.indexOf('guest:') === -1) continue;
+        if (await this.saveRound(r)) resent++;
+      }
+    } catch (e) {}
+    this.syncing = false;
+    this.status = linked + ' name(s) linked' + (resent ? ', ' + resent + ' round(s) updated' : '')
+                + (failed ? ', ' + failed + ' failed' : '') + '.';
+    await this.refreshProfile();
   },
 
   /** Local history snapshot -> the rounds schema in doc 08. */
@@ -1239,6 +1324,15 @@ const Cloud = {
       '<br><span style="color:var(--muted);">Joining also links your scores to the record already on file.</span>' +
       '<button data-invite="' + esc(inv.id) + '"' + (this.busy ? ' disabled' : '') + '>Join</button></div>').join('');
 
+    // Names on the card are not names in the pool. Until they are linked, every
+    // round is filed against guests and the standings have nothing to add up.
+    const stray = this.pool.length ? this.unlinkedNames() : [];
+    const unlinked = stray.length
+      ? '<div class="cloud-note"><b>' + stray.length + ' name(s) on your cards aren\u2019t linked to anyone:</b><br>' +
+        esc(stray.slice(0, 6).join(', ')) + (stray.length > 6 ? '\u2026' : '') +
+        '<br><button class="cloud-backup" id="cloudLink">Link them</button></div>'
+      : '';
+
     const pending = this.unsyncedRounds().length;
     const total = (() => { try { return History.load().length; } catch (e) { return 0; } })();
     const backup = total === 0 ? ''
@@ -1254,11 +1348,13 @@ const Cloud = {
       '<div class="sub">' + esc(this.user.email || '') + '</div>' +
       '<div class="sub" style="margin-top:6px;">' + linked + '</div>' +
       '<div class="sub">' + groupLine + '</div></div>' +
-      invites + backup + note +
+      invites + backup + unlinked + note +
       '<button class="menu-item" id="cloudSignOut">Sign out</button>';
 
     const bk = document.getElementById('cloudBackup');
     if (bk) bk.onclick = () => Cloud.backfill();
+    const ln = document.getElementById('cloudLink');
+    if (ln) ln.onclick = () => { UI.closeMenu(); UI.showLinkNames(); };
 
     this.renderDiag(el, esc);
     const out = document.getElementById('cloudSignOut');
@@ -9619,6 +9715,63 @@ const UI = {
    * normalises the two. Nothing here writes: it is a read-only view over scores
    * that already exist, so opening it mid-round cannot disturb a game.
    */
+  /**
+   * Link the short names this group writes on a card to the golfer records in
+   * the pool. Suggestions are ranked, but nothing is saved without a tap — a
+   * wrong link here would quietly file rounds under the wrong man.
+   */
+  showLinkNames() {
+    const names = Cloud.unlinkedNames();
+    const overlay = document.createElement('div');
+    overlay.className = 'history-overlay';
+    overlay.innerHTML =
+      '<div class="history-header">' +
+      '<button class="history-back" id="linkBack">&larr; Back</button>' +
+      '<h2>Link names</h2><div style="width:60px;"></div></div>' +
+      '<div class="history-list" id="linkBody"></div>';
+    document.body.appendChild(overlay);
+    overlay.querySelector('#linkBack').onclick = () => overlay.remove();
+    const body = overlay.querySelector('#linkBody');
+
+    if (!names.length) {
+      body.innerHTML = '<div class="history-empty">Every name on your cards is already linked.</div>';
+      return;
+    }
+
+    const esc = (t) => String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    body.innerHTML =
+      '<div class="cloud-note" style="padding:0 4px 12px;">Your cards use short names; the group roster uses full ones. ' +
+      'Link them once and every round \u2014 past and future \u2014 files against the right person. ' +
+      'Suggestions are a guess, so check each one.</div>' +
+      names.map((n) => {
+        const opts = Cloud.suggestFor(n);
+        const rest = Cloud.pool.filter((g) => opts.indexOf(g) === -1);
+        const opt = (g, sel) => '<option value="' + esc(g.id) + '"' + (sel ? ' selected' : '') + '>' +
+          esc(g.name) + (g.currentIndex ? ' \u00b7 ' + esc(g.currentIndex) : '') + '</option>';
+        return '<div class="link-row"><div class="link-name">' + esc(n) + '</div>' +
+          '<select class="link-pick" data-name="' + esc(n) + '">' +
+          '<option value="">\u2014 not in this group \u2014</option>' +
+          opts.map((g, i) => opt(g, i === 0)).join('') +
+          (rest.length ? '<optgroup label="everyone else">' + rest.map((g) => opt(g, false)).join('') + '</optgroup>' : '') +
+          '</select></div>';
+      }).join('') +
+      '<button class="btn primary" id="linkSave" style="width:100%;margin-top:16px;padding:12px;">Save links</button>';
+
+    body.querySelector('#linkSave').onclick = async () => {
+      const pairs = [...body.querySelectorAll('.link-pick')].map((sel) => ({
+        name: sel.getAttribute('data-name'), golferId: sel.value,
+      })).filter((x) => x.golferId);
+      if (!pairs.length) { overlay.remove(); return; }
+      body.querySelector('#linkSave').disabled = true;
+      body.querySelector('#linkSave').textContent = 'Saving\u2026';
+      await Cloud.linkNames(pairs);
+      overlay.remove();
+      Err.toast(Cloud.status || 'Linked');
+    };
+  },
+
   showComboCalc(round, label) {
     const src = Game.comboSource(round);
     const OPTIONS = [[1,1],[1,2],[2,1],[2,2],[1,3]];
