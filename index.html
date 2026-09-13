@@ -715,9 +715,12 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.11';
+const APP_VERSION = '7.12';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.12': [
+    'Nassau now defaults to team delta, which is how this group has always set it up by hand',
+  ],
   '7.11': [
     'Sweeps and quads are now their own lines everywhere KP money appears, instead of being folded into the KP figure',
   ],
@@ -2263,6 +2266,56 @@ const Game = {
     return g;
   },
 
+  /**
+   * How this group picks teams: lowest handicap partners the highest.
+   *
+   * With four that is the only pairing that balances — the alternatives put
+   * the two best players together. With five, the low/high pair stays together
+   * and plays each of the other three PAIRS, which is three matches and leaves
+   * everyone in two of them; nobody sits out and nobody plays every hole
+   * against the same partner.
+   *
+   * Returns suggestions, never a decision. Brian: "99% of the time it's low &
+   * high together. As long as there is a manual way to break out of the
+   * assumption, it's fine." So this is what the wizard proposes, and the wizard
+   * always offers a way past it.
+   *
+   * Ties are broken by the order the players were entered rather than by
+   * handicap alone, so two men on the same number produce the same teams every
+   * time it is asked. A suggestion that quietly reshuffles between renders is
+   * worse than no suggestion.
+   */
+  suggestTeams(players) {
+    const ps = (players || []).filter((p) => p && p.id && String(p.name || '').trim());
+    if (ps.length < 4 || ps.length > 5) return [];   // the app plays 4 or 5
+
+    // The `|| (a.i - b.i)` is belt-and-braces TODAY — Array#sort has been
+    // stable since ES2019, so equal handicaps would keep entry order anyway,
+    // and a mutation test removing it changes nothing. It stays because `i` is
+    // captured from the ENTRY array: if anything upstream ever sorts or
+    // regroups players before this runs, sort stability preserves that new
+    // order while `i` still preserves the order they were typed in, which is
+    // the one the tee order actually reflects.
+    const order = ps.map((p, i) => ({ id: p.id, hcp: p.handicap || 0, i }))
+      .sort((a, b) => (a.hcp - b.hcp) || (a.i - b.i));
+
+    const low = order[0], high = order[order.length - 1];
+    const pair = [low.id, high.id];
+    const rest = order.slice(1, -1);                 // 2 of them at four, 3 at five
+    const sum = (ids) => ids.reduce((t, id) => t + (order.filter((o) => o.id === id)[0] || { hcp: 0 }).hcp, 0);
+    const match = (a, b) => ({ teamA: a, teamB: b, deltaA: sum(a) - sum(b) });
+
+    if (ps.length === 4) return [match(pair, rest.map((o) => o.id))];
+
+    // Five: every pair of the remaining three, in handicap order, so the list
+    // reads the same way twice.
+    const out = [];
+    for (let i = 0; i < rest.length; i++) {
+      for (let j = i + 1; j < rest.length; j++) out.push(match(pair, [rest[i].id, rest[j].id]));
+    }
+    return out;
+  },
+
   applyHandicapMode(g) {
     const playerHandicaps = {};
     State.data.players.forEach(p => {
@@ -3772,7 +3825,11 @@ const Wizard = {
       teamA: [],
       teamB: [],
       withJunk: true,
-      handicapMode: 'full', // full, off_low, team_delta
+      // Team delta is how this group plays Nassau: the higher side's total
+      // handicap minus the lower side's, given to that team's highest man. It
+      // was 'full' here while every real round was set up as team delta by
+      // hand, which is a default that makes work rather than saving it.
+      handicapMode: 'team_delta', // full, off_low, team_delta
       stakes: {front:2, back:5, overall:2},
       junkValue: {front:1, back:2},
       pointValue: {front:1, back:1},
