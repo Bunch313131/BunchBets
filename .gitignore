@@ -40,7 +40,10 @@ roster*.csv
 backend/roster*.csv
 *First_Users*
 
-# Local emulator harness scratch
+# Local emulator harness scratch. vendor/ is local copies of the Firebase
+# compat SDK so the integration suite never depends on a CDN mid-test;
+# backend/README.md has the one-liner that rebuilds it.
+/vendor/
 backend/vendor/
 apptest/
 

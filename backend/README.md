@@ -22,17 +22,33 @@ live: three real defects came out of it, and none were visible in review.
 ## Running
 
 ```bash
-npm install
+npm install                                # firebase-admin and playwright
 firebase emulators:start --only firestore,auth --project bb-test   # needs a JVM
 
 # rules
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8181 node --test rules.test.js
 
-# integration — also needs the harness served and the emulator seeded
-#   (cloud.test.mjs wipes and reseeds Firestore itself)
-cd ../apptest && python3 -m http.server 8099 &
-node --test cloud.test.mjs
+# integration — needs cloud-test.html served from the REPO ROOT (not backend/),
+#   because the page loads ./js/cloud.js and ./vendor/ relative to it.
+#   cloud.test.mjs wipes and reseeds Firestore itself.
+cd .. && python3 -m http.server 8099 &
+node --test cloud.test.mjs                 # from backend/
 ```
+
+`vendor/` holds local copies of the compat SDK, because the page must not
+depend on reaching a CDN mid-test. It is gitignored; rebuild it from the repo
+root with:
+
+```bash
+mkdir -p vendor && for f in firebase-app-compat.js firebase-auth-compat.js \
+    firebase-firestore-compat.js firebase-database-compat.js; do
+  curl -sS -o vendor/$f https://www.gstatic.com/firebasejs/9.22.0/$f
+done
+```
+
+Both emulator ports are pinned in `firebase.json` (firestore 8181, auth 9099).
+On a host without IPv6 the emulator warns that it cannot bind `::1` and binds
+`127.0.0.1` only — harmless, and the suite addresses it by IP anyway.
 
 ## Seeding
 
