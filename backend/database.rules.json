@@ -1,20 +1,33 @@
 {
-  // Live-sharing tree. The SHARE CODE is the secret: you may read and write a
-  // round you can name, but you may not list the collection to discover one.
+  // Realtime Database rules for BUNCHBETS-TEST (the beta project).
+  // Deploy:  node backend/deploy-rules.mjs <test-key>.json \
+  //            https://bunchbets-test-default-rtdb.firebaseio.com put backend/database.rules.json
   //
-  // This was previously ".read"/".write": true on `games` ITSELF, which let a
-  // stranger enumerate every live share code and read — or delete — any round
-  // in flight. The app only ever touches <path>/<code> (LiveSync host/join),
-  // so denying the collection level costs it nothing.
+  // The SHARE CODE is the secret: you may read and write a round you can name,
+  // but you may not list the collection to discover one. Before 2026-09-13 this
+  // was ".read"/".write": true on `games` ITSELF, so anyone could enumerate every
+  // live share code and read or delete a round in flight.
   //
-  // `beta_games` had no rule at all, which is why live sharing silently failed
-  // on beta: every read and write was denied.
+  // `beta_games` had no rule at all, which is why live sharing silently failed on
+  // beta — every read and write denied.
+  //
+  // The .validate is copied from the production project, which had it and this
+  // one did not: it refuses anything that is not shaped like a live round, so a
+  // stray write cannot park junk under a share code.
   "rules": {
     "games": {
-      "$code": { ".read": true, ".write": true }
+      "$gameCode": {
+        ".read": true,
+        ".write": true,
+        ".validate": "newData.hasChildren(['data', 'updatedAt'])"
+      }
     },
     "beta_games": {
-      "$code": { ".read": true, ".write": true }
+      "$gameCode": {
+        ".read": true,
+        ".write": true,
+        ".validate": "newData.hasChildren(['data', 'updatedAt'])"
+      }
     }
   }
 }

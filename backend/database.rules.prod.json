@@ -1,0 +1,38 @@
+{
+  // Realtime Database rules for BUNCHBETS (production). Recorded here as they
+  // stand on 2026-09-13 — they were NOT changed. Until now the only copy lived
+  // in the Firebase console.
+  //
+  // `games` was already in the right shape and already carried the .validate,
+  // so the repoint needs nothing here. Verified anonymously rather than assumed:
+  //   PUT {"data":{...},"updatedAt":1} -> 200    (what LiveSync writes)
+  //   PUT {"junk":1}                   -> 401    (.validate refuses it)
+  //   GET /games?shallow=true          -> 401    (no enumeration)
+  //
+  // The smashters* trees belong to a DIFFERENT app (Truckee Invitational)
+  // sharing this project. They are left exactly as found — but note they are
+  // .read/.write true at the COLLECTION level, so they are world-readable,
+  // world-writable and enumerable, including smashters-scorer-codes. Not
+  // BunchBets' call to change; raised with Brian 2026-09-13.
+  "rules": {
+    "games": {
+      "$gameCode": {
+        ".read": true,
+        ".write": true,
+        ".validate": "newData.hasChildren(['data', 'updatedAt'])"
+      }
+    },
+    "smashters": {
+      ".read": true,
+      ".write": true
+    },
+    "smashters-scorer-codes": {
+      ".read": true,
+      ".write": true
+    },
+    "smashters-archives": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}
