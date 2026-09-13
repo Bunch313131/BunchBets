@@ -43,3 +43,6 @@ backend/roster*.csv
 # Local emulator harness scratch
 backend/vendor/
 apptest/
+
+# Files the session could not delete (no unlink permission). Safe to remove by hand.
+_to_delete/
