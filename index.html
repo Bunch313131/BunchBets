@@ -764,10 +764,17 @@ function haversineMi(lat1,lon1,lat2,lon2){
 const IS_BETA = !!window._bbBeta;
 
 // === FIREBASE CONFIG ===
-// NOTE: prod and beta currently share the bunchbets-test project because a real
-// production project does not exist yet. Live-sync writes are namespaced by
-// LIVE_PATH below so beta traffic cannot collide with live rounds. Replace
-// PROD_FIREBASE_CONFIG as soon as bunchbets-prod is stood up.
+// Two separate projects, finally. `bunchbets` is production; `bunchbets-test` is
+// beta. A merge on 2026-04-18 had silently swapped the live app onto the test
+// project, so for four months the comment here read "TEST ENVIRONMENT - does not
+// affect live data" while pointing at exactly the live data.
+//
+// Live-sync writes are ALSO namespaced by LIVE_PATH below, so the two are
+// separated twice over: wrong project and wrong path would both have to happen.
+//
+// These are Firebase *web* configs. They are public by design — they name the
+// project, they do not authorise anything. Access is controlled by the database
+// rules, which is where the real protection has to live.
 const BETA_FIREBASE_CONFIG = {
   apiKey: "AIzaSyCSt28t8rV5taevsl6iVI9QlOV-XR1wrCE",
   authDomain: "bunchbets-test.firebaseapp.com",
@@ -777,7 +784,15 @@ const BETA_FIREBASE_CONFIG = {
   messagingSenderId: "820215666223",
   appId: "1:820215666223:web:48501679a5540306a998da"
 };
-const PROD_FIREBASE_CONFIG = BETA_FIREBASE_CONFIG; // TODO: point at bunchbets-prod
+const PROD_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDZlbkZMkfmFk1CS1i51JQ1NuknlNae0zo",
+  authDomain: "bunchbets.firebaseapp.com",
+  databaseURL: "https://bunchbets-default-rtdb.firebaseio.com",
+  projectId: "bunchbets",
+  storageBucket: "bunchbets.firebasestorage.app",
+  messagingSenderId: "267555779116",
+  appId: "1:267555779116:web:af1e05bacb82f0d4fe5789"
+};
 const FIREBASE_CONFIG = IS_BETA ? BETA_FIREBASE_CONFIG : PROD_FIREBASE_CONFIG;
 
 // Live-sharing namespace. Keeps beta rounds out of the production tree even
