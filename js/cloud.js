@@ -278,7 +278,18 @@ BB.cloud = {
       createdByUid: user.uid,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
-    await ref.set(payload, { merge: true });
+    // A full replace, NOT { merge: true }.
+    //
+    // merge replaces arrays wholesale but deep-merges maps, and `results` is a
+    // map keyed by golfer id. So re-saving a round after linking "Bunch" to
+    // ghin:1506580 updated golferIds correctly while leaving the old
+    // results['guest:bunch'] entry sitting beside the new one — and every
+    // standing that player appeared in silently doubled. Nothing threw; the
+    // round listed correctly; only adding the numbers up revealed it.
+    //
+    // A round is a snapshot the client owns in full. There are no server-owned
+    // fields to protect here, so a plain set is both correct and idempotent.
+    await ref.set(payload);
     return ref.id;
   },
 

@@ -158,6 +158,64 @@ describe('cloud module against real rules', () => {
     await page.close();
   });
 
+  /**
+   * The one that cost a season's standings.
+   *
+   * Re-saving a round is not an edge case — it is what happens every time a
+   * short name on a card gets linked to a real golfer, which rewrites both
+   * golferIds and the keys of the results map. With { merge: true } Firestore
+   * replaced the array but deep-merged the map, so the old guest entry survived
+   * beside the new one and every standing that player appeared in doubled.
+   *
+   * Nothing threw. The round listed correctly. Only adding the numbers up
+   * showed it. So this asserts the stored document EXACTLY, not that it
+   * contains what was written.
+   */
+  test('re-saving a round replaces it — no stale golfers left behind', async () => {
+    const page = await signedInPage('uid_resave', 'jpsilvestri2@gmail.com');
+    await page.evaluate(async () => {
+      await window.cloud.ensureUserDoc();
+      const [inv] = await window.cloud.pendingInvites();
+      if (!inv) throw new Error('no pending invitation — test fixtures are not isolated');
+      await window.cloud.acceptInvite(inv.id);
+    });
+
+    const out = await page.evaluate(async (g) => {
+      const id = 'resave-fixture';
+      // As first uploaded: the card said "Bunch", nobody was linked.
+      await window.cloud.saveRound({
+        id, groupId: g, date: '2026-08-28', courseName: 'El Macero CC',
+        golferIds: ['guest:bunch', 'guest:casey'],
+        unmatchedNames: ['Bunch', 'Casey'],
+        results: { 'guest:bunch': { name: 'Bunch', money: 20, gross: 82 },
+                   'guest:casey': { name: 'Casey', money: -20, gross: 79 } },
+      });
+      // After linking: same round, same doc, real ids.
+      await window.cloud.saveRound({
+        id, groupId: g, date: '2026-08-28', courseName: 'El Macero CC',
+        golferIds: ['ghin:1506580', 'ghin:1236530'],
+        unmatchedNames: [],
+        results: { 'ghin:1506580': { name: 'Brian Bunch', money: 20, gross: 82 },
+                   'ghin:1236530': { name: 'Brian Casey', money: -20, gross: 79 } },
+      });
+      const doc = (await window.cloud.groupRounds(g)).find((r) => r.id === id);
+      return {
+        ids: doc.golferIds,
+        keys: Object.keys(doc.results).sort(),
+        unmatched: doc.unmatchedNames,
+        stats: window.cloud.aggregate([doc]).map((s) => [s.golferId, s.money, s.rounds]),
+      };
+    }, GROUP);
+
+    assert.deepEqual(out.keys, ['ghin:1236530', 'ghin:1506580'],
+      'the guest keys must be GONE, not merged alongside');
+    assert.deepEqual(out.ids, ['ghin:1506580', 'ghin:1236530']);
+    assert.deepEqual(out.unmatched, [], 'an emptied array must clear, not persist');
+    assert.deepEqual(out.stats, [['ghin:1506580', 20, 1], ['ghin:1236530', -20, 1]],
+      'two players in the round, not four, and the money is not doubled');
+    await page.close();
+  });
+
   test('a non-member cannot read the group’s rounds', async () => {
     const page = await signedInPage('uid_outsider2', 'outsider2@example.com');
     await page.evaluate(() => window.cloud.ensureUserDoc());
