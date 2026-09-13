@@ -1,0 +1,20 @@
+{
+  // Live-sharing tree. The SHARE CODE is the secret: you may read and write a
+  // round you can name, but you may not list the collection to discover one.
+  //
+  // This was previously ".read"/".write": true on `games` ITSELF, which let a
+  // stranger enumerate every live share code and read — or delete — any round
+  // in flight. The app only ever touches <path>/<code> (LiveSync host/join),
+  // so denying the collection level costs it nothing.
+  //
+  // `beta_games` had no rule at all, which is why live sharing silently failed
+  // on beta: every read and write was denied.
+  "rules": {
+    "games": {
+      "$code": { ".read": true, ".write": true }
+    },
+    "beta_games": {
+      "$code": { ".read": true, ".write": true }
+    }
+  }
+}
