@@ -129,52 +129,78 @@ console.log('\na new game is a new round — every per-round tracker goes with i
 }
 
 // --------------------------------------------------------------------------
-console.log('\ntapping a number selects it, so typing replaces\n');
+console.log('\ntapping a number clears it, so typing replaces\n');
 {
   const { page, ctx } = await boot();
-  await page.evaluate(() => { window._bb.State.data.tab = 'setup'; window._bb.UI.render(); });
-  await page.waitForTimeout(300);
-
-  const probe = await page.evaluate(async () => {
-    const inputs = [...document.querySelectorAll('input')];
-    const num = inputs.find((i) => (i.type === 'tel' || i.type === 'number') && i.value && !i.readOnly);
-    if (!num) return { none: true };
-    num.focus();
-    await new Promise((r) => setTimeout(r, 50));
-    return {
-      value: num.value,
-      start: num.selectionStart,
-      end: num.selectionEnd,
-      type: num.type,
-    };
-  });
-  check('a numeric field exists to test', !probe.none, true);
-  if (!probe.none) {
-    check('the whole value is selected on focus',
-      [probe.start, probe.end], [0, probe.value.length]);
-  }
-
-  // A text field must NOT be selected: the name box filters a dropdown on what
-  // is typed, and selecting it would make the first keystroke erase the name.
   await page.evaluate(() => {
-    // Seeded deliberately: an empty box cannot demonstrate "not selected", and a
-    // check that quietly skips reads as coverage while proving nothing.
     window._bb.Wizard.data.players = [{ name: 'Brian Bunch', handicap: 8 }];
     window._bb.Wizard.active = true;
     window._bb.Wizard.step = 'players';
     window._bb.Wizard.render();
   });
   await page.waitForTimeout(300);
+
+  const sel = '.wizard-player-row input[data-field="handicap"]';
+  const focused = await page.evaluate(async (s) => {
+    const el = document.querySelector(s);
+    if (!el) return { none: true };
+    el.focus();
+    await new Promise((r) => setTimeout(r, 60));
+    return { value: el.value, placeholder: el.placeholder };
+  }, sel);
+  check('the field is emptied', focused.value, '');
+  check('  and the old number is ghosted behind it', focused.placeholder, '8');
+
+  // No selection UI at all is the point: iOS draws drag handles and a copy bar
+  // over a two-character number, which is what this replaced.
+  const selected = await page.evaluate((s) => {
+    const el = document.querySelector(s);
+    return el.selectionStart !== el.selectionEnd;
+  }, sel);
+  check('nothing is selected, so iOS has no handles to draw', selected, false);
+
+  // Typing replaces outright rather than landing beside the old digit.
+  await page.fill(sel, '12');
+  await page.evaluate((s) => document.querySelector(s).blur(), sel);
+  await page.waitForTimeout(80);
+  check('typing replaces', await page.inputValue(sel), '12');
+  check('  and reaches state', await page.evaluate(() => window._bb.Wizard.data.players[0].handicap), 12);
+
+  // Tapping in and back out without typing must leave the number alone.
+  await page.evaluate(async (s) => {
+    const el = document.querySelector(s); el.focus();
+    await new Promise((r) => setTimeout(r, 40)); el.blur();
+  }, sel);
+  await page.waitForTimeout(80);
+  check('tapping in and out changes nothing', await page.inputValue(sel), '12');
+  check('  including in state', await page.evaluate(() => window._bb.Wizard.data.players[0].handicap), 12);
+
+  // The nasty one: type, delete it again, leave. The field's own oninput has
+  // already recorded the empty box as a zero, so restoring the display without
+  // telling it would show 12 while state said 0.
+  await page.evaluate(async (s) => {
+    const el = document.querySelector(s); el.focus();
+    await new Promise((r) => setTimeout(r, 40));
+    el.value = '9'; el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.value = '';  el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.blur();
+  }, sel);
+  await page.waitForTimeout(80);
+  check('emptying it and leaving restores the number', await page.inputValue(sel), '12');
+  check('  AND state agrees — no silent zero', await page.evaluate(() => window._bb.Wizard.data.players[0].handicap), 12);
+
+  // A text field must NOT be selected: the name box filters a dropdown on what
+  // is typed, and selecting it would make the first keystroke erase the name.
   const text = await page.evaluate(async () => {
     const el = document.querySelector('.wizard-player-row input[data-field="name"]');
     if (!el) return { none: true };
     el.focus();
     await new Promise((r) => setTimeout(r, 60));
-    return { value: el.value, start: el.selectionStart, end: el.selectionEnd };
+    return { value: el.value, placeholder: el.placeholder };
   });
   check('the name box was found with a value in it', !text.none && text.value.length > 0, true);
-  check('  and is NOT selected — its first keystroke must not wipe the name',
-    text.start === 0 && text.end === text.value.length, false);
+  check('  and is left alone — clearing it would strand the roster dropdown',
+    text.value, 'Brian Bunch');
   await ctx.close();
 }
 
@@ -182,13 +208,20 @@ console.log('\ntapping a number selects it, so typing replaces\n');
 console.log('\nthe picker offers the group, and never invents a course handicap\n');
 {
   const POOL = [
-    { id: 'ghin:1506580', name: 'Brian Bunch', currentIndex: '7.0' },
-    { id: 'ghin:1586673', name: 'Gary Nunes', currentIndex: '10.4' },
-    { id: 'ghin:326845', name: 'Tyler Bryan', currentIndex: '+0.3' },
+    { id: 'ghin:1506580', name: 'Brian Bunch', currentIndex: '7.0', aliases: ['Bunch'] },
+    { id: 'ghin:1586673', name: 'Gary Nunes', currentIndex: '10.4', aliases: ['Gary'] },
+    { id: 'ghin:326845', name: 'Tyler Bryan', currentIndex: '+0.3', aliases: ['Tyler'] },
   ];
   const { page, ctx, errs } = await boot({
     cloud: { user: { uid: 'u', email: 'b@x.com' }, groups: [{ id: 'nunes', name: 'Nunes' }], pool: POOL },
   });
+  // A round in local history, written the way the group actually writes cards:
+  // short names, and the handicap they really played off.
+  await page.evaluate(() => localStorage.setItem('bunchbets_history', JSON.stringify([
+    { id: 'r1', date: '2026-09-11T00:00:00.000Z',
+      players: [{ id: 'p1', name: 'Bunch', handicap: 8 }, { id: 'p2', name: 'Tyler', handicap: 0 }],
+      games: [], playerNet: {} },
+  ])));
 
   const r = await page.evaluate(() => window._bb.Wizard.pickerRoster());
   check('the group comes first', r.slice(0, 3).map((x) => x.name),
@@ -201,10 +234,15 @@ console.log('\nthe picker offers the group, and never invents a course handicap\
   // Gary is a 10.4 who plays off 12; filling 10 would be a stroke and a half
   // short on every net bet, with nothing on screen to say so.
   const gary = r.find((x) => x.name === 'Gary Nunes');
-  check('a pool-only golfer gets NO handicap guessed from his index',
+  check('a golfer never played here gets NO handicap guessed from his index',
     gary.handicap === undefined || gary.handicap === null, true);
   check('  but one this phone has played before keeps his number',
     r.find((x) => x.name === 'Brian Bunch').handicap, 8);
+  // Found through the alias, not the full name. The card says "Tyler"; the
+  // roster says "Tyler Bryan". Matching on the full name alone finds nothing and
+  // returns no handicap at all — which is exactly what it did.
+  check('and one whose card name is a SHORT name is still found',
+    r.find((x) => x.name === 'Tyler Bryan').handicap, 0);
 
   await page.evaluate(() => { window._bb.Wizard.active = true; window._bb.Wizard.step = 'players'; window._bb.Wizard.render(); });
   await page.waitForTimeout(300);

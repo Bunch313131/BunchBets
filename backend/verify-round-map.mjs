@@ -15,6 +15,7 @@ const src = fs.readFileSync(process.argv[2] || 'index.html', 'utf8');
 function grab(name) {
   let i = src.indexOf('\n  ' + name + '(');
   if (i < 0) i = src.indexOf('\n  async ' + name + '(');
+  if (i < 0) i = src.indexOf('\nfunction ' + name + '(');   // top-level helpers
   if (i < 0) throw new Error('not found: ' + name);
   let d = 0, started = false, j = i;
   for (; j < src.length; j++) {
@@ -240,6 +241,27 @@ console.log('\nthe cloud module is pinned to the release\n');
   check('index.html imports the module', !!m, true);
   check('  with a cache-busting query', !!(m && /\?v=$/.test(m[1])), true);
   check('  tied to APP_VERSION, not a literal', !!(m && m[2]), true);
+}
+
+/**
+ * The version compare, which used to be parseFloat.
+ *
+ * parseFloat('7.10') is 7.1, so at 7.10 What's New would compare EQUAL to 7.1
+ * and LESS than 7.9, and simply stop appearing for everyone. Nothing errors and
+ * no screen is visibly missing — the notes just never show again.
+ */
+console.log('\nversion comparison survives a two-digit minor\n');
+{
+  const cmp = eval('(' + grab('cmpVersion') + ')');
+  check('7.10 is NEWER than 7.9, not older', cmp('7.10', '7.9'), 1);
+  check('  and newer than 7.1', cmp('7.10', '7.1'), 1);
+  check('  which parseFloat called equal', 7.10 === 7.1, true);
+  check('ordinary ordering still holds', cmp('7.8', '7.9'), -1);
+  check('equal is equal', cmp('7.9', '7.9'), 0);
+  check('a missing segment is zero', cmp('8', '8.0'), 0);
+  check('major beats minor', cmp('10.0', '9.99'), 1);
+  check('sorts correctly end to end',
+    ['7.9', '7.10', '7.2', '8.0', '7.1'].sort(cmp), ['7.1', '7.2', '7.9', '7.10', '8.0']);
 }
 
 console.log(fail ? `\n${fail} FAILURES` : '\nall checks passed');

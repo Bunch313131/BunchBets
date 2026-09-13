@@ -715,9 +715,14 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.9';
+const APP_VERSION = '7.10';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.10': [
+    'Picking a group member now fills in the handicap you last played him off',
+    'Tapping a number clears the box and ghosts the old value behind it \u2014 no more iOS selection handles',
+    'Fixed: What\u2019s New would have stopped appearing for everyone at this exact version',
+  ],
   '7.9': [
     'Sign in from the player screen — your group\u2019s golfers and their current GHIN indexes are offered right where you build the round',
     'Fixed: starting a new game opened on hole 18 and treated the whole round as already scored',
@@ -4399,14 +4404,41 @@ const Wizard = {
     const hcpOf = {};
     local.forEach((r) => { hcpOf[norm(r.name)] = r.handicap; });
 
+    /**
+     * What we last played this man off.
+     *
+     * Rounds are the honest source, not the hand-kept "My Players" list: they
+     * are written every time anybody plays, they carry the number that was
+     * actually used, and nobody has to maintain them.
+     *
+     * Matched through the golfer's ALIASES as well as his name, because the
+     * card says "Bunch" and the roster says "Brian Bunch" — the same mismatch
+     * that filed four rounds against guests. Looking up only by full name finds
+     * nothing and quietly returns no handicap at all, which is what it did.
+     */
+    const lastPlayedOff = (g) => {
+      const names = {};
+      names[norm(g.name)] = 1;
+      (g.aliases || []).forEach((a) => { const k = norm(a); if (k) names[k] = 1; });
+      let rounds = [];
+      try { rounds = History.load(); } catch (e) {}   // newest first
+      for (const r of rounds) {
+        for (const p of (r.players || [])) {
+          if (names[norm(p.name)] && p.handicap != null) return p.handicap;
+        }
+      }
+      for (const k of Object.keys(names)) if (hcpOf[k] != null) return hcpOf[k];
+      return undefined;   // never derived from the index — see the picker comment
+    };
+
     const out = [], seen = {};
     if (typeof CLOUD_ENABLED !== 'undefined' && CLOUD_ENABLED && Cloud.user) {
       Cloud.pool.forEach((g) => {
         const k = norm(g.name);
         if (!k || seen[k]) return;
         seen[k] = 1;
-        // handicap stays undefined unless this phone has played him before.
-        out.push({ name: g.name, index: g.currentIndex || null, handicap: hcpOf[k] });
+        (g.aliases || []).forEach((a) => { const ak = norm(a); if (ak) seen[ak] = 1; });
+        out.push({ name: g.name, index: g.currentIndex || null, handicap: lastPlayedOff(g) });
       });
     }
     local.forEach((r) => {
@@ -10243,31 +10275,63 @@ document.getElementById('standingsMenuBtn').onclick = () => { UI.closeMenu(); UI
 if (window._bbDev) window._bb = { Cloud, UI, State, History, Game, Wizard };
 
 /**
- * Tapping a number field selects what is in it, so typing replaces rather than
- * inserting beside the existing digit.
+ * Tapping a number field clears it, showing the old value ghosted behind, so
+ * typing replaces rather than inserting beside the existing digit.
  *
  * Every one of these holds a short number that is almost always being replaced
  * outright — a handicap, a par, a stake. Landing the caret next to the old digit
  * means "8" becomes "78" or "87" depending on which side of it you happened to
  * tap, and on a phone getting back out of that is fiddlier than it sounds.
  *
+ * This started as select-all, which is the obvious answer and is wrong on a
+ * phone: iOS draws a real text selection, with the two blue drag handles and
+ * often the cut/copy bar, over a two-character number. Correct behaviour,
+ * unpleasant to look at, and it invites a drag nobody wants. Clearing the field
+ * gets the same result with no selection UI at all, and the placeholder keeps
+ * the old number visible so you can see what you are replacing.
+ *
+ * Restoring happens in the CAPTURE phase of blur, which is load-bearing: several
+ * of these fields own an onblur that does parseInt(value) || 0, and a target-phase
+ * restore would run after it had already written a zero over the real number.
+ * The synthetic input event then lets whatever owns the field re-read it, so a
+ * field that was typed into and then emptied ends up agreeing with state instead
+ * of showing one number and having stored another.
+ *
  * Delegated on purpose. There are two dozen of these fields, the wizard builds
  * more on the fly, and a per-field handler is a rule that only holds until the
- * next field is added.
- *
- * Deferred by a tick because iOS places the caret AFTER the focus event, which
- * would undo a selection made synchronously. Text fields are untouched: the
- * player-name box has a roster dropdown that filters on what is typed, and
- * selecting its contents would make the first keystroke wipe the name.
+ * next field is added. Text fields are untouched: the player-name box filters a
+ * dropdown on what is typed, and clearing it would strand the dropdown.
  */
+const BB_HELD = 'bbHeldValue', BB_PH = 'bbHeldPlaceholder';
+
+function bbIsNumberField(el) {
+  return !!el && el.tagName === 'INPUT' && !el.readOnly && !el.disabled &&
+         (el.type === 'number' || el.type === 'tel' ||
+          (el.inputMode || '').toLowerCase() === 'numeric');
+}
+
 document.addEventListener('focusin', (e) => {
   const el = e.target;
-  if (!el || el.tagName !== 'INPUT' || el.readOnly || el.disabled) return;
-  const numeric = el.type === 'number' || el.type === 'tel' ||
-                  (el.inputMode || '').toLowerCase() === 'numeric';
-  if (!numeric || !el.value) return;
-  setTimeout(() => { if (document.activeElement === el) { try { el.select(); } catch (err) {} } }, 0);
+  if (!bbIsNumberField(el) || !el.value || (BB_HELD in el.dataset)) return;
+  el.dataset[BB_HELD] = el.value;
+  el.dataset[BB_PH] = el.placeholder || '';
+  el.placeholder = el.value;
+  el.value = '';
 });
+
+document.addEventListener('blur', (e) => {
+  const el = e.target;
+  if (!el || !el.dataset || !(BB_HELD in el.dataset)) return;
+  const held = el.dataset[BB_HELD];
+  const restored = el.value === '';
+  if (restored) el.value = held;
+  el.placeholder = el.dataset[BB_PH] || '';
+  delete el.dataset[BB_HELD];
+  delete el.dataset[BB_PH];
+  // Only when we put the number back: the field's owner may have recorded the
+  // empty box as a zero on the way through.
+  if (restored) { try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch (err) {} }
+}, true);
 
 document.getElementById('resetBtn').onclick = () => {
   UI.closeMenu();
@@ -10373,6 +10437,27 @@ UI.initMenu();
 Cloud.boot();   // never throws; resolves to a no-op when signed out or offline
 
 // === WHAT'S NEW / VERSION CHECK ===
+
+/**
+ * Compare two dotted versions segment by segment: -1, 0 or 1.
+ *
+ * This used to be parseFloat, which reads "7.10" as 7.1 — so 7.10 would have
+ * compared EQUAL to 7.1 and LESS than 7.9, and What's New would have silently
+ * stopped appearing for everyone at exactly this release. The failure is
+ * invisible: no error, no missing screen to notice, just notes that quietly
+ * never show again.
+ *
+ * A missing segment counts as zero, so "8" and "8.0" are the same version.
+ */
+function cmpVersion(a, b) {
+  const pa = String(a == null ? '' : a).split('.');
+  const pb = String(b == null ? '' : b).split('.');
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = parseInt(pa[i], 10) || 0, y = parseInt(pb[i], 10) || 0;
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
 function showWhatsNew() {
   const storedVersion = localStorage.getItem(VERSION_KEY);
   if (!storedVersion) {
@@ -10380,12 +10465,12 @@ function showWhatsNew() {
     localStorage.setItem(VERSION_KEY, APP_VERSION);
     return;
   }
-  if (parseFloat(storedVersion) >= parseFloat(APP_VERSION)) return; // Same or newer, nothing new
+  if (cmpVersion(storedVersion, APP_VERSION) >= 0) return; // Same or newer, nothing new
 
   // Older version — collect all notes the user hasn't seen
   const allNotes = [];
-  Object.keys(RELEASE_NOTES).sort((a,b) => parseFloat(a) - parseFloat(b)).forEach(v => {
-    if (parseFloat(v) > parseFloat(storedVersion)) allNotes.push(...RELEASE_NOTES[v]);
+  Object.keys(RELEASE_NOTES).sort(cmpVersion).forEach(v => {
+    if (cmpVersion(v, storedVersion) > 0) allNotes.push(...RELEASE_NOTES[v]);
   });
   if (!allNotes.length) {
     localStorage.setItem(VERSION_KEY, APP_VERSION);
