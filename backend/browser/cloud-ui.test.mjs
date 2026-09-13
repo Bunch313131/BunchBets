@@ -9,11 +9,12 @@ const check = (label, got, want) => {
   console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${label}` + (ok ? '' : `\n          got ${JSON.stringify(got)}  want ${JSON.stringify(want)}`));
 };
 
-async function openApp(page) {
+async function openApp(page, beforeMenu) {
   await page.goto(ORIGIN + '/index.html', { waitUntil: 'domcontentloaded' });
   await page.evaluate(() => localStorage.setItem('bunchbets-installed', 'true'));
   await page.goto(ORIGIN + '/index.html', { waitUntil: 'load' });
   await page.waitForTimeout(900);
+  if (beforeMenu) await beforeMenu();
   await page.evaluate(() => {
     const w = document.getElementById('wizardOverlay'); if (w) w.remove();
     const n = document.querySelector('.whats-new-overlay'); if (n) n.remove();
@@ -27,7 +28,20 @@ console.log('BETA (localhost is treated as beta)\n');
 {
   const page = await browser.newPage({ viewport: { width: 420, height: 900 } });
   const errs = []; page.on('pageerror', (e) => errs.push(e.message));
-  await openApp(page);
+  // The real promise is that a launch costs nothing for someone who never opens
+  // the account panel. Check that BEFORE the menu, because opening it warms the
+  // SDK on purpose — the popup has to open inside the user gesture (doc 17).
+  let atLaunch = null;
+  await openApp(page, async () => {
+    atLaunch = await page.evaluate(() => ({
+      authSdk: !!document.querySelector('script[src*="firebase-auth-compat"]'),
+      fsSdk: !!document.querySelector('script[src*="firebase-firestore-compat"]'),
+      bb: typeof window.BB,
+    }));
+  });
+  check('launch fetches no auth SDK', atLaunch.authSdk, false);
+  check('launch fetches no firestore SDK', atLaunch.fsSdk, false);
+  check('launch does not import the cloud module', atLaunch.bb, 'undefined');
 
   const acct = await page.evaluate(() => {
     const el = document.getElementById('menuAccount');
@@ -42,18 +56,19 @@ console.log('BETA (localhost is treated as beta)\n');
   check('account panel is present', acct.exists, true);
   check('and visible on beta', acct.hidden, false);
   check('titled Account', acct.title, 'Account');
-  check('offers Google sign-in', acct.button, 'Sign in with Google');
+  check('offers Google sign-in', /Sign in with Google|Preparing sign-in/.test(acct.button || ''), true);
   check('says it is optional', /Optional/.test(acct.note || ''), true);
 
-  // Nothing should have been fetched for a signed-out user who never taps it.
-  const loaded = await page.evaluate(() => ({
-    authSdk: !!document.querySelector('script[src*="firebase-auth-compat"]'),
-    fsSdk: !!document.querySelector('script[src*="firebase-firestore-compat"]'),
-    bb: typeof window.BB,
+  // Opening the panel asks for the SDK — but Chromium here has no route to
+  // gstatic, so it cannot arrive. Assert only that the request was made; whether
+  // warming actually completes is cloud-popup.test.mjs's job, since that one
+  // serves the SDK through route interception.
+  const warmed = await page.evaluate(() => ({
+    asked: !!document.querySelector('script[src*="firebase-auth-compat"]'),
+    btn: (document.getElementById('cloudSignIn') || {}).textContent,
   }));
-  check('auth SDK NOT loaded when signed out', loaded.authSdk, false);
-  check('firestore SDK NOT loaded when signed out', loaded.fsSdk, false);
-  check('cloud module not imported either', loaded.bb, 'undefined');
+  check('opening the panel asks for the SDK', warmed.asked, true);
+  check('button stays disabled while it cannot arrive', warmed.btn, 'Preparing sign-in\u2026');
 
   // The rest of the app must be untouched.
   const app = await page.evaluate(() => ({
@@ -121,9 +136,3 @@ console.log('\nPRODUCTION (bunchbets.com — must be completely dark)\n');
 console.log(fail ? `\n${fail} FAILURES` : '\nall checks passed');
 await browser.close();
 process.exit(fail ? 1 : 0);
-
-/*
- * Run with the repo served over http (a module import needs a real origin):
- *   python3 -m http.server 8130   # from the repo root
- *   node backend/browser/cloud-ui.test.mjs
- */

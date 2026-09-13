@@ -922,31 +922,15 @@ const Cloud = {
   /** Called once at startup. Never throws. */
   async boot() {
     if (!CLOUD_ENABLED) return;
-    let flag = false, fbFlag = false, session = false;
-    try { flag = localStorage.getItem(CLOUD_REDIRECT_KEY) === '1'; } catch (e) {}
-    fbFlag = this.firebasePending();
-    session = this.hasSession();
-
-    if (!flag && !fbFlag && !session) { this.render(); return; }
-    this.diag('boot ourFlag=' + flag + ' fbFlag=' + fbFlag + ' session=' + session);
+    // Sign-in is popup-only now, so there is no redirect to finish. The only
+    // reason to pay for the SDK on a cold start is an existing session; anything
+    // else waits until the account panel is opened.
+    try { localStorage.removeItem(CLOUD_REDIRECT_KEY); } catch (e) {}
+    if (!this.hasSession()) { this.render(); return; }
+    this.diag('boot restoring session');
     try {
-      const api = await this.load();
+      await this.load();
       this.diag('sdk loaded');
-      if (flag || fbFlag) {
-        const res = await api.completeRedirect();
-        // Only now is it safe to forget: clearing before this resolved meant a
-        // reload mid-flight lost the handshake entirely.
-        try { localStorage.removeItem(CLOUD_REDIRECT_KEY); } catch (e) {}
-        if (res && res.error) {
-          this.diag('result ERROR ' + (res.error.code || res.error.message));
-          this.status = 'Sign-in failed: ' + (res.error.code || res.error.message);
-        } else if (res && res.user) {
-          this.diag('result OK ' + res.user.email);
-        } else {
-          this.diag('result EMPTY - Google sent nothing back');
-          this.status = 'Google did not send the sign-in back. See diagnostics below.';
-        }
-      }
     } catch (e) {
       console.log('[cloud] boot failed:', e && e.message);
       this.diag('boot threw ' + (e && (e.code || e.message)));
@@ -955,31 +939,41 @@ const Cloud = {
     this.render();
   },
 
-  async signIn() {
-    if (this.busy) return;
-    this.busy = true; this.status = 'Opening Google…'; this.render();
-    try {
-      const api = await this.load();
-      // Redirect is the verified-working path on an installed iOS PWA (doc 06);
-      // popup is smoother on desktop. The flag survives the round trip so the
-      // next load knows to pay for the SDK and finish the handshake.
-      const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-      const ua = navigator.userAgent || '';
-      const useRedirect = standalone || /iPad|iPhone|iPod/.test(ua) || (ua.indexOf('Mac') !== -1 && 'ontouchend' in document);
-      if (useRedirect) {
-        try { localStorage.setItem(CLOUD_REDIRECT_KEY, '1'); } catch (e) {}
-        this.diag('redirect start standalone=' + standalone);
-        await api.signInWithGoogle({ redirect: true });
-        return;   // the page is on its way out
-      }
-      this.diag('popup start');
-      await api.signInWithGoogle({ redirect: false });
+  /**
+   * POPUP, always. signInWithRedirect cannot work from this origin: Safari
+   * partitions the auth domain's storage, so the credential never comes back and
+   * — worse — nothing errors (doc 17). Popup passes the credential by
+   * postMessage between windows and does not touch partitioned storage.
+   *
+   * window.open is only permitted inside a live user gesture, so this must NOT
+   * await anything before calling it. The SDK is warmed up when the panel renders
+   * and the button stays disabled until it is ready; by the time it can be
+   * tapped, `this.api` is already in hand and the popup opens synchronously.
+   */
+  signIn() {
+    if (this.busy || !this.api) return;
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    this.diag('popup start standalone=' + standalone);
+    this.busy = true; this.status = 'Waiting for Google…'; this.render();
+
+    this.api.signInWithGoogle({ redirect: false }).then(() => {
+      this.diag('popup ok');
       this.status = '';
-    } catch (e) {
-      try { localStorage.removeItem(CLOUD_REDIRECT_KEY); } catch (e2) {}
-      this.status = 'Sign-in failed: ' + (e.code || e.message);
-    }
-    this.busy = false; this.render();
+      this.busy = false;
+      this.render();          // onUserChanged also fires and pulls the profile
+    }).catch((e) => {
+      const code = (e && e.code) || (e && e.message) || 'unknown';
+      this.diag('popup failed ' + code);
+      // A blocked popup is the one failure worth explaining rather than just
+      // reporting, because the user can do something about it.
+      this.status = /popup-blocked|popup_blocked/.test(code)
+        ? 'Your browser blocked the sign-in window. Allow pop-ups for this site and try again.'
+        : /cancelled|closed-by-user/.test(code)
+          ? 'Sign-in cancelled.'
+          : 'Sign-in failed: ' + code;
+      this.busy = false;
+      this.render();
+    });
   },
 
   async signOut() {
@@ -1039,6 +1033,18 @@ const Cloud = {
     if (c) c.onclick = () => Cloud.diagClear();
   },
 
+  /**
+   * Called when the menu opens. The tap that follows has to open a window
+   * synchronously — it cannot do that if it must first wait for half a megabyte
+   * of Firebase — so the SDK is fetched now and the button stays disabled until
+   * it lands. Deliberately NOT in render(): boot() renders too, and a signed-out
+   * launch should still cost nothing.
+   */
+  warm() {
+    if (!CLOUD_ENABLED || this.api || this._loading) return;
+    this.load().then(() => this.render()).catch(() => this.render());
+  },
+
   render() {
     const el = document.getElementById('menuAccount');
     if (!el) return;
@@ -1048,9 +1054,11 @@ const Cloud = {
     const note = this.status ? '<div class="cloud-note">' + esc(this.status) + '</div>' : '';
 
     if (!this.user) {
+      const ready = !!this.api;
       el.innerHTML =
         '<div class="menu-section-title">Account</div>' +
-        '<button class="menu-item primary" id="cloudSignIn"' + (this.busy ? ' disabled' : '') + '>Sign in with Google</button>' +
+        '<button class="menu-item primary" id="cloudSignIn"' + (ready && !this.busy ? '' : ' disabled') + '>' +
+        (this.busy ? 'Waiting for Google\u2026' : ready ? 'Sign in with Google' : 'Preparing sign-in\u2026') + '</button>' +
         '<div class="cloud-note">Optional. Signing in saves your rounds and unlocks group stats \u2014 scoring works exactly the same without it.</div>' +
         note;
       const b = document.getElementById('cloudSignIn');
@@ -5189,7 +5197,7 @@ const UI = {
     document.getElementById('menuOverlay').classList.add('open');
     document.getElementById('slideMenu').classList.add('open');
     document.body.style.overflow = 'hidden';
-    try { Cloud.render(); } catch (e) {}
+    try { Cloud.warm(); Cloud.render(); } catch (e) {}
   },
 
   closeMenu() {
