@@ -711,9 +711,13 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.7';
+const APP_VERSION = '7.8';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.8': [
+    'Fixed: re-filing a round after linking a name left the old entry behind, which doubled that player in the standings',
+    'Tyler Bryan added to the group',
+  ],
   '7.7': [
     'Standings — season money and scoring averages for your group, from every round anyone has saved',
     'Money is only ever counted inside one group, because that is who you actually settled with',
@@ -882,7 +886,18 @@ const Cloud = {
     this._loading = (async () => {
       await self.loadScript(CLOUD_SDK + 'firebase-auth-compat.js');
       await self.loadScript(CLOUD_SDK + 'firebase-firestore-compat.js');
-      const mod = await import('./js/cloud.js');
+      // ?v= is load-bearing, not decoration.
+      //
+      // js/cloud.js is the only shipped file the release ritual did not cover.
+      // index.html is fetched network-first so a new build arrives immediately;
+      // this module is a same-origin asset served CACHE-FIRST, refreshed only in
+      // the background. A fix to it therefore does nothing for a whole launch,
+      // with no symptom — which is exactly how a corrected saveRound sat unused
+      // on a phone while it went on writing the bug it had fixed.
+      //
+      // Pinning the URL to APP_VERSION makes the module miss on every release,
+      // at the HTTP layer as well as the service worker's.
+      const mod = await import('./js/cloud.js?v=' + APP_VERSION);
       const api = mod.default;
       api.init(FIREBASE_CONFIG);
       api.onUserChanged((user) => {

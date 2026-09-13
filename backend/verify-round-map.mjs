@@ -222,5 +222,25 @@ console.log('\na failed alias write must not be reported as linked\n');
   check('the name still resolves to nobody', C.golferIdFor('Bunch'), null);
 }
 
+/**
+ * js/cloud.js is the only shipped file the release ritual did not cover.
+ *
+ * index.html is fetched network-first, so a new build lands immediately. The
+ * module is a same-origin asset served CACHE-FIRST and refreshed only in the
+ * background, so a fix to it does nothing for a whole launch and says nothing
+ * about it — which is how a corrected saveRound sat unused on a phone while the
+ * old one went on writing the bug it had fixed.
+ *
+ * Static check on purpose: the invariant is in the source, and a runtime test
+ * would need a service worker and two launches to observe it.
+ */
+console.log('\nthe cloud module is pinned to the release\n');
+{
+  const m = src.match(/import\('\.\/js\/cloud\.js([^']*)'\s*(\+\s*APP_VERSION)?\)/);
+  check('index.html imports the module', !!m, true);
+  check('  with a cache-busting query', !!(m && /\?v=$/.test(m[1])), true);
+  check('  tied to APP_VERSION, not a literal', !!(m && m[2]), true);
+}
+
 console.log(fail ? `\n${fail} FAILURES` : '\nall checks passed');
 process.exit(fail ? 1 : 0);
