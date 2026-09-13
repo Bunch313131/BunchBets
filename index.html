@@ -830,7 +830,7 @@ const CLOUD_DIAG_KEY = 'bb-cloud-diag';
  */
 const Cloud = {
   api: null, user: null, userDoc: null, golfer: null,
-  groups: [], invites: [], status: '', busy: false,
+  groups: [], invites: [], status: '', busy: false, settling: false,
   _loading: null,
 
   loadScript(src) {
@@ -857,7 +857,9 @@ const Cloud = {
       const api = mod.default;
       api.init(FIREBASE_CONFIG);
       api.onUserChanged((user) => {
+        self.diag('authState ' + (user ? 'USER ' + user.email : 'null'));
         self.user = user;
+        self.settling = false;
         if (user) self.refreshProfile();
         else { self.userDoc = null; self.golfer = null; self.groups = []; self.invites = []; self.render(); }
       });
@@ -958,9 +960,23 @@ const Cloud = {
 
     this.api.signInWithGoogle({ redirect: false }).then(() => {
       this.diag('popup ok');
-      this.status = '';
+      // Do NOT drop back to the signed-out panel here. The popup resolves before
+      // onAuthStateChanged has finished awaiting ensureUserDoc(), so rendering
+      // now paints "Sign in with Google" straight over a successful sign-in —
+      // which looks exactly like a failure and invites a second attempt.
       this.busy = false;
-      this.render();          // onUserChanged also fires and pulls the profile
+      this.settling = true;
+      this.status = '';
+      this.render();
+      // If auth never settles, say so rather than sitting on a spinner forever.
+      setTimeout(() => {
+        if (this.settling && !this.user) {
+          this.diag('authState NEVER FIRED after popup');
+          this.settling = false;
+          this.status = 'Signed in with Google, but the app never got the session back.';
+          this.render();
+        }
+      }, 12000);
     }).catch((e) => {
       const code = (e && e.code) || (e && e.message) || 'unknown';
       this.diag('popup failed ' + code);
@@ -972,6 +988,7 @@ const Cloud = {
           ? 'Sign-in cancelled.'
           : 'Sign-in failed: ' + code;
       this.busy = false;
+      this.settling = false;
       this.render();
     });
   },
@@ -983,17 +1000,25 @@ const Cloud = {
     this.render();
   },
 
+  /**
+   * Each await is breadcrumbed separately. A single "profile failed" tells you
+   * nothing about WHICH of five round trips died, and this chain is invisible
+   * from a phone.
+   */
   async refreshProfile() {
-    if (!this.api || !this.user) return;
+    if (!this.api || !this.user) { this.diag('profile skipped api=' + !!this.api + ' user=' + !!this.user); return; }
+    let step = 'start';
     try {
-      await this.api.ensureUserDoc();
-      this.userDoc = await this.api.myUserDoc();
-      this.golfer = await this.api.myGolfer();
-      this.groups = await this.api.myGroups();
-      this.invites = await this.api.pendingInvites();
+      step = 'ensureUserDoc';   await this.api.ensureUserDoc();
+      step = 'myUserDoc';       this.userDoc = await this.api.myUserDoc();
+      step = 'myGolfer';        this.golfer = await this.api.myGolfer();
+      step = 'myGroups';        this.groups = await this.api.myGroups();
+      step = 'pendingInvites';  this.invites = await this.api.pendingInvites();
       this.status = '';
+      this.diag('profile ok invites=' + this.invites.length + ' groups=' + this.groups.length);
     } catch (e) {
-      this.status = 'Could not reach your profile: ' + (e.code || e.message);
+      this.diag('profile FAILED at ' + step + ': ' + (e.code || e.message));
+      this.status = 'Could not load your profile (' + step + '): ' + (e.code || e.message);
     }
     this.render();
   },
@@ -1055,10 +1080,13 @@ const Cloud = {
 
     if (!this.user) {
       const ready = !!this.api;
+      const label = this.busy ? 'Waiting for Google\u2026'
+        : this.settling ? 'Signing you in\u2026'
+        : ready ? 'Sign in with Google' : 'Preparing sign-in\u2026';
       el.innerHTML =
         '<div class="menu-section-title">Account</div>' +
-        '<button class="menu-item primary" id="cloudSignIn"' + (ready && !this.busy ? '' : ' disabled') + '>' +
-        (this.busy ? 'Waiting for Google\u2026' : ready ? 'Sign in with Google' : 'Preparing sign-in\u2026') + '</button>' +
+        '<button class="menu-item primary" id="cloudSignIn"' + (ready && !this.busy && !this.settling ? '' : ' disabled') + '>' +
+        label + '</button>' +
         '<div class="cloud-note">Optional. Signing in saves your rounds and unlocks group stats \u2014 scoring works exactly the same without it.</div>' +
         note;
       const b = document.getElementById('cloudSignIn');
