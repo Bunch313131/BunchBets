@@ -817,6 +817,7 @@ const LIVE_PATH = IS_BETA ? 'beta_games' : 'games';
 const CLOUD_ENABLED = IS_BETA;
 const CLOUD_SDK = 'https://www.gstatic.com/firebasejs/9.22.0/';
 const CLOUD_REDIRECT_KEY = 'bb-cloud-redirect';
+const CLOUD_DIAG_KEY = 'bb-cloud-diag';
 
 /**
  * The app's side of the bridge to js/cloud.js.
@@ -882,22 +883,73 @@ const Cloud = {
   },
 
   redirectPending() {
-    try { return localStorage.getItem(CLOUD_REDIRECT_KEY) === '1'; } catch (e) { return false; }
+    try { if (localStorage.getItem(CLOUD_REDIRECT_KEY) === '1') return true; } catch (e) {}
+    // Firebase leaves its own marker before it navigates away. Trust that too:
+    // if our flag is lost — different storage context, a clear, anything — the
+    // returning credential would otherwise be silently dropped on the floor.
+    return this.firebasePending();
+  },
+
+  firebasePending() {
+    try {
+      for (let i = 0; i < sessionStorage.length; i++) {
+        if ((sessionStorage.key(i) || '').indexOf('firebase:pendingRedirect') === 0) return true;
+      }
+    } catch (e) {}
+    return false;
+  },
+
+  // A home-screen app has no console and no address bar, so it cannot be
+  // debugged from the outside. It records what it saw instead, across the
+  // redirect, and shows it in the account panel.
+  diag(msg) {
+    try {
+      const log = JSON.parse(localStorage.getItem(CLOUD_DIAG_KEY) || '[]');
+      log.push(new Date().toTimeString().slice(0, 8) + '  ' + msg);
+      localStorage.setItem(CLOUD_DIAG_KEY, JSON.stringify(log.slice(-10)));
+    } catch (e) {}
+  },
+
+  diagRead() {
+    try { return JSON.parse(localStorage.getItem(CLOUD_DIAG_KEY) || '[]'); } catch (e) { return []; }
+  },
+
+  diagClear() {
+    try { localStorage.removeItem(CLOUD_DIAG_KEY); } catch (e) {}
+    this.render();
   },
 
   /** Called once at startup. Never throws. */
   async boot() {
     if (!CLOUD_ENABLED) return;
-    if (!this.redirectPending() && !this.hasSession()) { this.render(); return; }
+    let flag = false, fbFlag = false, session = false;
+    try { flag = localStorage.getItem(CLOUD_REDIRECT_KEY) === '1'; } catch (e) {}
+    fbFlag = this.firebasePending();
+    session = this.hasSession();
+
+    if (!flag && !fbFlag && !session) { this.render(); return; }
+    this.diag('boot ourFlag=' + flag + ' fbFlag=' + fbFlag + ' session=' + session);
     try {
       const api = await this.load();
-      if (this.redirectPending()) {
-        try { localStorage.removeItem(CLOUD_REDIRECT_KEY); } catch (e) {}
+      this.diag('sdk loaded');
+      if (flag || fbFlag) {
         const res = await api.completeRedirect();
-        if (res && res.error) this.status = 'Sign-in failed: ' + (res.error.code || res.error.message);
+        // Only now is it safe to forget: clearing before this resolved meant a
+        // reload mid-flight lost the handshake entirely.
+        try { localStorage.removeItem(CLOUD_REDIRECT_KEY); } catch (e) {}
+        if (res && res.error) {
+          this.diag('result ERROR ' + (res.error.code || res.error.message));
+          this.status = 'Sign-in failed: ' + (res.error.code || res.error.message);
+        } else if (res && res.user) {
+          this.diag('result OK ' + res.user.email);
+        } else {
+          this.diag('result EMPTY - Google sent nothing back');
+          this.status = 'Google did not send the sign-in back. See diagnostics below.';
+        }
       }
     } catch (e) {
       console.log('[cloud] boot failed:', e && e.message);
+      this.diag('boot threw ' + (e && (e.code || e.message)));
       this.status = 'Cloud unavailable offline';
     }
     this.render();
@@ -916,9 +968,11 @@ const Cloud = {
       const useRedirect = standalone || /iPad|iPhone|iPod/.test(ua) || (ua.indexOf('Mac') !== -1 && 'ontouchend' in document);
       if (useRedirect) {
         try { localStorage.setItem(CLOUD_REDIRECT_KEY, '1'); } catch (e) {}
+        this.diag('redirect start standalone=' + standalone);
         await api.signInWithGoogle({ redirect: true });
         return;   // the page is on its way out
       }
+      this.diag('popup start');
       await api.signInWithGoogle({ redirect: false });
       this.status = '';
     } catch (e) {
@@ -970,6 +1024,21 @@ const Cloud = {
     this.busy = false; this.render();
   },
 
+  renderDiag(el, esc) {
+    const lines = this.diagRead();
+    if (!lines.length) return;
+    const box = document.createElement('div');
+    box.className = 'cloud-note';
+    box.innerHTML = '<b>Sign-in diagnostics</b><br>' +
+      '<span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;line-height:1.6;">' +
+      lines.map(esc).join('<br>') + '</span>' +
+      '<br><button id="cloudDiagClear" style="margin-top:6px;background:none;border:1px solid var(--border);' +
+      'border-radius:6px;color:var(--muted);font-size:11px;padding:4px 8px;cursor:pointer;">Clear</button>';
+    el.appendChild(box);
+    const c = box.querySelector('#cloudDiagClear');
+    if (c) c.onclick = () => Cloud.diagClear();
+  },
+
   render() {
     const el = document.getElementById('menuAccount');
     if (!el) return;
@@ -986,6 +1055,7 @@ const Cloud = {
         note;
       const b = document.getElementById('cloudSignIn');
       if (b) b.onclick = () => Cloud.signIn();
+      this.renderDiag(el, esc);
       return;
     }
 
@@ -1011,6 +1081,7 @@ const Cloud = {
       invites + note +
       '<button class="menu-item" id="cloudSignOut">Sign out</button>';
 
+    this.renderDiag(el, esc);
     const out = document.getElementById('cloudSignOut');
     if (out) out.onclick = () => Cloud.signOut();
     el.querySelectorAll('[data-invite]').forEach((btn) => {
