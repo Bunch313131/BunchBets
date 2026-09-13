@@ -682,9 +682,13 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.5';
+const APP_VERSION = '7.6';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.6': [
+    'Live sharing moved to the production database — everyone in a shared round needs this version, or you will not see each other',
+    'Tightened the live-sharing rules so a round can only be reached with its share code',
+  ],
   '7.5': [
     'KPs now require gross par — a stroke no longer wins a closest-to-the-pin',
     'If the closest player misses par there is no KP on that hole, and it carries to the next par 3',
