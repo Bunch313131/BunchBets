@@ -682,9 +682,14 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.4';
+const APP_VERSION = '7.5';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.5': [
+    'KPs now require gross par — a stroke no longer wins a closest-to-the-pin',
+    'If the closest player misses par there is no KP on that hole, and it carries to the next par 3',
+    'KP prompt now asks who hit it closest and shows each score — enter the closest player even if he missed',
+  ],
   '7.4': [
     'Bet math fix: only the most recent bet or press can start a new press — this changes some Nassau settlements',
     'Bet math fix: sweeps and quads now require a team to actually win all four KPs',
