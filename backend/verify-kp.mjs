@@ -33,7 +33,7 @@ const PAR3S = [2, 6, 11, 15];                          // holes 3, 7, 12, 16
 
 globalThis.State = { data: { course: { par: PAR }, startingHole: 0, games: [] } };
 
-const Game = eval('({' + grab('computeKP') + `,
+const Game = eval('({' + [grab('computeKP'), grab('kpTeamSplit')].join(',') + `,
   getPar3Holes() { return ${JSON.stringify(PAR3S)}; },
   courseHole(pos) { return pos; },
   strokes(g, pid, hole) { return (g.strokesCount && g.strokesCount[pid]) || 0; }
@@ -140,6 +140,72 @@ check('  next win collects both', r7.results[1].value, 4);
 // the dangling carry must kill the sweep. (Already covered by r1, restated as
 // the regression this whole thing exists to prevent.)
 check('dangling carry on the last par 3 kills the sweep', r1.hasSweeps, false);
+
+/**
+ * Splitting the KP bet into holes / sweeps / quads.
+ *
+ * The parts must add back to the single figure that was settled before the
+ * split existed, to the cent — this is a reporting change, not a rules change,
+ * and a rounding difference here would quietly move real money.
+ *
+ * It also matters which way up they are. The sweep bonus matches the hole
+ * money and the quad bonus matches holes plus sweep, so a quadded round pays
+ * FOUR times the par 3s. Showing that as one number is what made the 7.4
+ * sweeps bug survive as long as it did.
+ */
+console.log('\nsplitting KP from its bonuses\n');
+{
+  // The old expression, kept verbatim as the oracle.
+  const before = (kp, szA, szB) => {
+    if (kp.hasSweeps || kp.hasQuads) {
+      const signA = kp.sweepsTeam === 'A' ? 1 : -1;
+      return signA * kp.grandTotal * (kp.sweepsTeam === 'A' ? szB : szA);
+    }
+    if (kp.netA > 0) return kp.netA * szB;
+    if (kp.netA < 0) return kp.netA * szA;
+    return 0;
+  };
+
+  // Team A sweeps and quads all four par 3s at $4: holes 16, sweep 16, quad 32.
+  const swept = { hasSweeps: true, hasQuads: true, sweepsTeam: 'A',
+                  totalKPValue: 16, sweepsBonus: 16, quadsBonus: 32, grandTotal: 64, netA: 16 };
+  const s1 = Game.kpTeamSplit(swept, 2, 2);
+  check('holes, sweep and quad are separate', [s1.base, s1.sweeps, s1.quads], [32, 32, 64]);
+  check('  and add back to what was settled before', s1.total, before(swept, 2, 2));
+  check('  the bonuses are the larger half', Math.abs(s1.sweeps + s1.quads) > Math.abs(s1.base), true);
+
+  // Same round from the losing side.
+  const sweptB = { ...swept, sweepsTeam: 'B' };
+  const s2 = Game.kpTeamSplit(sweptB, 2, 2);
+  check('a sweep the other way is negative to A', s2.total < 0, true);
+  check('  and still reconciles', s2.total, before(sweptB, 2, 2));
+  check('  with every part signed the same way', [s2.base < 0, s2.sweeps < 0, s2.quads < 0], [true, true, true]);
+
+  // A sweep without a quad.
+  const sweepOnly = { hasSweeps: true, hasQuads: false, sweepsTeam: 'A',
+                      totalKPValue: 16, sweepsBonus: 16, quadsBonus: 0, grandTotal: 32, netA: 16 };
+  const s3 = Game.kpTeamSplit(sweepOnly, 2, 2);
+  check('no quad, no quad line', s3.quads, 0);
+  check('  and it reconciles', s3.total, before(sweepOnly, 2, 2));
+
+  // The ordinary round, which is most of them: KPs traded, nobody swept.
+  const plain = { hasSweeps: false, hasQuads: false, sweepsTeam: null,
+                  totalKPValue: 16, sweepsBonus: 0, quadsBonus: 0, grandTotal: 16, netA: 4 };
+  const s4 = Game.kpTeamSplit(plain, 2, 2);
+  check('an ordinary round is one line', [s4.sweeps, s4.quads], [0, 0]);
+  check('  showing the NET of the holes, not the gross pot', s4.base, 8);
+  check('  and reconciles', s4.total, before(plain, 2, 2));
+
+  // Uneven teams — 2 v 3 — where the multiplier is the side being paid.
+  const uneven = { ...swept };
+  const s5 = Game.kpTeamSplit(uneven, 2, 3);
+  check('uneven teams reconcile too', s5.total, before(uneven, 2, 3));
+
+  // Nothing at all.
+  const none = { hasSweeps: false, hasQuads: false, netA: 0, totalKPValue: 0, grandTotal: 0 };
+  check('no KP money is four zeros', Object.values(Game.kpTeamSplit(none, 2, 2)), [0, 0, 0, 0]);
+  check('and a missing kp object does not throw', Game.kpTeamSplit(null, 2, 2).total, 0);
+}
 
 console.log(fail ? `\n${fail} FAILURES` : '\nall checks passed');
 process.exit(fail ? 1 : 0);

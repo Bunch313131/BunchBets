@@ -715,9 +715,12 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.10';
+const APP_VERSION = '7.11';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.11': [
+    'Sweeps and quads are now their own lines everywhere KP money appears, instead of being folded into the KP figure',
+  ],
   '7.10': [
     'Picking a group member now fills in the handicap you last played him off',
     'Tapping a number clears the box and ghosts the old value behind it \u2014 no more iOS selection handles',
@@ -1934,6 +1937,29 @@ const History = {
     return labels[type] || type;
   },
 
+  /**
+   * The KP bet as its parts: holes won, then each bonus, per player.
+   *
+   * These used to arrive as one figure tagged "(Sweeps!)" — which says a bonus
+   * happened but not what it was worth, and the bonuses are the larger half. A
+   * sweep matches the hole money and a quad matches holes plus sweep, so a
+   * quadded round pays four times what the par 3s did. Reading that as a single
+   * number means the only way to check a settlement is to re-derive the
+   * multipliers by hand, which is how the 7.4 sweeps bug survived as long as it
+   * did.
+   *
+   * Zero parts are dropped so an ordinary round still shows one KP line.
+   */
+  kpParts(src, sz) {
+    const per = (v) => (v || 0) / (sz || 1);
+    const rows = [];
+    const base = per(src.kpBase != null ? src.kpBase : (src.kpValue != null ? src.kpValue : src.kp));
+    if (Math.abs(base) > 0.005) rows.push({ label: 'KP', amount: base });
+    if (Math.abs(per(src.kpSweeps)) > 0.005) rows.push({ label: 'Sweeps', amount: per(src.kpSweeps) });
+    if (Math.abs(per(src.kpQuads)) > 0.005) rows.push({ label: 'Quads', amount: per(src.kpQuads) });
+    return rows;
+  },
+
   show() {
     const rounds = this.load();
     const overlay = document.createElement('div');
@@ -2288,6 +2314,40 @@ const Game = {
     }
   },
 
+  /**
+   * KP money from Team A's perspective, split into what was won on the holes
+   * and what the bonuses added.
+   *
+   * The parts are exact: computeKP returns grandTotal as
+   * totalKPValue + sweepsBonus + quadsBonus, and the team-size multiplier
+   * applies to the whole figure, so applying it to each part and adding them
+   * back reproduces the old single number to the cent. Nothing is reapportioned.
+   *
+   * Sweeps and quads are worth more than the KPs themselves — a sweep matches
+   * the KP total and a quad matches KP plus sweep, so a quadded round is four
+   * times the hole money. Reporting that as one line means the only way to check
+   * a settlement is to re-derive the multipliers by hand.
+   */
+  kpTeamSplit(kp, szA, szB) {
+    const zero = { base: 0, sweeps: 0, quads: 0, total: 0 };
+    if (!kp) return zero;
+    if (kp.hasSweeps || kp.hasQuads) {
+      // One multiplier for the whole KP bet: the winning side is paid by each
+      // member of the losing side.
+      const mult = (kp.sweepsTeam === 'A' ? 1 : -1) * (kp.sweepsTeam === 'A' ? szB : szA);
+      const base = mult * (kp.totalKPValue || 0);
+      const sweeps = mult * (kp.sweepsBonus || 0);
+      const quads = mult * (kp.quadsBonus || 0);
+      return { base, sweeps, quads, total: base + sweeps + quads };
+    }
+    // No sweep: netA already nets the two sides' hole wins against each other,
+    // so there is nothing to split.
+    let total = 0;
+    if (kp.netA > 0) total = kp.netA * szB;
+    else if (kp.netA < 0) total = kp.netA * szA;
+    return { base: total, sweeps: 0, quads: 0, total };
+  },
+
   net(gross, strokes) {
     return (gross != null && isFinite(gross)) ? gross - (strokes||0) : null;
   },
@@ -2571,15 +2631,8 @@ const Game = {
 
     // KP values (match-specific closest-to-pin bets, including sweeps/quads)
     const kp = g.withJunk ? this.computeKP(g) : {netA:0, grandTotal:0, results:[], hasSweeps:false, hasQuads:false};
-    let kpTeam = 0;
-    if (kp.hasSweeps || kp.hasQuads) {
-      // Sweeps/quads: winning team gets grandTotal (already includes multipliers)
-      const signA = kp.sweepsTeam === 'A' ? 1 : -1;
-      kpTeam = signA * kp.grandTotal * (kp.sweepsTeam === 'A' ? szB : szA);
-    } else {
-      if (kp.netA > 0) kpTeam = kp.netA * szB;
-      else if (kp.netA < 0) kpTeam = kp.netA * szA;
-    }
+    const kpSplit = this.kpTeamSplit(kp, szA, szB);
+    const kpTeam = kpSplit.total;
 
     const total = front.teamPayA + back.teamPayA + overall.teamPayA + junkTeam + kpTeam;
 
@@ -2592,6 +2645,9 @@ const Game = {
         overall: overall.teamPayA,
         junk: junkTeam,
         kp: kpTeam,
+        kpBase: kpSplit.base,
+        kpSweeps: kpSplit.sweeps,
+        kpQuads: kpSplit.quads,
         total
       }
     };
@@ -2767,21 +2823,16 @@ const Game = {
     else if (junk.netA < 0) junkTeam = junk.netA * szA;
 
     const kp = g.withJunk ? this.computeKPThroughHole(g, maxHole) : {netA:0, grandTotal:0, results:[], hasSweeps:false, hasQuads:false};
-    let kpTeam = 0;
-    if (kp.hasSweeps || kp.hasQuads) {
-      const signA = kp.sweepsTeam === 'A' ? 1 : -1;
-      kpTeam = signA * kp.grandTotal * (kp.sweepsTeam === 'A' ? szB : szA);
-    } else {
-      if (kp.netA > 0) kpTeam = kp.netA * szB;
-      else if (kp.netA < 0) kpTeam = kp.netA * szA;
-    }
+    const kpSplit = this.kpTeamSplit(kp, szA, szB);
+    const kpTeam = kpSplit.total;
 
     const total = front.teamPayA + back.teamPayA + overall.teamPayA + junkTeam + kpTeam;
 
     return {
       segments: {front, back, overall},
       junk, kp,
-      teamTotals: { front: front.teamPayA, back: back.teamPayA, overall: overall.teamPayA, junk: junkTeam, kp: kpTeam, total }
+      teamTotals: { front: front.teamPayA, back: back.teamPayA, overall: overall.teamPayA, junk: junkTeam,
+                    kp: kpTeam, kpBase: kpSplit.base, kpSweeps: kpSplit.sweeps, kpQuads: kpSplit.quads, total }
     };
   },
 
@@ -2812,18 +2863,13 @@ const Game = {
     else if (junk.netA < 0) junkTeam = junk.netA * szA;
 
     const kp = g.withJunk ? this.computeKPThroughHole(g, maxHole) : {netA:0, grandTotal:0, results:[], hasSweeps:false, hasQuads:false};
-    let kpTeam = 0;
-    if (kp.hasSweeps || kp.hasQuads) {
-      const signA = kp.sweepsTeam === 'A' ? 1 : -1;
-      kpTeam = signA * kp.grandTotal * (kp.sweepsTeam === 'A' ? szB : szA);
-    } else {
-      if (kp.netA > 0) kpTeam = kp.netA * szB;
-      else if (kp.netA < 0) kpTeam = kp.netA * szA;
-    }
+    const kpSplit = this.kpTeamSplit(kp, szA, szB);
+    const kpTeam = kpSplit.total;
 
     return {
       holeDetails, frontPoints, backPoints, frontValue, backValue,
       junkValue: junkTeam, kpValue: kpTeam, kp,
+      kpBase: kpSplit.base, kpSweeps: kpSplit.sweeps, kpQuads: kpSplit.quads,
       totalValue: frontValue + backValue + junkTeam + kpTeam
     };
   },
@@ -3106,14 +3152,8 @@ const Game = {
 
     // KP values
     const kp = g.withJunk ? this.computeKP(g) : {netA:0, grandTotal:0, results:[], hasSweeps:false, hasQuads:false};
-    let kpTeam = 0;
-    if (kp.hasSweeps || kp.hasQuads) {
-      const signA = kp.sweepsTeam === 'A' ? 1 : -1;
-      kpTeam = signA * kp.grandTotal * (kp.sweepsTeam === 'A' ? szB : szA);
-    } else {
-      if (kp.netA > 0) kpTeam = kp.netA * szB;
-      else if (kp.netA < 0) kpTeam = kp.netA * szA;
-    }
+    const kpSplit = this.kpTeamSplit(kp, szA, szB);
+    const kpTeam = kpSplit.total;
 
     return {
       holeDetails,
@@ -3123,6 +3163,7 @@ const Game = {
       backValue,
       junkValue: junkTeam,
       kpValue: kpTeam,
+      kpBase: kpSplit.base, kpSweeps: kpSplit.sweeps, kpQuads: kpSplit.quads,
       kp,
       totalValue: frontValue + backValue + junkTeam + kpTeam
     };
@@ -7858,13 +7899,14 @@ const UI = {
               const frontPP = result.frontPoints * (g.pointValue.front || 0);
               const backPP = result.backPoints * (g.pointValue.back || 0);
               const junkPP = result.junkValue / sz;
-              const kpPP = result.kpValue / sz;
               const totalPP = result.totalValue / sz;
               return [
                 h('div',{class:'muted'},'Front: ' + (result.frontPoints>0?'+':'') + result.frontPoints + ' pts = ' + Utils.fmt(frontPP) + '/ea'),
                 h('div',{class:'muted',style:'margin-top:4px;'},'Back: ' + (result.backPoints>0?'+':'') + result.backPoints + ' pts = ' + Utils.fmt(backPP) + '/ea'),
                 h('div',{class:'muted',style:'margin-top:4px;'},'Junk: ' + Utils.fmt(junkPP) + '/ea'),
-                result.kpValue !== 0 ? h('div',{class:'muted',style:'margin-top:4px;color:var(--warning);'},'KP: ' + Utils.fmt(kpPP) + '/ea' + (result.kp.hasSweeps ? ' (Sweeps!)' : '') + (result.kp.hasQuads ? ' (Quads!)' : '')) : null,
+                ...UI.kpParts(result, sz).map((r) =>
+                  h('div',{class:'muted',style:'margin-top:4px;color:var(--warning);'},
+                    r.label + ': ' + Utils.fmt(r.amount) + '/ea')),
                 h('div',{style:'margin-top:8px;font-weight:700;'},'Total: ' + Utils.fmt(totalPP) + '/ea')
               ];
             })())
@@ -8157,7 +8199,6 @@ const UI = {
             (() => {
               const sz = (g.teamA||[]).length || 1;
               const junkPP = result.junkValue / sz;
-              const kpPP = result.kpValue / sz;
               const totalPP = result.totalValue / sz;
               return h('div',{},[
                 h('div',{class:'card',style:'margin-top:12px;'},[
@@ -8165,10 +8206,11 @@ const UI = {
                     h('div',{class:'muted'},'Junk:'),
                     h('div',{style:'font-weight:600;'},Utils.fmt(junkPP) + '/ea')
                   ]),
-                  result.kpValue !== 0 ? h('div',{class:'row',style:'justify-content:space-between;margin-top:4px;'},[
-                    h('div',{class:'muted',style:'color:var(--warning);'},'KP:'),
-                    h('div',{style:'font-weight:600;color:var(--warning);'},Utils.fmt(kpPP) + '/ea' + (result.kp.hasSweeps ? ' (Sweeps!)' : '') + (result.kp.hasQuads ? ' (Quads!)' : ''))
-                  ]) : null
+                  ...UI.kpParts(result, sz).map((r) =>
+                    h('div',{class:'row',style:'justify-content:space-between;margin-top:4px;'},[
+                      h('div',{class:'muted',style:'color:var(--warning);'},r.label + ':'),
+                      h('div',{style:'font-weight:600;color:var(--warning);'},Utils.fmt(r.amount) + '/ea')
+                    ]))
                 ].filter(Boolean)),
                 h('div',{class:'card',style:'margin-top:12px;background:linear-gradient(135deg,rgba(59,130,246,0.1),rgba(22,163,74,0.1));'},[
                   h('div',{class:'row',style:'justify-content:space-between;align-items:center;'},[
@@ -8678,12 +8720,12 @@ const UI = {
           (() => {
             const sz = (g.teamA||[]).length || 1;
             const junkPP = res.teamTotals.junk / sz;
-            const kpPP = res.teamTotals.kp / sz;
             const totalPP = res.teamTotals.total / sz;
             return h('div',{},[
               h('div',{class:'card',style:'margin-top:8px;'},[
                 h('div',{class:'pill'},`Junk: ${Utils.fmt(junkPP)}/ea`),
-                res.teamTotals.kp !== 0 ? h('div',{class:'pill',style:'margin-top:4px;'},`KP: ${Utils.fmt(kpPP)}/ea`) : null
+                ...UI.kpParts(res.teamTotals, sz).map((r) =>
+                  h('div',{class:'pill',style:'margin-top:4px;'},`${r.label}: ${Utils.fmt(r.amount)}/ea`))
               ].filter(Boolean)),
 
               // Total
@@ -9145,7 +9187,7 @@ const UI = {
           lines.push(`  Front:   ${Utils.fmt(res.frontPoints * (g.pointValue.front||0))}/ea`);
           lines.push(`  Back:    ${Utils.fmt(res.backPoints * (g.pointValue.back||0))}/ea`);
           lines.push(`  Junk:    ${Utils.fmt(res.junkValue / sz)}/ea`);
-          if (res.kpValue !== 0) lines.push(`  KP:      ${Utils.fmt(res.kpValue / sz)}/ea${res.kp.hasSweeps ? ' (Sweeps!)' : ''}${res.kp.hasQuads ? ' (Quads!)' : ''}`);
+          UI.kpParts(res, sz).forEach((r) => lines.push(`  ${(r.label + ':').padEnd(8)} ${Utils.fmt(r.amount)}/ea`));
           lines.push(`  Total:   ${Utils.fmt(res.totalValue / sz)}/ea`);
         } else if (g.gameType === 'skins') {
           const res = Game.computeSkinsResult(g);
@@ -9171,7 +9213,7 @@ const UI = {
           lines.push(`  Back:    ${Utils.fmt(res.segments.back.payA)}/ea`);
           lines.push(`  Overall: ${Utils.fmt(res.segments.overall.payA)}/ea`);
           lines.push(`  Junk:    ${Utils.fmt(res.teamTotals.junk / sz)}/ea`);
-          if (res.teamTotals.kp !== 0) lines.push(`  KP:      ${Utils.fmt(res.teamTotals.kp / sz)}/ea${res.kp.hasSweeps ? ' (Sweeps!)' : ''}${res.kp.hasQuads ? ' (Quads!)' : ''}`);
+          UI.kpParts(res.teamTotals, sz).forEach((r) => lines.push(`  ${(r.label + ':').padEnd(8)} ${Utils.fmt(r.amount)}/ea`));
           lines.push(`  Total:   ${Utils.fmt(res.teamTotals.total / sz)}/ea`);
         }
         lines.push('');
@@ -9337,7 +9379,7 @@ const UI = {
           ];
           const extras = [];
           if (Math.abs(res.teamTotals.junk/sz) > 0.005) extras.push(`Junk: ${sfmt(res.teamTotals.junk/sz)}/ea`);
-          if (Math.abs(res.teamTotals.kp/sz) > 0.005) extras.push(`KP: ${sfmt(res.teamTotals.kp/sz)}/ea`);
+          this.kpParts(res.teamTotals, sz).forEach((r) => extras.push(`${r.label}: ${sfmt(r.amount)}/ea`));
           if (extras.length) segLines.push(extras);
           segLines.push([`Total: ${sfmt(res.teamTotals.total/sz)}/ea`]);
           gameLines.push({ label: 'Nassau', type: 'team', teamLabel, segmentLines: segLines });
