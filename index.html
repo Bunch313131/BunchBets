@@ -309,6 +309,7 @@ body.is-beta header { box-shadow: inset 0 3px 0 #dc2626; }
 .cloud-id .sub { color:var(--muted); font-size:12px; }
 .cloud-invite { margin:4px 12px 8px; padding:10px 12px; border:1px solid var(--acc); border-radius:10px; font-size:13px; line-height:1.45; }
 .cloud-invite button { margin-top:8px; width:100%; padding:9px; border-radius:8px; border:none; background:var(--acc); color:#fff; font-weight:700; font-size:13px; cursor:pointer; }
+.cloud-backup { margin-top:8px; padding:7px 12px; border-radius:8px; border:1px solid var(--acc); background:none; color:var(--acc); font-weight:700; font-size:12px; cursor:pointer; }
 
 /* Wizard Styles */
 .wizard-overlay { position:fixed; top:calc(-1 * env(safe-area-inset-top, 0px)); left:0; right:0; bottom:calc(-1 * env(safe-area-inset-bottom, 0px)); z-index:200; display:flex; flex-direction:column; overflow:hidden; background:#000; padding-top:env(safe-area-inset-top, 0px); padding-bottom:env(safe-area-inset-bottom, 0px); }
@@ -830,7 +831,8 @@ const CLOUD_DIAG_KEY = 'bb-cloud-diag';
  */
 const Cloud = {
   api: null, user: null, userDoc: null, golfer: null,
-  groups: [], invites: [], status: '', busy: false, settling: false,
+  groups: [], invites: [], pool: [], status: '', busy: false, settling: false,
+  syncing: false,
   _loading: null,
 
   loadScript(src) {
@@ -1014,6 +1016,8 @@ const Cloud = {
       step = 'myGolfer';        this.golfer = await this.api.myGolfer();
       step = 'myGroups';        this.groups = await this.api.myGroups();
       step = 'pendingInvites';  this.invites = await this.api.pendingInvites();
+      step = 'groupPool';       this.pool = this.groups.length
+                                  ? await this.api.groupPool(this.groups[0].id) : [];
       this.status = '';
       this.diag('profile ok invites=' + this.invites.length + ' groups=' + this.groups.length);
     } catch (e) {
@@ -1070,6 +1074,133 @@ const Cloud = {
     this.load().then(() => this.render()).catch(() => this.render());
   },
 
+  // ------------------------------------------------------------------ rounds
+
+  /**
+   * Local player -> golfer id.
+   *
+   * EXACT match on a normalised name, or nothing. The pool is 17 real people
+   * with names from GHIN; the local card has whatever was typed on the first
+   * tee. A near-match here would quietly file someone's round under another
+   * man's record and show up months later as a wrong season total, so anyone
+   * who is not an unambiguous hit stays a guest.
+   */
+  golferIdFor(name) {
+    const norm = (t) => String(t || '').toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
+    const want = norm(name);
+    if (!want) return null;
+    const hits = this.pool.filter((g) => norm(g.name) === want);
+    return hits.length === 1 ? hits[0].id : null;   // ambiguous counts as no match
+  },
+
+  /** Local history snapshot -> the rounds schema in doc 08. */
+  buildRound(r) {
+    const players = (r.players || []).filter((p) => String(p.name || '').trim());
+    const slug = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+    const idOf = {}, golferIds = [], unmatched = [];
+    players.forEach((p) => {
+      const gid = this.golferIdFor(p.name);
+      idOf[p.id] = gid || ('guest:' + (slug(p.name) || p.id));
+      if (!gid) unmatched.push(p.name);
+      golferIds.push(idOf[p.id]);
+    });
+
+    // Scores are duplicated across games and synced on entry, but a player need
+    // not be in every game — read the union rather than trusting games[0].
+    const grossTotal = (pid) => {
+      let tot = 0, played = 0;
+      for (let h = 0; h < 18; h++) {
+        for (const g of (r.games || [])) {
+          const arr = g.gross && g.gross[pid];
+          if (arr && arr[h] != null) { tot += arr[h]; played++; break; }
+        }
+      }
+      return { tot, played };
+    };
+
+    const results = {};
+    players.forEach((p) => {
+      const g = grossTotal(p.id);
+      results[idOf[p.id]] = {
+        name: p.name,                       // keep it readable without the pool
+        money: (r.playerNet && r.playerNet[p.id]) || 0,
+        gross: g.played === 18 ? g.tot : null,   // partial rounds must not skew a scoring average
+        holes: g.played,
+        handicap: p.handicap || 0,
+      };
+    });
+
+    return {
+      id: r.id,
+      groupId: this.groups.length ? this.groups[0].id : null,
+      date: r.date,
+      courseName: (r.course && r.course.name) || 'Course',
+      courseSnapshot: r.course || null,
+      startingHole: r.startingHole || 0,
+      golferIds,
+      unmatchedNames: unmatched,            // visible, not silently dropped
+      games: r.games || [],
+      results,
+      appVersion: APP_VERSION,
+    };
+  },
+
+  /**
+   * Fire and forget. The local save has already happened; this can fail in any
+   * way it likes without the round being at risk. Success is recorded back onto
+   * the local record so backfill knows what is already up.
+   */
+  saveRound(snapshot) {
+    if (!CLOUD_ENABLED || !this.api || !this.user || !snapshot) return Promise.resolve(false);
+    const self = this;
+    return this.api.saveRound(this.buildRound(snapshot)).then((id) => {
+      self.diag('round saved ' + id);
+      self.markSynced(snapshot.id, id);
+      return true;
+    }).catch((e) => {
+      self.diag('round save failed ' + (e.code || e.message));
+      return false;
+    });
+  },
+
+  /** Stamp the local history record so we never upload the same round twice. */
+  markSynced(localId, cloudId) {
+    try {
+      const rounds = History.load();
+      const row = rounds.filter((x) => x.id === localId)[0];
+      if (!row) return;
+      row.cloudId = cloudId;
+      row.cloudSyncedAt = new Date().toISOString();
+      History.save(rounds);
+    } catch (e) {}
+  },
+
+  unsyncedRounds() {
+    try { return History.load().filter((r) => !r.cloudId); } catch (e) { return []; }
+  },
+
+  /** Upload everything already sitting in local history. Sequential on purpose. */
+  async backfill() {
+    if (this.syncing || !this.api || !this.user) return;
+    const pending = this.unsyncedRounds();
+    if (!pending.length) { this.status = 'Everything is already backed up.'; this.render(); return; }
+    this.syncing = true; this.status = 'Backing up ' + pending.length + ' round(s)…'; this.render();
+    let ok = 0, failed = 0;
+    for (const r of pending) {
+      // One at a time: a burst of writes from a phone on course wifi is how you
+      // find out about rate limits at the worst possible moment.
+      const done = await this.saveRound(r);
+      if (done) ok++; else failed++;
+      this.status = 'Backing up… ' + (ok + failed) + ' of ' + pending.length;
+      this.render();
+    }
+    this.syncing = false;
+    this.status = failed ? (ok + ' backed up, ' + failed + ' failed — try again later')
+                         : (ok + ' round(s) backed up.');
+    this.render();
+  },
+
   render() {
     const el = document.getElementById('menuAccount');
     if (!el) return;
@@ -1108,14 +1239,26 @@ const Cloud = {
       '<br><span style="color:var(--muted);">Joining also links your scores to the record already on file.</span>' +
       '<button data-invite="' + esc(inv.id) + '"' + (this.busy ? ' disabled' : '') + '>Join</button></div>').join('');
 
+    const pending = this.unsyncedRounds().length;
+    const total = (() => { try { return History.load().length; } catch (e) { return 0; } })();
+    const backup = total === 0 ? ''
+      : pending === 0
+        ? '<div class="cloud-note">All ' + total + ' saved round(s) are backed up.</div>'
+        : '<div class="cloud-note">' + pending + ' of ' + total + ' round(s) not backed up yet.' +
+          '<br><button class="cloud-backup" id="cloudBackup"' + (this.syncing ? ' disabled' : '') + '>' +
+          (this.syncing ? 'Backing up\u2026' : 'Back up now') + '</button></div>';
+
     el.innerHTML =
       '<div class="menu-section-title">Account</div>' +
       '<div class="cloud-id"><b>' + esc(name) + '</b>' +
       '<div class="sub">' + esc(this.user.email || '') + '</div>' +
       '<div class="sub" style="margin-top:6px;">' + linked + '</div>' +
       '<div class="sub">' + groupLine + '</div></div>' +
-      invites + note +
+      invites + backup + note +
       '<button class="menu-item" id="cloudSignOut">Sign out</button>';
+
+    const bk = document.getElementById('cloudBackup');
+    if (bk) bk.onclick = () => Cloud.backfill();
 
     this.renderDiag(el, esc);
     const out = document.getElementById('cloudSignOut');
@@ -1609,6 +1752,11 @@ const History = {
 
     rounds.unshift(snapshot);
     this.save(rounds);
+
+    // The local save above is the one that matters and has already happened.
+    // This is deliberately not awaited and deliberately cannot throw: a round
+    // must never be at risk because the network is not there.
+    try { Cloud.saveRound(snapshot); } catch (e) {}
   },
 
   deleteRound(id) {
