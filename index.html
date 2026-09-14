@@ -720,9 +720,13 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.14';
+const APP_VERSION = '7.15';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.15': [
+    'Teams now arrive arranged low-with-high instead of first-two-against-next-two',
+    'Five players sets up all three matches \u2014 the pair against each pair of the other three',
+  ],
   '7.14': [
     'Pick your tees on the player screen \u2014 handicaps re-derive as you change them',
     'A handicap you type over stays yours, and changing tees no longer takes it back',
@@ -4001,6 +4005,62 @@ const Wizard = {
     this.render();
   },
 
+  /**
+   * Fill in the teams the way the first tee would.
+   *
+   * This used to pair the first two players entered against the next two, which
+   * is the one arrangement this group never uses — it puts the two best players
+   * together. Game.suggestTeams() pairs lowest with highest instead.
+   *
+   * With FIVE it proposes three matches, which is the format rather than a
+   * convenience: the low/high pair plays each of the other three pairs, so
+   * nobody sits out and nobody spends the round against the same partner. Three
+   * matches means three games, sharing the stakes.
+   *
+   * Only ever fills in BLANK teams. Someone who has already arranged the sides
+   * has said what they want, and coming back through this screen must not undo
+   * it.
+   */
+  proposeTeams(validPlayers) {
+    const first = this.data.games[0];
+    if (!first) return;
+    const assigned = this.data.games.some((g) => (g.teamA || []).length || (g.teamB || []).length);
+    if (assigned) return;
+
+    const ids = validPlayers.map((p, i) => ({ id: 'p' + (i + 1), name: p.name, handicap: p.handicap || 0 }));
+    const matches = Game.suggestTeams(ids);
+
+    if (!matches.length) {
+      // Three players, or two: no two-man teams to propose. Keep the old
+      // behaviour rather than leaving the sides empty.
+      const pids = ids.map((p) => p.id);
+      first.teamA = pids[0] ? [pids[0]] : [];
+      first.teamB = pids[1] ? [pids[1]] : [];
+      return;
+    }
+
+    first.teamA = matches[0].teamA.slice();
+    first.teamB = matches[0].teamB.slice();
+
+    // The second and third matches of a five-man round. Nassau only: the other
+    // game types are not played as a set of two-man matches.
+    if (first.gameType === 'nassau' && matches.length > 1 && this.data.games.length === 1) {
+      matches.slice(1).forEach((m) => {
+        const g = this.createGameData();
+        g.gameType = 'nassau';
+        g.teamA = m.teamA.slice();
+        g.teamB = m.teamB.slice();
+        g.stakes = { ...first.stakes };
+        g.junkValue = { ...first.junkValue };
+        g.withJunk = first.withJunk;
+        g.autoPress = { ...first.autoPress };
+        g.handicapMode = first.handicapMode;
+        this.data.games.push(g);
+      });
+    }
+    this.currentGameIndex = 0;
+  },
+
   createGameData() {
     return {
       gameType: 'nassau',
@@ -5011,21 +5071,7 @@ const Wizard = {
           Err.toast('Need at least 2 players');
           return;
         }
-        // Auto-assign teams for first game if not already set
-        const g = this.getCurrentGame();
-        if (g.teamA.length === 0 && g.teamB.length === 0) {
-          const pids = validPlayers.map((p, i) => 'p' + (i+1));
-          if (pids.length >= 4) {
-            g.teamA = [pids[0], pids[1]];
-            g.teamB = [pids[2], pids[3]];
-          } else if (pids.length === 3) {
-            g.teamA = [pids[0]];
-            g.teamB = [pids[1]];
-          } else {
-            g.teamA = [pids[0]];
-            g.teamB = [pids[1]];
-          }
-        }
+        this.proposeTeams(validPlayers);
         this.step = 'game';
         this.render();
       };

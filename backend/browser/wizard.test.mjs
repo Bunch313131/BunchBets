@@ -322,6 +322,70 @@ console.log('\nthe picker offers the group, and never invents a course handicap\
 }
 
 // --------------------------------------------------------------------------
+console.log('\nteams arrive already arranged\n');
+{
+  const { page, ctx, errs } = await boot();
+  const propose = (players) => page.evaluate((ps) => {
+    const W = window._bb.Wizard;
+    W.data.players = ps;
+    W.data.games = [W.createGameData()];
+    W.currentGameIndex = 0;
+    W.proposeTeams(ps);
+    return W.data.games.map((g) => ({ a: g.teamA, b: g.teamB, type: g.gameType,
+                                      stakes: g.stakes, hcpMode: g.handicapMode }));
+  }, players);
+
+  // p1..p5 are assigned by position, so this is Tyler 0, Casey 6, Bunch 8,
+  // Ken 12, Gary 12 in the order they were typed.
+  const four = await propose([
+    { name: 'Tyler', handicap: 0 }, { name: 'Casey', handicap: 6 },
+    { name: 'Bunch', handicap: 8 }, { name: 'Ken', handicap: 12 },
+  ]);
+  check('four players make one match', four.length, 1);
+  check('lowest with highest', [four[0].a, four[0].b], [['p1', 'p4'], ['p2', 'p3']]);
+  // The arrangement this replaced: first two entered against the next two,
+  // which puts the two best players on the same side.
+  check('  NOT the first two against the next two', four[0].a, ['p1', 'p4']);
+  check('and it is a team-delta nassau', [four[0].type, four[0].hcpMode], ['nassau', 'team_delta']);
+
+  const five = await propose([
+    { name: 'Tyler', handicap: 0 }, { name: 'Casey', handicap: 6 },
+    { name: 'Bunch', handicap: 8 }, { name: 'Ken', handicap: 12 },
+    { name: 'Tim', handicap: 21 },
+  ]);
+  check('five players make three matches', five.length, 3);
+  check('the pair stays together throughout', five.map((g) => g.a.join('+')),
+    ['p1+p5', 'p1+p5', 'p1+p5']);
+  check('  against each pair of the other three', five.map((g) => g.b.join('+')),
+    ['p2+p3', 'p2+p4', 'p3+p4']);
+  check('every match is a nassau', five.map((g) => g.type), ['nassau', 'nassau', 'nassau']);
+  check('and they share the stakes',
+    five.map((g) => JSON.stringify(g.stakes)), five.map(() => JSON.stringify(five[0].stakes)));
+
+  // Someone who has arranged the sides has said what they want.
+  const kept = await page.evaluate(() => {
+    const W = window._bb.Wizard;
+    W.data.players = [{ name: 'Tyler', handicap: 0 }, { name: 'Casey', handicap: 6 },
+                      { name: 'Bunch', handicap: 8 }, { name: 'Ken', handicap: 12 }];
+    W.data.games = [W.createGameData()];
+    W.data.games[0].teamA = ['p1', 'p2'];
+    W.data.games[0].teamB = ['p3', 'p4'];
+    W.proposeTeams(W.data.players);
+    return { a: W.data.games[0].teamA, n: W.data.games.length };
+  });
+  check('teams already arranged are left alone', kept.a, ['p1', 'p2']);
+  check('  and no extra matches are invented', kept.n, 1);
+
+  const three = await propose([
+    { name: 'Tyler', handicap: 0 }, { name: 'Casey', handicap: 6 }, { name: 'Bunch', handicap: 8 },
+  ]);
+  check('three players get one against one', [three[0].a, three[0].b], [['p1'], ['p2']]);
+  check('  and no second match', three.length, 1);
+
+  check('no page errors', errs, []);
+  await ctx.close();
+}
+
 console.log('\nthe tee is pickable, and it moves the numbers\n');
 {
   const POOL = [
