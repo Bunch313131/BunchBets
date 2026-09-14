@@ -720,9 +720,14 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.16';
+const APP_VERSION = '7.17';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.17': [
+    'Setting up a round is now one question per screen — sign in, course and tees, players, games, teams, stakes, then a review before anything starts',
+    'The tees moved onto the course screen, where the course is chosen — change them there and the handicaps follow',
+    'Teams arrive already arranged, and the old all-in-one setup is still there under Advanced',
+  ],
   '7.16': [
     'The tee note now says what it actually does \u2014 it only claims to set handicaps when it can',
   ],
@@ -889,6 +894,16 @@ const LIVE_PATH = IS_BETA ? 'beta_games' : 'games';
 // Auth configured, so the whole feature stays invisible there. Flip this to
 // `true` once bunchbets has both (project doc 16).
 const CLOUD_ENABLED = IS_BETA;
+
+// The redesigned setup flow. Beta only until it has been played with: a wizard
+// is the one screen where a surprise costs somebody a round rather than a
+// reload, so production keeps the flow its users already know.
+const NEW_WIZARD = IS_BETA;
+
+// A marker the browser tests assert on, so a test that accidentally loads a
+// DIFFERENT build — the live site, a cached copy — fails loudly instead of
+// passing against code nobody is changing.
+window.BB_BUILD_MARKER = APP_VERSION;
 const CLOUD_SDK = 'https://www.gstatic.com/firebasejs/9.22.0/';
 const CLOUD_REDIRECT_KEY = 'bb-cloud-redirect';
 const CLOUD_DIAG_KEY = 'bb-cloud-diag';
@@ -3954,7 +3969,11 @@ const Wizard = {
       if (splash) {
         splash.classList.add('curtain-up');
         setTimeout(() => {
-          this.step = 'course';
+          this.step = NEW_WIZARD ? 'signin' : 'course';
+          // The sign-in button opens a popup, which needs a live tap and cannot
+          // wait on a 470KB download (doc 17), so the SDK has to already be on
+          // its way by the time the curtain finishes.
+          if (NEW_WIZARD) Cloud.warm();
           splash.remove();
           // Reset course content positioning
           const overlay = document.getElementById('wizardOverlay');
@@ -3964,7 +3983,9 @@ const Wizard = {
           }
         }, 1400);
       } else {
-        this.step = 'course'; this.render();
+        this.step = NEW_WIZARD ? 'signin' : 'course';
+        if (NEW_WIZARD) Cloud.warm();
+        this.render();
       }
     };
     this._splashTimer = setTimeout(advanceSplash, 8500);
@@ -4025,9 +4046,14 @@ const Wizard = {
    * it.
    */
   proposeTeams(validPlayers) {
-    const first = this.data.games[0];
+    // The first TEAM game, not games[0]. With Skins or Wolf in the round the
+    // team game is not first, and arranging sides on a Skins game leaves the
+    // Nassau with nobody on either side — which is what happened the moment a
+    // test turned Nassau off and back on with Skins already on.
+    const teamGames = this.data.games.filter((g) => g.gameType === 'nassau' || g.gameType === 'vegas');
+    const first = teamGames[0];
     if (!first) return;
-    const assigned = this.data.games.some((g) => (g.teamA || []).length || (g.teamB || []).length);
+    const assigned = teamGames.some((g) => (g.teamA || []).length || (g.teamB || []).length);
     if (assigned) return;
 
     const ids = validPlayers.map((p, i) => ({ id: 'p' + (i + 1), name: p.name, handicap: p.handicap || 0 }));
@@ -4047,7 +4073,9 @@ const Wizard = {
 
     // The second and third matches of a five-man round. Nassau only: the other
     // game types are not played as a set of two-man matches.
-    if (first.gameType === 'nassau' && matches.length > 1 && this.data.games.length === 1) {
+    // Counted against the TEAM games, not every game: a round that also has
+    // Skins in it still wants all three Nassau matches.
+    if (first.gameType === 'nassau' && matches.length > 1 && teamGames.length === 1) {
       matches.slice(1).forEach((m) => {
         const g = this.createGameData();
         g.gameType = 'nassau';
@@ -4273,16 +4301,25 @@ const Wizard = {
     let content;
     switch(this.step) {
       case 'splash': content = this.renderSplash(); break;
+      case 'signin': content = this.renderSignIn(); break;
       case 'course': content = this.renderCourse(); break;
       case 'courseSetup': content = this.renderCourseSetup(); break;
       case 'players': content = this.renderPlayers(); break;
+      case 'games': content = this.renderGames(); break;
+      case 'teams': content = this.renderTeams(); break;
+      case 'stakes': content = this.renderStakes(); break;
+      case 'review': content = this.renderReview(); break;
       case 'game': content = this.renderGame(); break;
       default: content = document.createElement('div');
     }
 
-    // During splash, pre-render course step behind it so curtain reveals it
+    // During splash, pre-render the NEXT step behind it so the curtain reveals
+    // it. Hardcoding the course screen here meant the new flow advanced its step
+    // to 'signin' and then revealed the course anyway — the sign-in screen never
+    // appeared on a real launch, and a test that set the step directly could not
+    // see it.
     if (this.step === 'splash') {
-      const courseContent = this.renderCourse();
+      const courseContent = NEW_WIZARD ? this.renderSignIn() : this.renderCourse();
       courseContent.style.position = 'absolute';
       courseContent.style.inset = '0';
       courseContent.style.zIndex = '0';
@@ -4421,6 +4458,7 @@ const Wizard = {
       <div class="wizard-content" id="wizardCourseList">
         <div class="wizard-course-locating">Loading courses...</div>
       </div>
+      ${NEW_WIZARD ? '<div id="wizardCourseTee" style="padding:0 16px 12px;"></div>' : ''}
       <div class="wizard-footer">
         <div style="width:100%;display:flex;align-items:center;gap:10px;margin-bottom:6px;">
           <span style="font-size:13px;font-weight:600;white-space:nowrap;">Starting Hole:</span>
@@ -4556,8 +4594,33 @@ const Wizard = {
           card.classList.add('selected');
           this.data.selectedCourse = card.dataset.course;
           this.data.selectedSource = card.dataset.source || null;
+          // A different course has different tees, or none — show that as soon
+          // as it is picked rather than a screen later.
+          if (NEW_WIZARD) { Wizard.setCourseTees(card.dataset.course); paintTee(); }
         };
       });
+      paintTee();
+    };
+
+    /** The tee row under the course list, on the new flow only. */
+    const paintTee = () => {
+      if (!NEW_WIZARD) return;
+      const slot = div.querySelector('#wizardCourseTee');
+      if (!slot) return;
+      slot.innerHTML = this.teeStrip();
+      const sel = slot.querySelector('#wizardTee');
+      if (sel) sel.onchange = (e) => {
+        State.data.course.teeName = e.target.value;
+        State.scheduleSave();
+        // Re-derive here too. Players are normally picked AFTER this screen, so
+        // it looks like there is nothing yet to re-derive — but Back is one tap
+        // and changing the tee from here would otherwise leave every filled
+        // handicap sitting on the old slope, with the new tee on screen saying
+        // otherwise. repaint:false because this screen redraws its own tee row;
+        // a full render() would rebuild the course list underneath it.
+        Wizard.retee({ repaint: false });
+        paintTee();
+      };
     };
 
     // Event handlers
@@ -4805,7 +4868,7 @@ const Wizard = {
    * know something the index does not — would be the same quiet wrongness as
    * every other bug this week.
    */
-  retee() {
+  retee(opts) {
     const tee = Game.selectedTee(State.data.course);
     this.data.players.forEach((p) => {
       // Recompute from the index STORED ON THE PLAYER, not by looking the man up
@@ -4817,7 +4880,7 @@ const Wizard = {
       const ch = Game.courseHandicap(p.index, tee);
       if (ch != null) p.handicap = ch;
     });
-    this.render();
+    if (!opts || opts.repaint !== false) this.render();
   },
 
   /**
@@ -4942,12 +5005,334 @@ const Wizard = {
    * each time would throw away whatever is half-typed in a name box.
    */
   syncCloud() {
-    if (!this.active || this.step !== 'players') return;
+    if (!this.active || (this.step !== 'players' && this.step !== 'signin')) return;
     const sig = (typeof CLOUD_ENABLED !== 'undefined' && CLOUD_ENABLED)
       ? [!!Cloud.user, Cloud.groups.length, Cloud.pool.length, Cloud.busy, !!Cloud.api].join('|') : '';
     if (sig === this._cloudSig) return;
     this._cloudSig = sig;
     this.render();
+  },
+
+  // ═══════════════════════════════════════════════════════
+  // THE REDESIGNED FLOW (beta) — see NEW_WIZARD
+  // ═══════════════════════════════════════════════════════
+
+  /** Shared chrome so the seven screens cannot drift apart. */
+  wizStep(n) {
+    const total = 6;   // signin isn't counted; it is not part of setting up a round
+    let bars = '';
+    for (let i = 1; i <= total; i++) {
+      bars += '<div style="flex:1;height:3px;border-radius:2px;background:' +
+        (i <= n ? 'var(--acc)' : 'var(--border)') + ';"></div>';
+    }
+    return '<div style="display:flex;gap:6px;padding:4px 16px 0;">' + bars + '</div>';
+  },
+
+  wizHead(title, sub) {
+    const esc = (t) => String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return '<div class="wizard-header"><h2>' + esc(title) + '</h2>' +
+      (sub ? '<p>' + esc(sub) + '</p>' : '') + '</div>';
+  },
+
+  wizFoot(nextLabel, opts) {
+    const o = opts || {};
+    return '<div class="wizard-footer">' +
+      (o.back === false ? '' : '<button class="btn secondary" id="wizBack">Back</button>') +
+      '<button class="btn primary" id="wizNext">' + nextLabel + '</button>' +
+      (o.extra || '') + '</div>';
+  },
+
+  /** 1 — sign in. Offered, never required. */
+  renderSignIn() {
+    const div = document.createElement('div');
+    div.className = 'wizard-screen';
+    const esc = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    // Warm only when this screen is actually the live step. It is also rendered
+    // BEHIND the splash so the curtain has something to reveal, and warming from
+    // there fetches the auth SDK on every launch — breaking the promise that a
+    // launch costs nothing for someone who never signs in. The splash advance
+    // warms instead, which is ~1.4s before the button can be pressed.
+    if (this.step === 'signin') Cloud.warm();
+    this._cloudSig = [!!Cloud.user, Cloud.groups.length, Cloud.pool.length, Cloud.busy, !!Cloud.api].join('|');
+
+    const signedIn = CLOUD_ENABLED && Cloud.user;
+    const body = signedIn
+      ? '<div class="card"><div style="font-weight:700;font-size:15px;">' +
+        esc(Cloud.user.displayName || Cloud.user.email || 'Signed in') + '</div>' +
+        '<div class="muted" style="font-size:12px;margin-top:3px;">' + esc(Cloud.user.email || '') + '</div>' +
+        (Cloud.groups.length
+          ? '<div class="muted" style="font-size:12px;margin-top:8px;">' + esc(Cloud.groups[0].name) +
+            ' \u00b7 ' + Cloud.pool.length + ' golfer(s), with live indexes</div>'
+          : '<div class="muted" style="font-size:12px;margin-top:8px;">Not in a group yet.</div>') +
+        '</div>'
+      : '<div class="card"><div class="muted" style="font-size:13px;line-height:1.5;">' +
+        'Sign in and your group\u2019s golfers come with you \u2014 current GHIN indexes, rounds saved off this phone, and season standings.' +
+        '</div>' +
+        (CLOUD_ENABLED
+          ? '<button class="btn primary" id="wizSignIn" style="width:100%;margin-top:12px;padding:12px;"' +
+            (Cloud.api && !Cloud.busy ? '' : ' disabled') + '>' +
+            (Cloud.busy ? 'Waiting for Google\u2026' : Cloud.api ? 'Continue with Google' : 'Preparing\u2026') +
+            '</button>'
+          : '<div class="note" style="margin-top:10px;">Accounts are not switched on in this build.</div>') +
+        '</div>';
+
+    div.innerHTML = this.wizStep(0) +
+      this.wizHead("Who's keeping score?", signedIn ? 'You\u2019re all set.' : 'Optional \u2014 scoring works either way.') +
+      '<div class="wizard-content">' + body +
+      '<div class="note" style="text-align:center;margin-top:16px;">' +
+      (signedIn ? '' : 'Skip this and everything stays on this phone.') + '</div></div>' +
+      this.wizFoot(signedIn ? 'Next' : 'Continue without an account', { back: false });
+
+    setTimeout(() => {
+      const si = div.querySelector('#wizSignIn');
+      if (si) si.onclick = () => Cloud.signIn();          // synchronous: the popup needs the tap
+      div.querySelector('#wizNext').onclick = () => { this.step = 'course'; this.render(); };
+    }, 0);
+    return div;
+  },
+
+  /** 4 — what are we playing. */
+  renderGames() {
+    const div = document.createElement('div');
+    div.className = 'wizard-screen';
+    const TYPES = [
+      ['nassau', 'Nassau', 'Front, back, overall \u00b7 team delta'],
+      ['skins', 'Skins', 'Every man for himself, carries over'],
+      ['vegas', 'Vegas', 'Two-man, scores side by side'],
+      ['wolf', 'Wolf', 'Pick a partner off the tee, or go alone'],
+      ['ninepoint', '9-Point', 'Three-ball, nine points a hole'],
+    ];
+    const on = (t) => this.data.games.some((g) => g.gameType === t);
+    const row = ([t, name, blurb]) =>
+      '<div class="wizard-option' + (on(t) ? ' selected' : '') + '" data-type="' + t + '">' +
+      '<div style="flex:1;min-width:0;"><div style="font-size:16px;font-weight:700;">' + name + '</div>' +
+      '<div class="muted" style="font-size:12px;margin-top:2px;">' + blurb + '</div></div>' +
+      '<div style="width:50px;height:30px;border-radius:999px;flex:0 0 auto;display:flex;align-items:center;' +
+      'padding:0 3px;box-sizing:border-box;background:' + (on(t) ? 'var(--acc)' : 'var(--border)') +
+      ';justify-content:' + (on(t) ? 'flex-end' : 'flex-start') + ';">' +
+      '<div style="width:24px;height:24px;border-radius:50%;background:' + (on(t) ? '#fff' : 'var(--muted)') + ';"></div></div></div>';
+
+    div.innerHTML = this.wizStep(3) +
+      this.wizHead('What are we playing?', 'Nassau is on. Add anything else you fancy.') +
+      '<div class="wizard-content">' + TYPES.map(row).join('') +
+      '<div class="note" style="margin-top:12px;line-height:1.5;">Nothing here is remembered against you \u2014 change it any week.</div>' +
+      '</div>' + this.wizFoot('Next');
+
+    setTimeout(() => {
+      div.querySelectorAll('.wizard-option').forEach((el) => {
+        el.onclick = () => { this.toggleGameType(el.dataset.type); this.render(); };
+      });
+      div.querySelector('#wizBack').onclick = () => { this.step = 'players'; this.render(); };
+      div.querySelector('#wizNext').onclick = () => {
+        if (!this.data.games.length) { Err.toast('Pick at least one game'); return; }
+        this.step = this.hasTeamGame() ? 'teams' : 'stakes';
+        this.render();
+      };
+    }, 0);
+    return div;
+  },
+
+  hasTeamGame() {
+    return this.data.games.some((g) => g.gameType === 'nassau' || g.gameType === 'vegas');
+  },
+
+  /**
+   * Add or remove a game type.
+   *
+   * Removing the LAST team game clears the proposed teams too, so that turning
+   * Nassau off and on again re-proposes from the current players rather than
+   * leaving sides arranged for a lineup that has since changed.
+   */
+  toggleGameType(type) {
+    const has = this.data.games.filter((g) => g.gameType === type);
+    if (has.length) {
+      this.data.games = this.data.games.filter((g) => g.gameType !== type);
+    } else {
+      const g = this.createGameData();
+      g.gameType = type;
+      const ids = this.data.players.filter((p) => String(p.name || '').trim()).map((p, i) => 'p' + (i + 1));
+      // Individual games default to everyone in the round, which is what a
+      // four-ball almost always wants and is one less screen to walk.
+      if (type === 'skins') g.skinsPlayers = ids;
+      if (type === 'wolf') { g.wolfPlayers = ids.slice(0, 5); g.wolfTeeOrder = ids.slice(0, 5); }
+      if (type === 'ninepoint') g.ninePointPlayers = ids.slice(0, 3);
+      this.data.games.push(g);
+    }
+    if (this.hasTeamGame()) this.proposeTeams(this.data.players.filter((p) => String(p.name || '').trim()));
+    this.currentGameIndex = 0;
+  },
+
+  /** 5 — teams. */
+  renderTeams() {
+    const div = document.createElement('div');
+    div.className = 'wizard-screen';
+    const esc = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    const team = this.data.games.filter((g) => g.gameType === 'nassau' || g.gameType === 'vegas');
+    const nameOf = (pid) => {
+      const i = parseInt(String(pid).replace('p', ''), 10) - 1;
+      const p = this.data.players[i];
+      return p ? p.name : pid;
+    };
+    const hcpOf = (pid) => {
+      const i = parseInt(String(pid).replace('p', ''), 10) - 1;
+      const p = this.data.players[i];
+      return p ? (p.handicap || 0) : 0;
+    };
+    const side = (ids, label, colour) =>
+      '<div style="padding:12px 13px;border-radius:10px;border:1px solid ' + colour +
+      ';background:' + colour.replace('var(--', 'rgba(').replace(')', '') + ';">' +
+      '<div style="font-size:10.5px;color:' + colour + ';text-transform:uppercase;letter-spacing:.6px;font-weight:700;margin-bottom:6px;">' +
+      label + '</div>' +
+      ids.map((pid) => '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:3px;">' +
+        '<div style="font-size:15px;font-weight:600;">' + esc(nameOf(pid)) + '</div>' +
+        '<div class="muted" style="font-size:13px;font-variant-numeric:tabular-nums;">' + hcpOf(pid) + '</div></div>').join('') +
+      '</div>';
+
+    const matches = team.map((g, i) => {
+      const a = (g.teamA || []).reduce((t, pid) => t + hcpOf(pid), 0);
+      const b = (g.teamB || []).reduce((t, pid) => t + hcpOf(pid), 0);
+      const d = a - b;
+      const strokes = d === 0 ? 'no strokes'
+        : (d > 0 ? esc(nameOf((g.teamA || [])[0])) + '\u2019s side gives ' + d
+                 : esc(nameOf((g.teamB || [])[0])) + '\u2019s side gives ' + (-d));
+      return '<div class="card" style="margin-bottom:10px;">' +
+        (team.length > 1 ? '<div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:8px;">Match ' + (i + 1) + '</div>' : '') +
+        side(g.teamA || [], 'Team A', '#16a34a') +
+        '<div style="text-align:center;font-size:12px;color:var(--muted);font-weight:700;letter-spacing:1px;margin:8px 0;">VS</div>' +
+        side(g.teamB || [], 'Team B', '#dc2626') +
+        '<div class="muted" style="font-size:12px;margin-top:10px;">' + a + ' v ' + b + ' \u00b7 ' + strokes + '</div>' +
+        '</div>';
+    }).join('');
+
+    div.innerHTML = this.wizStep(4) +
+      this.wizHead(team.length > 1 ? 'Three matches' : 'Teams?',
+        team.length > 1 ? 'The pair plays each of the other three.' : 'Low and high together, the way you always do it.') +
+      '<div class="wizard-content">' + matches +
+      '<button class="wizard-add-btn" id="wizPickTeams">Pick teams myself</button>' +
+      '<div class="note" style="margin-top:12px;line-height:1.5;">Lowest handicap with highest. With four that is the only pairing that balances.</div>' +
+      '</div>' + this.wizFoot('Next');
+
+    setTimeout(() => {
+      div.querySelector('#wizPickTeams').onclick = () => { this.step = 'game'; this.render(); };
+      div.querySelector('#wizBack').onclick = () => { this.step = 'games'; this.render(); };
+      div.querySelector('#wizNext').onclick = () => { this.step = 'stakes'; this.render(); };
+    }, 0);
+    return div;
+  },
+
+  /** 6 — money. */
+  renderStakes() {
+    const div = document.createElement('div');
+    div.className = 'wizard-screen';
+    const g = this.data.games[0] || this.createGameData();
+    const nassau = this.data.games.filter((x) => x.gameType === 'nassau')[0];
+    const money = (id, label, val) =>
+      '<div><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:6px;">' +
+      label + '</div><input type="tel" inputmode="numeric" id="' + id + '" value="' + val +
+      '" style="text-align:center;font-size:19px;font-weight:700;"></div>';
+
+    const nassauCard = nassau ? '<div class="card" style="margin-bottom:10px;">' +
+      '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">Nassau</div>' +
+      '<div class="grid grid-3">' +
+      money('wizFront', 'Front', nassau.stakes.front) +
+      money('wizBack', 'Back', nassau.stakes.back) +
+      money('wizOverall', 'Overall', nassau.stakes.overall) +
+      '</div>' +
+      (this.data.games.filter((x) => x.gameType === 'nassau').length > 1
+        ? '<div class="note" style="margin-top:10px;">Applied to all three matches.</div>' : '') +
+      '</div>' : '';
+
+    const junkCard = '<div class="card">' +
+      '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;">' +
+      '<input type="checkbox" id="wizJunk"' + (g.withJunk ? ' checked' : '') + '>' +
+      '<span style="font-weight:700;font-size:15px;">Junk &amp; KP</span></label>' +
+      '<div id="wizJunkVals" style="margin-top:12px;' + (g.withJunk ? '' : 'display:none;') + '">' +
+      '<div class="grid grid-2">' +
+      money('wizJunkFront', 'Front $/pt', g.junkValue.front) +
+      money('wizJunkBack', 'Back $/pt', g.junkValue.back) +
+      '</div>' +
+      '<div class="note" style="margin-top:10px;line-height:1.5;">KPs need gross par. Sweeps and quads ride on top and show as their own lines.</div>' +
+      '</div></div>';
+
+    div.innerHTML = this.wizStep(5) +
+      this.wizHead('Playing for?', 'Last week\u2019s numbers, already filled in.') +
+      '<div class="wizard-content">' + nassauCard + junkCard + '</div>' +
+      this.wizFoot('Next');
+
+    setTimeout(() => {
+      const num = (id) => { const el = div.querySelector('#' + id); return el ? (parseInt(el.value, 10) || 0) : 0; };
+      const apply = () => {
+        this.data.games.forEach((x) => {
+          if (x.gameType === 'nassau') {
+            x.stakes = { front: num('wizFront'), back: num('wizBack'), overall: num('wizOverall') };
+          }
+          x.withJunk = div.querySelector('#wizJunk').checked;
+          x.junkValue = x.withJunk ? { front: num('wizJunkFront'), back: num('wizJunkBack') } : { front: 0, back: 0 };
+        });
+      };
+      div.querySelector('#wizJunk').onchange = (e) => {
+        div.querySelector('#wizJunkVals').style.display = e.target.checked ? '' : 'none';
+      };
+      div.querySelector('#wizBack').onclick = () => { apply(); this.step = this.hasTeamGame() ? 'teams' : 'games'; this.render(); };
+      div.querySelector('#wizNext').onclick = () => { apply(); this.step = 'review'; this.render(); };
+    }, 0);
+    return div;
+  },
+
+  /** 7 — review. Every line taps back to where it was set. */
+  renderReview() {
+    const div = document.createElement('div');
+    div.className = 'wizard-screen';
+    const esc = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    const players = this.data.players.filter((p) => String(p.name || '').trim());
+    const tee = Game.selectedTee(State.data.course);
+    const nassau = this.data.games.filter((x) => x.gameType === 'nassau')[0];
+    const nameOf = (pid) => {
+      const i = parseInt(String(pid).replace('p', ''), 10) - 1;
+      return players[i] ? players[i].name : pid;
+    };
+
+    const row = (step, title, detail) =>
+      '<div class="wizard-course-card" data-step="' + step + '" style="margin-bottom:8px;">' +
+      '<div class="course-head"><h3>' + title + '</h3>' +
+      '<span class="muted" style="font-size:18px;">\u203A</span></div>' +
+      '<p>' + detail + '</p></div>';
+
+    const teamLine = this.data.games.filter((x) => x.gameType === 'nassau' || x.gameType === 'vegas')
+      .map((x) => (x.teamA || []).map(nameOf).join(' + ') + ' vs ' + (x.teamB || []).map(nameOf).join(' + '))
+      .join('<br>');
+
+    div.innerHTML = this.wizStep(6) +
+      this.wizHead('Ready', 'Tap anything to go back and change it.') +
+      '<div class="wizard-content">' +
+      row('course', esc(State.data.course.name) + (tee ? ' \u00b7 ' + esc(tee.name) : ''),
+        (tee ? esc(tee.rating) + ' / ' + esc(tee.slope) + ' \u00b7 ' : '') +
+        'starting on ' + ((State.data.startingHole || 0) + 1)) +
+      row('players', players.length + ' playing',
+        esc(players.map((p) => p.name.split(' ')[0] + ' ' + (p.handicap || 0)).join(' \u00b7 '))) +
+      // History owns the pretty names for game types; Wizard does not have a
+      // gameLabel of its own, and the guarded call that looked like it did was
+      // quietly falling through to the raw type string.
+      row('games', this.data.games.map((x) => History.gameLabel(x.gameType))
+        .filter((v, i, a) => a.indexOf(v) === i).join(', ') || 'No games',
+        teamLine || 'Individual') +
+      (nassau ? row('stakes', '$' + nassau.stakes.front + ' / $' + nassau.stakes.back + ' / $' + nassau.stakes.overall,
+        (nassau.withJunk ? 'Junk &amp; KP at $' + nassau.junkValue.front + ' a point' : 'No junk')) : '') +
+      '<button class="wizard-add-btn" id="wizAdvanced" style="margin-top:14px;">Advanced setup</button>' +
+      '</div>' +
+      '<div class="wizard-footer"><button class="btn secondary" id="wizBack">Back</button>' +
+      '<button class="btn primary" id="wizPlay" style="background:var(--success);border-color:var(--success);font-weight:700;">Play</button></div>';
+
+    setTimeout(() => {
+      div.querySelectorAll('.wizard-course-card').forEach((el) => {
+        el.onclick = () => { this.step = el.dataset.step; this.render(); };
+      });
+      div.querySelector('#wizAdvanced').onclick = () => { this.step = 'game'; this.render(); };
+      div.querySelector('#wizBack').onclick = () => { this.step = 'stakes'; this.render(); };
+      div.querySelector('#wizPlay').onclick = () => this.finish();
+    }, 0);
+    return div;
   },
 
   renderPlayers() {
@@ -4983,8 +5368,8 @@ const Wizard = {
         </div>
         <div id="wizardPlayersList">${playersHtml}</div>
         ${this.data.players.length < 5 ? '<button class="wizard-add-btn" id="wizardAddPlayer">+ Add Player</button>' : ''}
-        ${this.teeStrip()}
-        ${this.cloudStrip()}
+        ${NEW_WIZARD ? '' : this.teeStrip()}
+        ${NEW_WIZARD ? '' : this.cloudStrip()}
       </div>
       <div class="wizard-footer">
         <button class="btn secondary" id="wizardPlayersBack">Back</button>
@@ -5097,7 +5482,7 @@ const Wizard = {
           return;
         }
         this.proposeTeams(validPlayers);
-        this.step = 'game';
+        this.step = NEW_WIZARD ? 'games' : 'game';
         this.render();
       };
 
@@ -5867,7 +6252,9 @@ const Wizard = {
       };
 
       document.getElementById('wizardGameBack').onclick = () => {
-        this.step = 'players';
+        // Reached from Review (Advanced setup) or from Teams (pick teams
+        // myself) on the new flow, so Back belongs there, not two screens back.
+        this.step = NEW_WIZARD ? 'review' : 'players';
         this.render();
       };
     }, 0);
@@ -10730,7 +11117,7 @@ document.getElementById('standingsMenuBtn').onclick = () => { UI.closeMenu(); UI
 // alternative is stubbing Firestore at the network layer, which would mean a
 // leaderboard test that mostly tests Firestore — slower, and it would pass or
 // fail for reasons that have nothing to do with the arithmetic on screen.
-if (window._bbDev) window._bb = { Cloud, UI, State, History, Game, Wizard };
+if (window._bbDev) window._bb = { Cloud, UI, State, History, Game, Wizard, NEW_WIZARD };
 
 /**
  * Tapping a number field clears it, showing the old value ghosted behind, so

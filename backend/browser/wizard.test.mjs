@@ -90,6 +90,26 @@ async function boot({ seed = PLAYED, cloud = null } = {}) {
   return { page, ctx, errs };
 }
 
+/**
+ * Show the wizard step that currently carries the tee picker.
+ *
+ * It sat on the player step and moved to the course step in the redesign — the
+ * numbers it produces are visible on one, but the tee is part of choosing where
+ * you are playing, not who with. Which screen it lives on is not what any of
+ * these assertions is about, and pinning it made them die with a thirty-second
+ * timeout waiting for a strip that had simply moved one screen back.
+ */
+async function showTeeStep(page) {
+  const step = await page.evaluate(() => {
+    const s = window._bb.NEW_WIZARD ? 'course' : 'players';
+    window._bb.Wizard.active = true; window._bb.Wizard.step = s; window._bb.Wizard.render();
+    return s;
+  });
+  // The course step builds its list asynchronously and paints the tee row after.
+  await page.waitForTimeout(step === 'course' ? 450 : 300);
+  return step;
+}
+
 // --------------------------------------------------------------------------
 console.log('\na new game is a new round — every per-round tracker goes with it\n');
 {
@@ -310,12 +330,21 @@ console.log('\nthe picker offers the group, and never invents a course handicap\
     unrated.find((x) => x.name === 'Tyler Bryan').handicap, 0);
   await page.evaluate(() => { window._bb.State.data.course = JSON.parse(JSON.stringify(window._bb.State.presets)) && window._bb.State.data.course; });
 
-  await page.evaluate(() => { window._bb.Wizard.active = true; window._bb.Wizard.step = 'players'; window._bb.Wizard.render(); });
+  // Whose group is on offer has to be visible on the screen that offers it. In
+  // the redesigned flow that screen is `signin`, not `players` — sign-in moved
+  // out of the player step into one of its own. Asked of `players` there, this
+  // waits thirty seconds for a `.wiz-cloud` that is no longer rendered and dies
+  // with a timeout, which reads like a broken test rather than a moved screen.
+  const NEW = await page.evaluate(() => !!window._bb.NEW_WIZARD);
+  await page.evaluate((step) => {
+    window._bb.Wizard.active = true; window._bb.Wizard.step = step; window._bb.Wizard.render();
+  }, NEW ? 'signin' : 'players');
   await page.waitForTimeout(300);
-  const strip = await page.textContent('.wiz-cloud');
+  const strip = await page.textContent(NEW ? '.wizard-screen' : '.wiz-cloud');
   check('the step says whose group it is', /Nunes/.test(strip), true);
   check('  and how many are available', /3 golfer\(s\)/.test(strip), true);
-  check('no sign-in button while signed in', await page.locator('#wizardSignIn').count(), 0);
+  check('no sign-in button while signed in',
+    await page.locator(NEW ? '#wizSignIn' : '#wizardSignIn').count(), 0);
 
   check('no page errors', errs, []);
   await ctx.close();
@@ -401,11 +430,14 @@ console.log('\nthe tee is pickable, and it moves the numbers\n');
       { name: 'Timothy Mar', handicap: 21, hcpFromTee: true, index: '18.7' },
       { name: 'Visiting Steve', handicap: 20 },        // no index, typed by hand
     ];
-    window._bb.Wizard.active = true;
-    window._bb.Wizard.step = 'players';
-    window._bb.Wizard.render();
   });
-  await page.waitForTimeout(300);
+
+  // The tee picker moved from the player step to the course step in the
+  // redesign, so ask for whichever screen currently carries it. What is being
+  // tested is that picking a tee moves the numbers — not which screen it is
+  // picked on, and pinning the screen made this die with a timeout the moment
+  // the strip moved.
+  await showTeeStep(page);
 
   check('the tee is on screen', await page.locator('#wizardTee').count(), 1);
   check('  showing all eight', await page.locator('#wizardTee option').count(), 8);
@@ -429,12 +461,20 @@ console.log('\nthe tee is pickable, and it moves the numbers\n');
   // recompute would have written proves nothing, and the first version of this
   // used 19, which is exactly what Gold derives.
   await page.evaluate(() => {
-    const el = document.querySelectorAll('.wizard-player-row input[data-field="handicap"]')[1];
-    el.focus(); el.value = '15'; el.dispatchEvent(new Event('input', { bubbles: true })); el.blur();
+    window._bb.Wizard.step = 'players'; window._bb.Wizard.render();
   });
+  await page.waitForTimeout(300);
+  const typed = await page.evaluate(() => {
+    const el = document.querySelectorAll('.wizard-player-row input[data-field="handicap"]')[1];
+    if (!el) return false;
+    el.focus(); el.value = '15'; el.dispatchEvent(new Event('input', { bubbles: true })); el.blur();
+    return true;
+  });
+  check('the handicap box was there to type in', typed, true);
   await page.waitForTimeout(120);
   check('typing over a handicap releases it from the tee',
     await page.evaluate(() => window._bb.Wizard.data.players[1].hcpFromTee), false);
+  await showTeeStep(page);
   await page.selectOption('#wizardTee', 'Gold');
   await page.waitForTimeout(250);
   const held = await page.evaluate(() => window._bb.Wizard.data.players.map((p) => p.handicap));
@@ -494,8 +534,7 @@ console.log('\na course with no ratings switches the conversion off\n');
   check('so no handicap is derived', after.gary.handicap === undefined, true);
   check('  and it is not marked as coming from a tee', !!after.gary.fromTee, false);
 
-  await page.evaluate(() => { window._bb.Wizard.active = true; window._bb.Wizard.step = 'players'; window._bb.Wizard.render(); });
-  await page.waitForTimeout(250);
+  await showTeeStep(page);
   check('the screen says why', /No ratings on file for Del Paso/.test(await page.textContent('.wiz-tee')), true);
   check('  and offers no tee to pick', await page.locator('#wizardTee').count(), 0);
   await ctx.close();
@@ -507,8 +546,7 @@ console.log('\nthe tee caption only promises what the build can do\n');
   // The tee still records the round's tee, but nothing can be derived from it,
   // and saying otherwise is the cheap version of a number being quietly wrong.
   const { page, ctx } = await boot();
-  await page.evaluate(() => { window._bb.Wizard.active = true; window._bb.Wizard.step = 'players'; window._bb.Wizard.render(); });
-  await page.waitForTimeout(300);
+  await showTeeStep(page);
   const txt = await page.textContent('.wiz-tee');
   check('the tee is still offered', await page.locator('#wizardTee').count(), 1);
   check('  and still states the tee itself', /6499 yds/.test(txt), true);
@@ -541,13 +579,29 @@ console.log('\nthe tee caption only promises what the build can do\n');
 console.log('\nsigned out, the step still works — sign-in is offered, not required\n');
 {
   const { page, ctx, errs } = await boot();
-  await page.evaluate(() => { window._bb.Wizard.active = true; window._bb.Wizard.step = 'players'; window._bb.Wizard.render(); });
+  // Sign-in has its own screen in the redesign; it was a strip on the player
+  // step before. Either way it is one screen into starting a round rather than
+  // three taps away in the pancake menu, and either way it is skippable.
+  const NEW = await page.evaluate(() => !!window._bb.NEW_WIZARD);
+  await page.evaluate((s) => {
+    window._bb.Wizard.active = true; window._bb.Wizard.step = s; window._bb.Wizard.render();
+  }, NEW ? 'signin' : 'players');
   await page.waitForTimeout(300);
 
   check('the prompt is here, not three taps away in the menu',
-    await page.locator('#wizardSignIn').count(), 1);
+    await page.locator(NEW ? '#wizSignIn' : '#wizardSignIn').count(), 1);
   check('  and says what signing in buys',
-    /current GHIN indexes/.test(await page.textContent('.wiz-cloud')), true);
+    /current GHIN indexes/.test(await page.textContent(NEW ? '.wizard-screen' : '.wiz-cloud')), true);
+  if (NEW) {
+    check('  and can be walked past without an account',
+      await page.textContent('#wizNext'), 'Continue without an account');
+    await page.click('#wizNext');
+    await page.waitForTimeout(250);
+    check('    which lands on the course step',
+      await page.evaluate(() => window._bb.Wizard.step), 'course');
+    await page.evaluate(() => { window._bb.Wizard.step = 'players'; window._bb.Wizard.render(); });
+    await page.waitForTimeout(300);
+  }
 
   const r = await page.evaluate(() => window._bb.Wizard.pickerRoster().map((x) => x.name));
   check('this phone’s own names still work signed out', r, ['Brian Bunch', 'Visiting Steve']);
