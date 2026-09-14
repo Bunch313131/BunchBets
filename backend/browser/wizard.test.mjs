@@ -205,6 +205,51 @@ console.log('\ntapping a number clears it, so typing replaces\n');
 }
 
 // --------------------------------------------------------------------------
+console.log('\ncarrying a saved round forward\n');
+{
+  // A round saved before tees existed. Saved state replaces the default
+  // wholesale, so without a migration the conversion would be dead for every
+  // install that already has the app — which is all of them.
+  const { page, ctx } = await boot();
+  const c = await page.evaluate(() => ({
+    tees: (window._bb.State.data.course.tees || []).length,
+    teeName: window._bb.State.data.course.teeName,
+    hcp: window._bb.State.data.course.hcp.join(','),
+  }));
+  check('the tee list is attached on load', c.tees, 8);
+  check('  defaulting to White', c.teeName, 'White');
+  check('  and the allocation in play is left exactly as saved',
+    c.hcp, '15,13,9,1,7,3,17,11,5,8,2,16,6,10,12,18,4,14');
+  await ctx.close();
+
+  // The pre-March allocation, written to disk. GHIN has no record of it and
+  // every net bet at El Macero depended on which side of that date you were on.
+  const bad = [7,15,9,1,11,3,17,13,5,4,2,10,8,12,14,18,6,16];
+  const ctx2 = await browser.newContext({ viewport: { width: 420, height: 900 }, serviceWorkers: 'block' });
+  const p2 = await ctx2.newPage();
+  await p2.goto(ORIGIN + '/index.html', { waitUntil: 'domcontentloaded' });
+  await p2.evaluate(([seed, badHcp]) => {
+    localStorage.setItem('bunchbets-installed', 'true');
+    localStorage.setItem('nassauV28_complete', JSON.stringify({ ...seed, presets: {
+      'El Macero': { hcp: badHcp, par: seed.course.par },
+      'El Macero New': { hcp: [15,13,9,1,7,3,17,11,5,8,2,16,6,10,12,18,4,14], par: seed.course.par },
+      'My Muni': { hcp: badHcp.slice().reverse(), par: seed.course.par },
+    } }));
+  }, [PLAYED, bad]);
+  await p2.goto(ORIGIN + '/index.html', { waitUntil: 'load' });
+  await p2.waitForTimeout(800);
+  const pre = await p2.evaluate(() => ({
+    elMacero: window._bb.State.presets['El Macero'].hcp.join(','),
+    hasNew: 'El Macero New' in window._bb.State.presets,
+    muni: window._bb.State.presets['My Muni'].hcp.join(','),
+  }));
+  check('a saved El Macero carrying the bad allocation is corrected',
+    pre.elMacero, '15,13,9,1,7,3,17,11,5,8,2,16,6,10,12,18,4,14');
+  check('  and the workaround preset it forced is dropped', pre.hasNew, false);
+  check('someone else\u2019s own course is NOT touched', pre.muni, bad.slice().reverse().join(','));
+  await ctx2.close();
+}
+
 console.log('\nthe picker offers the group, and never invents a course handicap\n');
 {
   const POOL = [
@@ -233,16 +278,30 @@ console.log('\nthe picker offers the group, and never invents a course handicap\
   // The rule that keeps the money right: an index is not a course handicap.
   // Gary is a 10.4 who plays off 12; filling 10 would be a stroke and a half
   // short on every net bet, with nothing on screen to say so.
-  const gary = r.find((x) => x.name === 'Gary Nunes');
-  check('a golfer never played here gets NO handicap guessed from his index',
-    gary.handicap === undefined || gary.handicap === null, true);
-  check('  but one this phone has played before keeps his number',
-    r.find((x) => x.name === 'Brian Bunch').handicap, 8);
-  // Found through the alias, not the full name. The card says "Tyler"; the
-  // roster says "Tyler Bryan". Matching on the full name alone finds nothing and
-  // returns no handicap at all — which is exactly what it did.
-  check('and one whose card name is a SHORT name is still found',
+  // El Macero White, 72.0/129, is the seeded default. The whole point of the
+  // tee: an index converts to a course handicap exactly, so nothing is guessed
+  // and nothing is left blank.
+  check('Gary\u2019s 10.4 index fills as the 12 he plays off',
+    r.find((x) => x.name === 'Gary Nunes').handicap, 12);
+  check('  Bunch\u2019s 7.0 as an 8', r.find((x) => x.name === 'Brian Bunch').handicap, 8);
+  check('  and Tyler\u2019s +0.3 as a 0, not a 1',
     r.find((x) => x.name === 'Tyler Bryan').handicap, 0);
+  check('none of them is the raw index rounded',
+    r.filter((x) => x.index).map((x) => x.handicap === Math.round(parseFloat(x.index))), [false, false, true]);
+
+  // A course with no rating on file must still refuse to invent a number.
+  const unrated = await page.evaluate(() => {
+    window._bb.State.data.course.tees = [];
+    return window._bb.Wizard.pickerRoster();
+  });
+  check('with no rated tee, a stranger gets no handicap at all',
+    unrated.find((x) => x.name === 'Gary Nunes').handicap, undefined);
+  check('  but someone this phone has played keeps his number',
+    unrated.find((x) => x.name === 'Brian Bunch').handicap, 8);
+  // Through the alias: the card says "Tyler", the roster says "Tyler Bryan".
+  check('  found by alias, not just full name',
+    unrated.find((x) => x.name === 'Tyler Bryan').handicap, 0);
+  await page.evaluate(() => { window._bb.State.data.course = JSON.parse(JSON.stringify(window._bb.State.presets)) && window._bb.State.data.course; });
 
   await page.evaluate(() => { window._bb.Wizard.active = true; window._bb.Wizard.step = 'players'; window._bb.Wizard.render(); });
   await page.waitForTimeout(300);

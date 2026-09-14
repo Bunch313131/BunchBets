@@ -715,9 +715,14 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.12';
+const APP_VERSION = '7.13';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.13': [
+    'Tees \u2014 El Macero now carries all eight sets with their real ratings and slopes, defaulting to White',
+    'Picking a group member fills his course handicap off the tee, converted from his live GHIN index',
+    'Fixed: El Macero\u2019s stroke indexes were chosen by today\u2019s date, and the pre-March set was wrong',
+  ],
   '7.12': [
     'Nassau now defaults to team delta, which is how this group has always set it up by hand',
   ],
@@ -1732,16 +1737,48 @@ window.addEventListener('error', ev => {
 });
 
 // === STATE MANAGER ===
+/**
+ * The course the app ships with, kept apart from live state so a saved round can
+ * be migrated against it. `State.data.course` starts as a deep copy: the round
+ * in play owns its own par and allocation, and editing them must never reach
+ * back into this.
+ */
+const BB_DEFAULT_COURSE = {
+      name: 'El Macero',
+      // Verified against GHIN course 7796 on 2026-09-14: this par array and this
+      // stroke allocation are what the course is actually rated to, and every
+      // men's tee at El Macero shares both.
+      //
+      // This used to be a fork on `new Date() >= '2026-03-01'`, carrying a second
+      // allocation for "before March". GHIN has no record of the older one, every
+      // net bet at this course depended on which branch ran, and it had already
+      // produced one wrong hand-computed total. A date fork is also untestable in
+      // the only way that matters — it changes behaviour with no code change.
+      hcp: [15,13,9,1,7,3,17,11,5,8,2,16,6,10,12,18,4,14],
+      par: [4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5],
+      // Rating and slope per tee, pulled from GHIN. An index is portable; a
+      // course handicap is not, and the tee is what converts one to the other.
+      // El Macero White is 72.0/129 — NOT the 73.0/127 recorded in August, since
+      // the course was re-rated in between.
+      teeName: 'White',
+      tees: [
+        { name: 'Aggie',            yardage: 7138, rating: 74.3, slope: 138, par: 72 },
+        { name: 'Blue',             yardage: 6855, rating: 73.1, slope: 137, par: 72 },
+        { name: 'Blue/White Combo', yardage: 6671, rating: 72.6, slope: 131, par: 72 },
+        { name: 'White',            yardage: 6499, rating: 72.0, slope: 129, par: 72 },
+        { name: 'White/Red Combo',  yardage: 6081, rating: 70.0, slope: 125, par: 72 },
+        { name: 'Red',              yardage: 5849, rating: 69.2, slope: 124, par: 72 },
+        { name: 'Red/Gold Combo',   yardage: 5515, rating: 67.5, slope: 120, par: 72 },
+        { name: 'Gold',             yardage: 5285, rating: 66.6, slope: 117, par: 72 }
+      ]
+};
+
 const State = {
   data: {
     tab: 'setup',
     players: [{id:'p1',name:'P1'},{id:'p2',name:'P2'},{id:'p3',name:'P3'},{id:'p4',name:'P4'},{id:'p5',name:'P5'}],
     games: [],
-    course: {
-      name: 'El Macero',
-      hcp: new Date() >= new Date('2026-03-01') ? [15,13,9,1,7,3,17,11,5,8,2,16,6,10,12,18,4,14] : [7,15,9,1,11,3,17,13,5,4,2,10,8,12,14,18,6,16],
-      par: [4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5]
-    },
+    course: JSON.parse(JSON.stringify(BB_DEFAULT_COURSE)),
     settings: { thTop: 12, thMin: 5 },
     debugStatus: false,
     lastActiveDate: null,
@@ -1751,14 +1788,65 @@ const State = {
     scoringView: 'hole',
     startingHole: 0
   },
-  presets: new Date() >= new Date('2026-03-01') ? {
+  // The same date fork used to sit here too, and with it an "El Macero New"
+  // preset that existed only so the older allocation could be worked around.
+  // GHIN knows one allocation for this course and it is this one.
+  presets: {
     'El Macero': { hcp:[15,13,9,1,7,3,17,11,5,8,2,16,6,10,12,18,4,14], par:[4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5] },
     'Del Paso': { hcp:[11,17,1,7,15,9,3,5,13,12,10,18,8,16,6,2,14,4], par:[5,3,4,5,3,4,4,4,4,4,4,3,5,3,5,4,3,4] }
-  } : {
-    'El Macero': { hcp:[7,15,9,1,11,3,17,13,5,4,2,10,8,12,14,18,6,16], par:[4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5] },
-    'El Macero New': { hcp:[15,13,9,1,7,3,17,11,5,8,2,16,6,10,12,18,4,14], par:[4,5,3,4,5,4,3,4,4,4,4,3,4,4,5,3,4,5] },
-    'Del Paso': { hcp:[11,17,1,7,15,9,3,5,13,12,10,18,8,16,6,2,14,4], par:[5,3,4,5,3,4,4,4,4,4,4,3,5,3,5,4,3,4] }
   },
+  /** The allocation the app used to carry for El Macero before 2026-03-01.
+   *  GHIN has no record of it, and every net bet at the course depended on
+   *  which side of that date you were on. Kept only so saved copies of it can
+   *  be recognised and corrected. */
+  BAD_EL_MACERO_HCP: [7,15,9,1,11,3,17,13,5,4,2,10,8,12,14,18,6,16],
+
+  /**
+   * A saved course, brought forward.
+   *
+   * Saved state REPLACES the default wholesale, so a course saved before tees
+   * existed would have no tees forever — the course-handicap conversion would
+   * silently do nothing for every install that already has the app, which is
+   * all of them. This attaches the tee list the app ships for that course and
+   * changes nothing else: par and the allocation in play are left exactly as
+   * saved, because those belong to the round being played.
+   */
+  migrateCourse(saved) {
+    const c = saved || {};
+    if (!c.tees && c.name === BB_DEFAULT_COURSE.name) {
+      c.tees = JSON.parse(JSON.stringify(BB_DEFAULT_COURSE.tees));
+      if (!c.teeName) c.teeName = BB_DEFAULT_COURSE.teeName;
+    }
+    return c;
+  },
+
+  /**
+   * Saved presets, brought forward.
+   *
+   * Presets are the user's own list, so this does not overwrite them — with one
+   * exception. A saved El Macero carrying the pre-March allocation is not a
+   * preference, it is the date-fork defect written to disk, and re-picking that
+   * course would hand out strokes on the wrong holes all over again. Only an
+   * exact match is corrected; an allocation someone edited themselves is theirs.
+   */
+  migratePresets(saved) {
+    const out = saved || {};
+    const bad = this.BAD_EL_MACERO_HCP.join(',');
+    Object.keys(out).forEach((name) => {
+      const pre = out[name];
+      if (pre && Array.isArray(pre.hcp) && pre.hcp.join(',') === bad) {
+        pre.hcp = BB_DEFAULT_COURSE.hcp.slice();
+      }
+    });
+    // "El Macero New" existed only as a hand-made workaround for the bad
+    // allocation. If it is now identical to El Macero, it is clutter.
+    if (out['El Macero New'] && out['El Macero'] &&
+        out['El Macero New'].hcp.join(',') === out['El Macero'].hcp.join(',')) {
+      delete out['El Macero New'];
+    }
+    return out;
+  },
+
   locks: 0,
   saveTimer: null,
   renderTimer: null,
@@ -1823,8 +1911,8 @@ const State = {
       const obj = JSON.parse(raw);
       if (obj.players && Array.isArray(obj.players)) this.data.players = obj.players;
       if (obj.games && Array.isArray(obj.games)) this.data.games = obj.games.map(Game.sanitize);
-      if (obj.course) this.data.course = obj.course;
-      if (obj.presets) this.presets = obj.presets;
+      if (obj.course) this.data.course = this.migrateCourse(obj.course);
+      if (obj.presets) this.presets = this.migratePresets(obj.presets);
       if (obj.settings) this.data.settings = obj.settings;
       if (obj.lastActiveDate) this.data.lastActiveDate = obj.lastActiveDate;
       this.data.roundCompleteShown = !!obj.roundCompleteShown;
@@ -2264,6 +2352,72 @@ const Game = {
       g.strokesCount[p.id] = parseInt(g.strokesCount[p.id])||0;
     });
     return g;
+  },
+
+  /**
+   * The tee being played, or null.
+   *
+   * Named rather than indexed so that re-ordering the tee list — which happens
+   * whenever a course is re-pulled from GHIN — cannot silently move everybody
+   * to a different set of tees.
+   */
+  selectedTee(course) {
+    const tees = (course && course.tees) || [];
+    if (!tees.length) return null;
+    const want = course.teeName;
+    return tees.filter((t) => t && t.name === want)[0] || null;
+  },
+
+  /**
+   * A GHIN handicap index as a number.
+   *
+   * GHIN returns it as a STRING, and two of its values are not numbers at all:
+   * "NH" means no handicap, and a plus handicap arrives as "+0.3", which is
+   * NEGATIVE 0.3 — a better-than-scratch player gives strokes back. parseFloat
+   * on "+0.3" quietly returns positive 0.3, which turns Tyler from the best
+   * player in the group into a bogey-ish 0 and moves money on every hole he
+   * gets a stroke he should be giving.
+   */
+  parseIndex(value) {
+    if (value == null) return null;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    const s = String(value).trim();
+    if (!s || s.toUpperCase() === 'NH') return null;
+    const n = parseFloat(s.charAt(0) === '+' ? '-' + s.slice(1) : s);
+    return Number.isFinite(n) ? n : null;
+  },
+
+  /**
+   * Course handicap: what a player actually plays off at a given set of tees.
+   *
+   * An index is portable; a course handicap is not. Against the four real
+   * rounds, every card handicap in this group is round(index x slope / 113) —
+   * the PRE-2020 formula, with no (CourseRating - Par) term. Current WHS adds
+   * that term, which at El Macero White would make Tim a 22 rather than the 21
+   * he has always played off.
+   *
+   * So the WHS term is available and OFF by default. This is not a correctness
+   * judgement: turning it on silently would change every net bet in the app's
+   * history by about a stroke, and a rules change has to be a decision somebody
+   * makes, not a side effect of a release.
+   *
+   * Returns null rather than a guess when the index or the slope is missing.
+   * A course with no rating data must leave the handicap box alone, not fill it
+   * with the raw index — that is 1-2 strokes light and says nothing on screen.
+   */
+  courseHandicap(index, tee, opts) {
+    const idx = this.parseIndex(index);
+    const slope = tee && Number(tee.slope);
+    if (idx == null || !slope || !isFinite(slope)) return null;
+    let ch = idx * slope / 113;
+    if (opts && opts.useRatingMinusPar) {
+      const rating = Number(tee.rating), par = Number(tee.par);
+      if (isFinite(rating) && isFinite(par)) ch += rating - par;
+    }
+    // Round half away from zero, so a plus handicap rounds the same distance
+    // from scratch as an equivalent positive one. Math.round(-0.5) is -0, which
+    // would hand a plus player a stroke he has not earned.
+    return ch < 0 ? -Math.round(-ch) : Math.round(ch);
   },
 
   /**
@@ -4526,7 +4680,26 @@ const Wizard = {
         }
       }
       for (const k of Object.keys(names)) if (hcpOf[k] != null) return hcpOf[k];
-      return undefined;   // never derived from the index — see the picker comment
+      return undefined;
+    };
+
+    /**
+     * The number to put in the box: the course handicap for the tee being
+     * played, and only that.
+     *
+     * This is the conversion that was missing. A GHIN index is not a course
+     * handicap — Gary is a 10.4 who plays off 12 — so filling the box with the
+     * raw index puts everyone 1-2 strokes light with nothing on screen to say
+     * so. With a rated tee the conversion is exact and the guessing is over.
+     *
+     * Without one (a course with no rating on file) it still refuses to invent a
+     * number, and falls back to whatever this group last played the man off.
+     * That is a fact rather than a derivation, and it is the honest second-best.
+     */
+    const tee = Game.selectedTee(State.data.course);
+    const handicapFor = (g) => {
+      const ch = Game.courseHandicap(g.currentIndex, tee);
+      return ch == null ? lastPlayedOff(g) : ch;
     };
 
     const out = [], seen = {};
@@ -4536,7 +4709,7 @@ const Wizard = {
         if (!k || seen[k]) return;
         seen[k] = 1;
         (g.aliases || []).forEach((a) => { const ak = norm(a); if (ak) seen[ak] = 1; });
-        out.push({ name: g.name, index: g.currentIndex || null, handicap: lastPlayedOff(g) });
+        out.push({ name: g.name, index: g.currentIndex || null, handicap: handicapFor(g) });
       });
     }
     local.forEach((r) => {
