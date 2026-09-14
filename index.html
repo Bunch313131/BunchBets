@@ -720,9 +720,12 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.15';
+const APP_VERSION = '7.16';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.16': [
+    'The tee note now says what it actually does \u2014 it only claims to set handicaps when it can',
+  ],
   '7.15': [
     'Teams now arrive arranged low-with-high instead of first-two-against-next-two',
     'Five players sets up all three matches \u2014 the pair against each pair of the other three',
@@ -4767,8 +4770,30 @@ const Wizard = {
       '</select></div>' +
       (cur ? '<div class="wiz-tee-msg">' + esc(cur.yardage) + ' yds \u00b7 ' +
         esc(cur.rating) + ' / ' + esc(cur.slope) +
-        ' \u2014 course handicaps come off this tee.</div>' : '') +
+        // Only promise the conversion when it can actually happen. It needs a
+        // GHIN index, which needs the group pool, which needs a signed-in
+        // account — so on a build with accounts dark this line was describing
+        // something the app was not doing. A caption that overstates is the same
+        // failure as a number that is quietly wrong, just cheaper to fix.
+        (this.canDeriveHandicaps()
+          ? ' \u2014 course handicaps come off this tee.'
+          : ' \u2014 recorded with the round. Handicaps stay as you type them.') +
+        '</div>' : '') +
       '</div>';
+  },
+
+  /**
+   * Can a handicap actually be derived from the tee right now?
+   *
+   * Needs a rated tee AND at least one golfer with a GHIN index to convert,
+   * which in turn needs a signed-in account and a group. Any of those missing
+   * and the tee is a note on the round rather than an input to anybody's
+   * strokes.
+   */
+  canDeriveHandicaps() {
+    if (!Game.selectedTee(State.data.course)) return false;
+    if (typeof CLOUD_ENABLED === 'undefined' || !CLOUD_ENABLED || !Cloud.user) return false;
+    return Cloud.pool.some((g) => Game.parseIndex(g.currentIndex) != null);
   },
 
   /**

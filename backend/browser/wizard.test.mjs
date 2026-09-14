@@ -412,6 +412,8 @@ console.log('\nthe tee is pickable, and it moves the numbers\n');
   check('  set to White', await page.inputValue('#wizardTee'), 'White');
   check('  with its rating and slope stated',
     /6499 yds \u00b7 72 \/ 129/.test(await page.textContent('.wiz-tee')), true);
+  check('  and it promises the conversion, because it can do it',
+    /course handicaps come off this tee/.test(await page.textContent('.wiz-tee')), true);
 
   // Blue is 137 against White's 129, so every derived handicap goes up.
   await page.selectOption('#wizardTee', 'Blue');
@@ -496,6 +498,43 @@ console.log('\na course with no ratings switches the conversion off\n');
   await page.waitForTimeout(250);
   check('the screen says why', /No ratings on file for Del Paso/.test(await page.textContent('.wiz-tee')), true);
   check('  and offers no tee to pick', await page.locator('#wizardTee').count(), 0);
+  await ctx.close();
+}
+
+console.log('\nthe tee caption only promises what the build can do\n');
+{
+  // Signed out — which is also every user on production while accounts are dark.
+  // The tee still records the round's tee, but nothing can be derived from it,
+  // and saying otherwise is the cheap version of a number being quietly wrong.
+  const { page, ctx } = await boot();
+  await page.evaluate(() => { window._bb.Wizard.active = true; window._bb.Wizard.step = 'players'; window._bb.Wizard.render(); });
+  await page.waitForTimeout(300);
+  const txt = await page.textContent('.wiz-tee');
+  check('the tee is still offered', await page.locator('#wizardTee').count(), 1);
+  check('  and still states the tee itself', /6499 yds/.test(txt), true);
+  check('it does NOT claim handicaps come off it', /course handicaps come off this tee/.test(txt), false);
+  check('  it says what actually happens', /Handicaps stay as you type them/.test(txt), true);
+
+  // Signed in with a group whose golfers have no index on file: same story.
+  await page.evaluate(() => {
+    Object.assign(window._bb.Cloud, { user: { uid: 'u' }, groups: [{ id: 'nunes', name: 'Nunes' }],
+      pool: [{ id: 'guest:dave', name: 'Dave', currentIndex: null },
+             { id: 'guest:pete', name: 'Pete', currentIndex: 'NH' }] });
+    window._bb.Wizard.render();
+  });
+  await page.waitForTimeout(250);
+  check('a pool with no usable index does not promise it either',
+    /course handicaps come off this tee/.test(await page.textContent('.wiz-tee')), false);
+  check('  and "NH" is not a usable index',
+    await page.evaluate(() => window._bb.Game.parseIndex('NH')), null);
+
+  await page.evaluate(() => {
+    window._bb.Cloud.pool = [{ id: 'ghin:1', name: 'Real Golfer', currentIndex: '7.0' }];
+    window._bb.Wizard.render();
+  });
+  await page.waitForTimeout(250);
+  check('one real index is enough to make the promise true',
+    /course handicaps come off this tee/.test(await page.textContent('.wiz-tee')), true);
   await ctx.close();
 }
 
