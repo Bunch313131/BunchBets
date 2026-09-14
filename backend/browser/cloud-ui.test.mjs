@@ -26,8 +26,27 @@ async function openApp(page, beforeMenu) {
 // ---------------------------------------------------------------- BETA
 console.log('BETA (localhost is treated as beta)\n');
 {
-  const page = await browser.newPage({ viewport: { width: 420, height: 900 } });
+  // Service workers BLOCKED. The worker precaches gstatic and serves it
+  // cache-first, and a service worker's fetch is not covered by page.route — so
+  // the auth SDK arrived from cache no matter what the route said, roughly one
+  // run in three depending on whether the worker had claimed the page yet.
+  const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, serviceWorkers: 'block' });
+  const page = await ctx.newPage();
   const errs = []; page.on('pageerror', (e) => errs.push(e.message));
+
+  // Block ONLY the two SDKs the account panel warms. This used to rely on the
+  // sandbox having no route to the internet — an assumption the old comment
+  // stated outright and which is simply false: the SDK usually arrived, and the
+  // run failed roughly once in three for a reason unrelated to the code. A test
+  // that flaky gets ignored, which is worse than not having it.
+  //
+  // Narrow on purpose. Blocking all of gstatic also kills firebase-app and
+  // firebase-database, which the page loads at launch for live sharing, and
+  // database-compat then throws INTERNAL with no app to attach to — trading a
+  // flaky failure for a deterministic one that is still not about the code.
+  await page.route('https://www.gstatic.com/**/firebase-auth-compat.js', (r) => r.abort());
+  await page.route('https://www.gstatic.com/**/firebase-firestore-compat.js', (r) => r.abort());
+
   // The real promise is that a launch costs nothing for someone who never opens
   // the account panel. Check that BEFORE the menu, because opening it warms the
   // SDK on purpose — the popup has to open inside the user gesture (doc 17).
@@ -59,10 +78,10 @@ console.log('BETA (localhost is treated as beta)\n');
   check('offers Google sign-in', /Sign in with Google|Preparing sign-in/.test(acct.button || ''), true);
   check('says it is optional', /Optional/.test(acct.note || ''), true);
 
-  // Opening the panel asks for the SDK — but Chromium here has no route to
-  // gstatic, so it cannot arrive. Assert only that the request was made; whether
-  // warming actually completes is cloud-popup.test.mjs's job, since that one
-  // serves the SDK through route interception.
+  // Opening the panel asks for the SDK, and the route above guarantees it cannot
+  // arrive. Assert only that the request was made; whether warming actually
+  // completes is cloud-popup.test.mjs's job, since that one serves the SDK
+  // through route interception.
   const warmed = await page.evaluate(() => ({
     asked: !!document.querySelector('script[src*="firebase-auth-compat"]'),
     btn: (document.getElementById('cloudSignIn') || {}).textContent,
@@ -88,7 +107,12 @@ console.log('BETA (localhost is treated as beta)\n');
 // ------------------------------------------------------- PRODUCTION stays dark
 console.log('\nPRODUCTION (bunchbets.com — must be completely dark)\n');
 {
-  const page = await browser.newPage({ viewport: { width: 420, height: 900 } });
+  // Service workers BLOCKED. The worker precaches gstatic and serves it
+  // cache-first, and a service worker's fetch is not covered by page.route — so
+  // the auth SDK arrived from cache no matter what the route said, roughly one
+  // run in three depending on whether the worker had claimed the page yet.
+  const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, serviceWorkers: 'block' });
+  const page = await ctx.newPage();
   const errs = []; page.on('pageerror', (e) => errs.push(e.message));
   // Serve the same build under the production hostname so IS_BETA is false.
   await page.route('https://bunchbets.com/**', async (route) => {

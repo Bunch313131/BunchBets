@@ -310,6 +310,11 @@ body.is-beta header { box-shadow: inset 0 3px 0 #dc2626; }
 .cloud-invite { margin:4px 12px 8px; padding:10px 12px; border:1px solid var(--acc); border-radius:10px; font-size:13px; line-height:1.45; }
 .cloud-invite button { margin-top:8px; width:100%; padding:9px; border-radius:8px; border:none; background:var(--acc); color:#fff; font-weight:700; font-size:13px; cursor:pointer; }
 .cloud-backup { margin-top:8px; padding:7px 12px; border-radius:8px; border:1px solid var(--acc); background:none; color:var(--acc); font-weight:700; font-size:12px; cursor:pointer; }
+.wiz-tee { margin-top:14px; padding:12px; border:1px solid var(--border); border-radius:10px; background:var(--card); }
+.wiz-tee-row { display:flex; align-items:center; gap:10px; }
+.wiz-tee-label { font-size:13px; font-weight:700; flex:0 0 auto; }
+.wiz-tee-pick { flex:1; min-height:44px; padding:9px 12px; border-radius:8px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:var(--txt); font-size:15px; }
+.wiz-tee-msg { margin-top:8px; font-size:12px; color:var(--muted); line-height:1.45; }
 .wiz-cloud { margin-top:14px; padding:12px; border:1px dashed var(--border); border-radius:10px; }
 .wiz-cloud-msg { font-size:12.5px; color:var(--muted); line-height:1.45; }
 .wiz-cloud-btn { margin-top:10px; width:100%; padding:11px; border-radius:8px; border:none; background:var(--acc); color:#fff; font-weight:700; font-size:14px; cursor:pointer; }
@@ -715,9 +720,14 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.13';
+const APP_VERSION = '7.14';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.14': [
+    'Pick your tees on the player screen \u2014 handicaps re-derive as you change them',
+    'A handicap you type over stays yours, and changing tees no longer takes it back',
+    'Fixed: choosing a different course kept the old course\u2019s ratings, so handicaps came off the wrong slope',
+  ],
   '7.13': [
     'Tees \u2014 El Macero now carries all eight sets with their real ratings and slopes, defaulting to White',
     'Picking a group member fills his course handicap off the tee, converted from his live GHIN index',
@@ -2352,6 +2362,24 @@ const Game = {
       g.strokesCount[p.id] = parseInt(g.strokesCount[p.id])||0;
     });
     return g;
+  },
+
+  /**
+   * The rated tee sets the app knows for a course, or an empty list.
+   *
+   * Empty is a real answer and the safe one: no ratings means no conversion,
+   * so the handicap box is left alone rather than filled from a slope that
+   * belongs to a different golf course.
+   *
+   * Only El Macero is rated today, from the GHIN pull. Other courses get their
+   * tees when they are pulled — the lookup is by name so nothing here changes
+   * when they are.
+   */
+  teesFor(courseName) {
+    if (courseName === BB_DEFAULT_COURSE.name) {
+      return JSON.parse(JSON.stringify(BB_DEFAULT_COURSE.tees));
+    }
+    return [];
   },
 
   /**
@@ -4500,6 +4528,10 @@ const Wizard = {
               State.data.course.name = this.data.selectedCourse;
             }
           }
+          // The tees belong to the course. Leaving the previous course's
+          // ratings attached would compute every handicap off the wrong slope,
+          // with nothing on screen to say so.
+          Wizard.setCourseTees(State.data.course.name);
         }
         this.step = 'players';
         this.render();
@@ -4640,6 +4672,70 @@ const Wizard = {
   },
 
   /**
+   * Point the course at a named course's tees, keeping the current tee if that
+   * course also has one by that name.
+   */
+  setCourseTees(courseName) {
+    const tees = Game.teesFor(courseName);
+    State.data.course.tees = tees;
+    const keep = tees.filter((t) => t.name === State.data.course.teeName)[0];
+    State.data.course.teeName = keep ? keep.name
+      : (tees.filter((t) => t.name === BB_DEFAULT_COURSE.teeName)[0] || tees[0] || {}).name || null;
+  },
+
+  /**
+   * The tee row on the players step.
+   *
+   * It sits here rather than on the course screen because this is where the
+   * numbers it produces are visible — change the tee and you watch the
+   * handicaps move. It belongs on the course screen in the redesign.
+   */
+  teeStrip() {
+    const tees = (State.data.course.tees) || [];
+    const esc = (t) => String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    if (!tees.length) {
+      return '<div class="wiz-tee"><div class="wiz-tee-msg">No ratings on file for ' +
+        esc(State.data.course.name) + ', so handicaps stay as you type them.</div></div>';
+    }
+    const cur = Game.selectedTee(State.data.course);
+    return '<div class="wiz-tee">' +
+      '<div class="wiz-tee-row"><span class="wiz-tee-label">Tees</span>' +
+      '<select id="wizardTee" class="wiz-tee-pick">' +
+      tees.map((t) => '<option value="' + esc(t.name) + '"' +
+        (cur && t.name === cur.name ? ' selected' : '') + '>' + esc(t.name) + '</option>').join('') +
+      '</select></div>' +
+      (cur ? '<div class="wiz-tee-msg">' + esc(cur.yardage) + ' yds \u00b7 ' +
+        esc(cur.rating) + ' / ' + esc(cur.slope) +
+        ' \u2014 course handicaps come off this tee.</div>' : '') +
+      '</div>';
+  },
+
+  /**
+   * Re-derive the handicaps that came from a tee, and leave alone the ones that
+   * did not.
+   *
+   * `hcpFromTee` is set when this filled the box and cleared the moment anybody
+   * types in it. Reverting a number somebody entered by hand — because they
+   * know something the index does not — would be the same quiet wrongness as
+   * every other bug this week.
+   */
+  retee() {
+    const tee = Game.selectedTee(State.data.course);
+    this.data.players.forEach((p) => {
+      // Recompute from the index STORED ON THE PLAYER, not by looking the man up
+      // in the pool again. The pool is cloud state: it is empty while the SDK is
+      // still loading, and it empties again on any sign-out. Re-deriving from it
+      // means changing tees in the wrong half-second silently does nothing —
+      // no error, just handicaps that stayed on the old tee.
+      if (!p.hcpFromTee || p.index == null) return;
+      const ch = Game.courseHandicap(p.index, tee);
+      if (ch != null) p.handicap = ch;
+    });
+    this.render();
+  },
+
+  /**
    * Names offered by the picker: the group pool first, then anyone this phone
    * has played with who is not in it.
    *
@@ -4709,7 +4805,9 @@ const Wizard = {
         if (!k || seen[k]) return;
         seen[k] = 1;
         (g.aliases || []).forEach((a) => { const ak = norm(a); if (ak) seen[ak] = 1; });
-        out.push({ name: g.name, index: g.currentIndex || null, handicap: handicapFor(g) });
+        const ch = Game.courseHandicap(g.currentIndex, tee);
+        out.push({ name: g.name, index: g.currentIndex || null,
+                   handicap: ch == null ? lastPlayedOff(g) : ch, fromTee: ch != null });
       });
     }
     local.forEach((r) => {
@@ -4800,6 +4898,7 @@ const Wizard = {
         </div>
         <div id="wizardPlayersList">${playersHtml}</div>
         ${this.data.players.length < 5 ? '<button class="wizard-add-btn" id="wizardAddPlayer">+ Add Player</button>' : ''}
+        ${this.teeStrip()}
         ${this.cloudStrip()}
       </div>
       <div class="wizard-footer">
@@ -4833,6 +4932,8 @@ const Wizard = {
             : '<span style="color:var(--muted);font-size:12px;">HCP ' + (r.handicap || 0) + '</span>';
           return '<div class="roster-pick" data-name="' + r.name + '" data-hcp="' +
             (r.handicap == null ? '' : r.handicap) +
+            '" data-from-tee="' + (r.fromTee ? '1' : '0') +
+            '" data-index="' + (r.index == null ? '' : r.index) +
             '" style="padding:10px 12px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
             '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + r.name + '</span>' + right + '</div>';
         }).join('');
@@ -4847,6 +4948,11 @@ const Wizard = {
             // one from the index would be 1-2 strokes light every time.
             const hcp = pick.dataset.hcp;
             if (hcp !== '') this.data.players[i].handicap = parseInt(hcp) || 0;
+            // Remember whether this number came off the tee, and the index it
+            // came from, so changing tees can re-derive it without trampling one
+            // that was typed by hand and without needing the cloud again.
+            this.data.players[i].hcpFromTee = pick.dataset.fromTee === '1';
+            this.data.players[i].index = pick.dataset.index || null;
             dropdown.style.display = 'none';
             this.render();
           };
@@ -4868,7 +4974,9 @@ const Wizard = {
 
       div.querySelectorAll('input[data-field="handicap"]').forEach(input => {
         input.oninput = (e) => {
-          this.data.players[parseInt(e.target.dataset.idx)].handicap = parseInt(e.target.value) || 0;
+          const pl = this.data.players[parseInt(e.target.dataset.idx)];
+          pl.handicap = parseInt(e.target.value) || 0;
+          pl.hcpFromTee = false;   // typed by hand: the tee no longer owns it
         };
       });
 
@@ -4878,6 +4986,13 @@ const Wizard = {
           this.render();
         };
       });
+
+      const teeSel = div.querySelector('#wizardTee');
+      if (teeSel) teeSel.onchange = (e) => {
+        State.data.course.teeName = e.target.value;
+        State.scheduleSave();
+        Wizard.retee();
+      };
 
       const signIn = div.querySelector('#wizardSignIn');
       if (signIn) signIn.onclick = () => Cloud.signIn();   // synchronous: the popup needs the tap

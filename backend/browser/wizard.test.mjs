@@ -64,6 +64,13 @@ async function boot({ seed = PLAYED, cloud = null } = {}) {
   page.on('pageerror', (e) => errs.push(e.message));
   page.on('dialog', (d) => d.accept());
 
+  // Nothing external resolves. Without this, opening the players step warms the
+  // real Firebase SDK, auth reports "nobody signed in", and Cloud.user is set
+  // back to null — quietly undoing the stub these tests are built on. Every
+  // cloud assertion below would then be passing for the wrong reason.
+  await page.route('**://**', (route) =>
+    route.request().url().startsWith(ORIGIN) ? route.continue() : route.abort());
+
   await page.goto(ORIGIN + '/index.html', { waitUntil: 'domcontentloaded' });
   await page.evaluate((s) => {
     localStorage.setItem('nassauV28_complete', JSON.stringify(s));
@@ -315,6 +322,119 @@ console.log('\nthe picker offers the group, and never invents a course handicap\
 }
 
 // --------------------------------------------------------------------------
+console.log('\nthe tee is pickable, and it moves the numbers\n');
+{
+  const POOL = [
+    { id: 'ghin:1506580', name: 'Brian Bunch', currentIndex: '7.0', aliases: ['Bunch'] },
+    { id: 'ghin:9857501', name: 'Timothy Mar', currentIndex: '18.7', aliases: ['Tim'] },
+  ];
+  const { page, ctx, errs } = await boot({
+    cloud: { user: { uid: 'u', email: 'b@x.com' }, groups: [{ id: 'nunes', name: 'Nunes' }], pool: POOL },
+  });
+  await page.evaluate(() => {
+    window._bb.Wizard.data.players = [
+      { name: 'Brian Bunch', handicap: 8, hcpFromTee: true, index: '7.0' },
+      { name: 'Timothy Mar', handicap: 21, hcpFromTee: true, index: '18.7' },
+      { name: 'Visiting Steve', handicap: 20 },        // no index, typed by hand
+    ];
+    window._bb.Wizard.active = true;
+    window._bb.Wizard.step = 'players';
+    window._bb.Wizard.render();
+  });
+  await page.waitForTimeout(300);
+
+  check('the tee is on screen', await page.locator('#wizardTee').count(), 1);
+  check('  showing all eight', await page.locator('#wizardTee option').count(), 8);
+  check('  set to White', await page.inputValue('#wizardTee'), 'White');
+  check('  with its rating and slope stated',
+    /6499 yds \u00b7 72 \/ 129/.test(await page.textContent('.wiz-tee')), true);
+
+  // Blue is 137 against White's 129, so every derived handicap goes up.
+  await page.selectOption('#wizardTee', 'Blue');
+  await page.waitForTimeout(250);
+  const moved = await page.evaluate(() => window._bb.Wizard.data.players.map((p) => p.handicap));
+  check('moving to Blue re-derives the handicaps it filled', moved.slice(0, 2), [8, 23]);
+  check('  and leaves a hand-typed one alone', moved[2], 20);
+  check('the course remembers the tee', await page.evaluate(() => window._bb.State.data.course.teeName), 'Blue');
+
+  // A number typed over is the player's, and the tee must not take it back.
+  // 15 is deliberately a number NO tee would produce for an 18.7 — the range
+  // across all eight is 19 to 23. An assertion that happens to match what the
+  // recompute would have written proves nothing, and the first version of this
+  // used 19, which is exactly what Gold derives.
+  await page.evaluate(() => {
+    const el = document.querySelectorAll('.wizard-player-row input[data-field="handicap"]')[1];
+    el.focus(); el.value = '15'; el.dispatchEvent(new Event('input', { bubbles: true })); el.blur();
+  });
+  await page.waitForTimeout(120);
+  check('typing over a handicap releases it from the tee',
+    await page.evaluate(() => window._bb.Wizard.data.players[1].hcpFromTee), false);
+  await page.selectOption('#wizardTee', 'Gold');
+  await page.waitForTimeout(250);
+  const held = await page.evaluate(() => window._bb.Wizard.data.players.map((p) => p.handicap));
+  check('  so changing tees again does NOT revert it', held[1], 15);
+  check('    and 15 is not what Gold would have derived',
+    await page.evaluate(() => window._bb.Game.courseHandicap('18.7',
+      window._bb.Game.selectedTee(window._bb.State.data.course))), 19);
+  check('  while the untouched one still follows the tee', held[0], 7);
+
+  // The pool is cloud state and is empty while the SDK loads or after a sign
+  // out. Re-deriving from it would mean changing tees in that window silently
+  // did nothing, so the index rides on the player instead.
+  await page.evaluate(() => { window._bb.Cloud.user = null; window._bb.Cloud.pool = []; });
+  await page.selectOption('#wizardTee', 'Aggie');
+  await page.waitForTimeout(250);
+  check('re-deriving does not need the pool', await page.evaluate(() => window._bb.Wizard.data.players[0].handicap), 9);
+
+  check('no page errors', errs, []);
+  await ctx.close();
+}
+
+console.log('\na course with no ratings switches the conversion off\n');
+{
+  const { page, ctx } = await boot({
+    cloud: { user: { uid: 'u', email: 'b@x.com' }, groups: [{ id: 'nunes', name: 'Nunes' }],
+             pool: [{ id: 'ghin:1586673', name: 'Gary Nunes', currentIndex: '10.4' }] },
+  });
+  // Picking a different course must not leave El Macero's ratings attached —
+  // every handicap would then come off the wrong slope, silently.
+  // Through the actual course step, not by calling setCourseTees directly:
+  // the wiring in that handler is the thing that was missing, and a test that
+  // calls the helper itself would pass with the handler empty.
+  await page.evaluate(() => {
+    window._bb.Wizard.active = true;
+    window._bb.Wizard.step = 'course';
+    window._bb.Wizard.render();
+  });
+  await page.waitForTimeout(400);
+  const picked = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll('.wizard-course-card')];
+    const del = cards.find((c) => c.dataset.course === 'Del Paso');
+    if (!del) return null;
+    del.click();
+    document.getElementById('wizardCourseNext').click();
+    return true;
+  });
+  check('Del Paso was selectable in the course list', picked, true);
+  await page.waitForTimeout(300);
+  const after = await page.evaluate(() => ({
+    tees: (window._bb.State.data.course.tees || []).length,
+    teeName: window._bb.State.data.course.teeName,
+    gary: window._bb.Wizard.pickerRoster().find((x) => x.name === 'Gary Nunes'),
+  }));
+  check('the course actually changed', await page.evaluate(() => window._bb.State.data.course.name), 'Del Paso');
+  check('the old course\u2019s tees are gone', after.tees, 0);
+  check('  and no tee is selected', after.teeName, null);
+  check('so no handicap is derived', after.gary.handicap === undefined, true);
+  check('  and it is not marked as coming from a tee', !!after.gary.fromTee, false);
+
+  await page.evaluate(() => { window._bb.Wizard.active = true; window._bb.Wizard.step = 'players'; window._bb.Wizard.render(); });
+  await page.waitForTimeout(250);
+  check('the screen says why', /No ratings on file for Del Paso/.test(await page.textContent('.wiz-tee')), true);
+  check('  and offers no tee to pick', await page.locator('#wizardTee').count(), 0);
+  await ctx.close();
+}
+
 console.log('\nsigned out, the step still works — sign-in is offered, not required\n');
 {
   const { page, ctx, errs } = await boot();
