@@ -496,6 +496,79 @@ console.log('\nthe tee is pickable, and it moves the numbers\n');
   await ctx.close();
 }
 
+console.log('\nthe course screen says which course it is talking about\n');
+{
+  // Brian, on the first real look at this screen: "it looks like the tees are
+  // part of the scrollable part and is confusing. We are selecting Elmo white
+  // here but it looks like Ancil Hoffman."
+  //
+  // Two separate defects behind that, both of which put the wrong course's
+  // numbers in front of you with nothing on screen to say so.
+  const { page, ctx, errs } = await boot();
+  const NEW = await page.evaluate(() => !!window._bb.NEW_WIZARD);
+  if (!NEW) { console.log('  (old flow — the course screen has no tee panel)'); await ctx.close(); }
+  else {
+    await showTeeStep(page);
+    const panel = async () => (await page.textContent('#wizardCourseTee')).replace(/\s+/g, ' ').trim();
+
+    // 1. The panel is DOCKED, not the last item in the scrolling list. Sharing
+    //    the page background and the scroll box is what made it read as
+    //    belonging to whatever course happened to be scrolled to.
+    const geom = await page.evaluate(() => {
+      const list = document.getElementById('wizardCourseList');
+      const dock = document.getElementById('wizardCourseTee');
+      return { inside: !!(list && dock && list.contains(dock)),
+               scrolls: !!(list && list.scrollHeight > list.clientHeight),
+               edge: dock ? getComputedStyle(dock).borderTopWidth : null };
+    });
+    check('the course list really does scroll', geom.scrolls, true);
+    check('  but the tee panel is not inside it', geom.inside, false);
+    check('  and has an edge of its own', geom.edge !== '0px', true);
+
+    check('the panel names the course, not just the tee', /El Macero/.test(await panel()), true);
+
+    // 2. Tapping a different card must move the NAME too. State.data.course.name
+    //    is not updated until Next, so reading it here named the course you had
+    //    just moved away from: tap Ancil Hoffman, read "El Macero".
+    await page.evaluate(() => {
+      const c = [...document.querySelectorAll('.wizard-course-card')]
+        .filter((x) => x.dataset.course === 'Ancil Hoffman')[0];
+      if (c) c.click();
+    });
+    await page.waitForTimeout(300);
+    const moved = await panel();
+    check('tapping another course moves the name with it', /Ancil Hoffman/.test(moved), true);
+    check('  and does NOT still name the one you left', /El Macero/.test(moved), false);
+    check('  the committed course is untouched until Next',
+      await page.evaluate(() => window._bb.State.data.course.name), 'El Macero');
+
+    // 3. Coming Back must not silently re-select the top of the list. This one
+    //    moves money: the first card's stroke allocation is not the allocation
+    //    of the course you chose, and every net bet settles on the wrong holes.
+    await page.evaluate(() => {
+      const c = [...document.querySelectorAll('.wizard-course-card')]
+        .filter((x) => x.dataset.course === 'Del Paso')[0];
+      if (c) c.click();
+      document.getElementById('wizardCourseNext').click();
+    });
+    await page.waitForTimeout(350);
+    check('Next commits the course you picked',
+      await page.evaluate(() => window._bb.State.data.course.name), 'Del Paso');
+    await showTeeStep(page);
+    check('coming Back keeps it selected, not the first card',
+      await page.evaluate(() => window._bb.Wizard.data.selectedCourse), 'Del Paso');
+    check('  the highlight agrees',
+      await page.evaluate(() => {
+        const sel = document.querySelector('.wizard-course-card.selected');
+        return sel ? sel.dataset.course : null;
+      }), 'Del Paso');
+    check('  and the panel still names it', /Del Paso/.test(await panel()), true);
+
+    check('no page errors', errs, []);
+    await ctx.close();
+  }
+}
+
 console.log('\na course with no ratings switches the conversion off\n');
 {
   const { page, ctx } = await boot({
@@ -535,7 +608,10 @@ console.log('\na course with no ratings switches the conversion off\n');
   check('  and it is not marked as coming from a tee', !!after.gary.fromTee, false);
 
   await showTeeStep(page);
-  check('the screen says why', /No ratings on file for Del Paso/.test(await page.textContent('.wiz-tee')), true);
+  const unratedPanel = (await page.textContent('.wiz-tee')).replace(/\s+/g, ' ');
+  check('the panel names the course it is talking about', /Del Paso/.test(unratedPanel), true);
+  check('  and says why there is nothing to pick',
+    /No ratings on file, so handicaps stay as you type them/.test(unratedPanel), true);
   check('  and offers no tee to pick', await page.locator('#wizardTee').count(), 0);
   await ctx.close();
 }

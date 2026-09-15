@@ -311,6 +311,13 @@ body.is-beta header { box-shadow: inset 0 3px 0 #dc2626; }
 .cloud-invite button { margin-top:8px; width:100%; padding:9px; border-radius:8px; border:none; background:var(--acc); color:#fff; font-weight:700; font-size:13px; cursor:pointer; }
 .cloud-backup { margin-top:8px; padding:7px 12px; border-radius:8px; border:1px solid var(--acc); background:none; color:var(--acc); font-weight:700; font-size:12px; cursor:pointer; }
 .wiz-tee { margin-top:14px; padding:12px; border:1px solid var(--border); border-radius:10px; background:var(--card); }
+/* Docked under the course list, NOT inside it. The list scrolls and this does
+   not, so it needs a hard edge of its own — sharing the page background made it
+   read as the last card in the list, i.e. as belonging to whatever course
+   happened to be scrolled to rather than to the one that is selected. */
+.wiz-tee-dock { flex:0 0 auto; padding:0 16px 12px; border-top:1px solid var(--border); background:var(--card); }
+.wiz-tee-dock .wiz-tee { margin-top:12px; }
+.wiz-tee-course { font-size:12px; font-weight:800; letter-spacing:0.04em; text-transform:uppercase; color:var(--muted); margin-bottom:9px; }
 .wiz-tee-row { display:flex; align-items:center; gap:10px; }
 .wiz-tee-label { font-size:13px; font-weight:700; flex:0 0 auto; }
 .wiz-tee-pick { flex:1; min-height:44px; padding:9px 12px; border-radius:8px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:var(--txt); font-size:15px; }
@@ -720,9 +727,14 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.17';
+const APP_VERSION = '7.18';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.18': [
+    'The tee panel now names the course it belongs to, and sits in its own bar below the course list instead of scrolling with it',
+    'Fixed: tapping a different course left the previous course\u2019s name on the tee panel',
+    'Fixed: going Back to the course screen quietly re-selected the top of the list \u2014 pressing Next again would have played the wrong course\u2019s stroke allocation',
+  ],
   '7.17': [
     'Setting up a round is now one question per screen — sign in, course and tees, players, games, teams, stakes, then a review before anything starts',
     'The tees moved onto the course screen, where the course is chosen — change them there and the handicaps follow',
@@ -4458,7 +4470,7 @@ const Wizard = {
       <div class="wizard-content" id="wizardCourseList">
         <div class="wizard-course-locating">Loading courses...</div>
       </div>
-      ${NEW_WIZARD ? '<div id="wizardCourseTee" style="padding:0 16px 12px;"></div>' : ''}
+      ${NEW_WIZARD ? '<div id="wizardCourseTee" class="wiz-tee-dock"></div>' : ''}
       <div class="wizard-footer">
         <div style="width:100%;display:flex;align-items:center;gap:10px;margin-bottom:6px;">
           <span style="font-size:13px;font-weight:600;white-space:nowrap;">Starting Hole:</span>
@@ -4580,11 +4592,30 @@ const Wizard = {
       feedbackLink.textContent = "Don\u2019t see your course? Request it here";
       container.appendChild(feedbackLink);
 
-      // Pre-select first course
-      if (firstCard) {
-        firstCard.classList.add('selected');
-        this.data.selectedCourse = firstCard.dataset.course;
-        this.data.selectedSource = firstCard.dataset.source || null;
+      // Pre-select the course already in play, and only fall back to the first
+      // card when there isn't one.
+      //
+      // This used to select the first card unconditionally, every time the list
+      // was built. Coming Back from the player step therefore threw away the
+      // course you had chosen — silently, since the highlight moved back to the
+      // top of the list as if you had never picked anything — and pressing Next
+      // again committed the first card's par and stroke allocation instead of
+      // the one you were playing. Every net bet of the round then settled on the
+      // wrong holes.
+      const want = this.data.selectedCourse || State.data.course.name;
+      const wanted = want
+        ? [...container.querySelectorAll('.wizard-course-card')]
+            .filter((c) => c.dataset.course === want)[0]
+        : null;
+      const pick = wanted || firstCard;
+      if (pick) {
+        pick.classList.add('selected');
+        this.data.selectedCourse = pick.dataset.course;
+        this.data.selectedSource = pick.dataset.source || null;
+        // Bring it into view: on a list of thirty it is otherwise off-screen,
+        // which is how the tee panel came to look like it belonged to whichever
+        // course happened to be scrolled to.
+        if (wanted) setTimeout(() => { try { pick.scrollIntoView({ block: 'nearest' }); } catch (e) {} }, 0);
       }
 
       // Click handlers
@@ -4607,7 +4638,9 @@ const Wizard = {
       if (!NEW_WIZARD) return;
       const slot = div.querySelector('#wizardCourseTee');
       if (!slot) return;
-      slot.innerHTML = this.teeStrip();
+      // The card that is selected right now, not the course the last round was
+      // played at — Next is what commits the choice to State.
+      slot.innerHTML = this.teeStrip({ courseName: this.data.selectedCourse || State.data.course.name });
       const sel = slot.querySelector('#wizardTee');
       if (sel) sel.onchange = (e) => {
         State.data.course.teeName = e.target.value;
@@ -4810,22 +4843,31 @@ const Wizard = {
   },
 
   /**
-   * The tee row on the players step.
+   * The tee row: which tee, at which course.
    *
-   * It sits here rather than on the course screen because this is where the
-   * numbers it produces are visible — change the tee and you watch the
-   * handicaps move. It belongs on the course screen in the redesign.
+   * IT NAMES THE COURSE, and the caller says which course that is. On the
+   * course screen the answer is the card you just tapped — `selectedCourse` —
+   * and NOT `State.data.course.name`, which still holds the previous round's
+   * course until Next commits the choice. Reading the committed name there put
+   * the wrong course's name on the panel: tap Ancil Hoffman and it answered
+   * "No ratings on file for El Macero", naming the course you had just moved
+   * away from. Tees and ratings are per course, so a panel that shows a slope
+   * without saying whose it is can only be read off the nearest thing on
+   * screen — which, in a list of thirty courses, is whatever you scrolled to.
    */
-  teeStrip() {
+  teeStrip(opts) {
+    const o = opts || {};
+    const name = o.courseName || State.data.course.name;
     const tees = (State.data.course.tees) || [];
     const esc = (t) => String(t == null ? '' : t)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const head = '<div class="wiz-tee-course">' + esc(name) + '</div>';
     if (!tees.length) {
-      return '<div class="wiz-tee"><div class="wiz-tee-msg">No ratings on file for ' +
-        esc(State.data.course.name) + ', so handicaps stay as you type them.</div></div>';
+      return '<div class="wiz-tee">' + head + '<div class="wiz-tee-msg">No ratings on file, ' +
+        'so handicaps stay as you type them.</div></div>';
     }
     const cur = Game.selectedTee(State.data.course);
-    return '<div class="wiz-tee">' +
+    return '<div class="wiz-tee">' + head +
       '<div class="wiz-tee-row"><span class="wiz-tee-label">Tees</span>' +
       '<select id="wizardTee" class="wiz-tee-pick">' +
       tees.map((t) => '<option value="' + esc(t.name) + '"' +
