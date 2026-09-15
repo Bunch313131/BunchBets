@@ -19,7 +19,21 @@
  *   node backend/browser/live-beta.mjs
  */
 import { chromium } from 'playwright';
-const URL = 'https://bunchbets-beta.pages.dev/';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Not named URL: that shadows the global URL constructor used just below.
+const SITE = 'https://bunchbets-beta.pages.dev/';
+
+// The version to expect is read out of the WORKING COPY, not typed in here.
+// Hardcoding it means editing this file every release, and the edit that gets
+// forgotten turns the one check that proves the deploy arrived into a check
+// that proves it did not — while reporting a pass for the previous release.
+const REPO = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../..');
+const WANT = (fs.readFileSync(path.join(REPO, 'index.html'), 'utf8')
+  .match(/APP_VERSION\s*=\s*'([^']+)'/) || [])[1];
+if (!WANT) { console.error('could not read APP_VERSION out of index.html'); process.exit(1); }
 let fail = 0;
 const check = (l, g, w) => { const ok = JSON.stringify(g) === JSON.stringify(w);
   if (!ok) fail++; console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${l}` + (ok ? '' : `\n          got  ${JSON.stringify(g)}\n          want ${JSON.stringify(w)}`)); };
@@ -28,11 +42,11 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, serviceWorkers: 'block' });
 const page = await ctx.newPage();
 const errs = []; page.on('pageerror', (e) => errs.push(e.message));
-await page.goto(URL + '?dev=1', { waitUntil: 'load' });
+await page.goto(SITE + '?dev=1', { waitUntil: 'load' });
 await page.waitForTimeout(2500);
 
-check('the live beta is serving 7.17',
-  await page.evaluate(() => window.BB_BUILD_MARKER), '7.17');
+check(`the live beta is serving ${WANT}, the version in the working copy`,
+  await page.evaluate(() => window.BB_BUILD_MARKER), WANT);
 check('it is beta, so the new flow is on',
   await page.evaluate(() => !!(window._bb && window._bb.NEW_WIZARD)), true);
 
@@ -50,6 +64,19 @@ check('a real launch lands on sign-in',
   await page.evaluate(() => window._bb.Wizard.step), 'signin');
 check('  with the skip offered, not a gate',
   (await page.textContent('#wizNext')).trim(), 'Continue without an account');
+// The tee panel names its course. Checked here as well as locally because it
+// is the thing Brian actually hit, and because a stale cached index.html would
+// serve the old panel while reporting the new version in the menu.
+await page.evaluate(() => { window._bb.Wizard.step = 'course'; window._bb.Wizard.render(); });
+await page.waitForTimeout(800);
+const dock = (await page.textContent('#wizardCourseTee')).replace(/\s+/g, ' ').trim();
+check('the tee panel names its course', /El Macero/i.test(dock), true);
+check('  and is docked outside the scrolling list',
+  await page.evaluate(() => {
+    const l = document.getElementById('wizardCourseList'), d = document.getElementById('wizardCourseTee');
+    return !!(l && d) && !l.contains(d) && getComputedStyle(d).borderTopWidth !== '0px';
+  }), true);
+
 check('no page errors', errs, []);
 console.log(fail ? `\n${fail} FAILURES` : '\nlive beta looks right');
 await browser.close();
