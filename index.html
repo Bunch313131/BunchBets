@@ -727,9 +727,13 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.18';
+const APP_VERSION = '7.19';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.19': [
+    'Fixed: Share results failed outright on any round with KP money \u2014 the sweeps and quads breakdown had been calling a function that was not there since 7.11',
+    'Fixed: switching a game\u2019s type to Skins, Wolf or 9-Point did not save or repaint',
+  ],
   '7.18': [
     'The tee panel now names the course it belongs to, and sits in its own bar below the course list instead of scrolling with it',
     'Fixed: tapping a different course left the previous course\u2019s name on the tee panel',
@@ -2070,29 +2074,6 @@ const History = {
   gameLabel(type) {
     const labels = {nassau:'Nassau', vegas:'Vegas', skins:'Skins', wolf:'Wolf', ninepoint:'9-Point'};
     return labels[type] || type;
-  },
-
-  /**
-   * The KP bet as its parts: holes won, then each bonus, per player.
-   *
-   * These used to arrive as one figure tagged "(Sweeps!)" — which says a bonus
-   * happened but not what it was worth, and the bonuses are the larger half. A
-   * sweep matches the hole money and a quad matches holes plus sweep, so a
-   * quadded round pays four times what the par 3s did. Reading that as a single
-   * number means the only way to check a settlement is to re-derive the
-   * multipliers by hand, which is how the 7.4 sweeps bug survived as long as it
-   * did.
-   *
-   * Zero parts are dropped so an ordinary round still shows one KP line.
-   */
-  kpParts(src, sz) {
-    const per = (v) => (v || 0) / (sz || 1);
-    const rows = [];
-    const base = per(src.kpBase != null ? src.kpBase : (src.kpValue != null ? src.kpValue : src.kp));
-    if (Math.abs(base) > 0.005) rows.push({ label: 'KP', amount: base });
-    if (Math.abs(per(src.kpSweeps)) > 0.005) rows.push({ label: 'Sweeps', amount: per(src.kpSweeps) });
-    if (Math.abs(per(src.kpQuads)) > 0.005) rows.push({ label: 'Quads', amount: per(src.kpQuads) });
-    return rows;
   },
 
   show() {
@@ -6312,6 +6293,36 @@ const UI = {
     return p ? p.name : id;
   },
 
+  /**
+   * The KP bet as its parts: holes won, then each bonus, per player.
+   *
+   * These used to arrive as one figure tagged "(Sweeps!)" — which says a bonus
+   * happened but not what it was worth, and the bonuses are the larger half. A
+   * sweep matches the hole money and a quad matches holes plus sweep, so a
+   * quadded round pays four times what the par 3s did. Reading that as a single
+   * number means the only way to check a settlement is to re-derive the
+   * multipliers by hand, which is how the 7.4 sweeps bug survived as long as it
+   * did.
+   *
+   * Zero parts are dropped so an ordinary round still shows one KP line.
+   *
+   * IT LIVES ON UI, where all six callers are. It was defined on History in
+   * 7.11 — one object too early in the file — so every call to it threw
+   * "UI.kpParts is not a function" from the moment it shipped: both result
+   * panels, the round detail, the text share and the image share. It survived
+   * four releases because nothing exercised a KP breakdown, and the first
+   * person to meet it was Brian sharing a finished round from the course.
+   */
+  kpParts(src, sz) {
+    const per = (v) => (v || 0) / (sz || 1);
+    const rows = [];
+    const base = per(src.kpBase != null ? src.kpBase : (src.kpValue != null ? src.kpValue : src.kp));
+    if (Math.abs(base) > 0.005) rows.push({ label: 'KP', amount: base });
+    if (Math.abs(per(src.kpSweeps)) > 0.005) rows.push({ label: 'Sweeps', amount: per(src.kpSweeps) });
+    if (Math.abs(per(src.kpQuads)) > 0.005) rows.push({ label: 'Quads', amount: per(src.kpQuads) });
+    return rows;
+  },
+
   gameLabel(g) {
     const abbr = (pid, used) => {
       const nm = this.playerName(pid);
@@ -6798,7 +6809,7 @@ const UI = {
         h('div',{class:'row',style:'margin-top:6px;flex-wrap:wrap;gap:8px;'},[
           h('label',{class:'nowrap'},[
             h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='nassau',
-              onchange:()=>{g.gameType='nassau';Game.sanitizeGame(g);State.scheduleSave();State.scheduleRender();}}),
+              onchange:()=>{g.gameType='nassau';Game.sanitize(g);State.scheduleSave();State.scheduleRender();}}),
             ' Nassau'
           ]),
           h('label',{class:'nowrap'},[
@@ -6814,17 +6825,17 @@ const UI = {
           ]),
           h('label',{class:'nowrap'},[
             h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='skins',
-              onchange:()=>{g.gameType='skins';g.withJunk=false;Game.sanitizeGame(g);State.scheduleSave();State.scheduleRender();}}),
+              onchange:()=>{g.gameType='skins';g.withJunk=false;Game.sanitize(g);State.scheduleSave();State.scheduleRender();}}),
             ' Skins'
           ]),
           h('label',{class:'nowrap'},[
             h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='wolf',
-              onchange:()=>{g.gameType='wolf';g.withJunk=false;Game.sanitizeGame(g);State.scheduleSave();State.scheduleRender();}}),
+              onchange:()=>{g.gameType='wolf';g.withJunk=false;Game.sanitize(g);State.scheduleSave();State.scheduleRender();}}),
             ' Wolf'
           ]),
           h('label',{class:'nowrap'},[
             h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='ninepoint',
-              onchange:()=>{g.gameType='ninepoint';g.withJunk=false;Game.sanitizeGame(g);State.scheduleSave();State.scheduleRender();}}),
+              onchange:()=>{g.gameType='ninepoint';g.withJunk=false;Game.sanitize(g);State.scheduleSave();State.scheduleRender();}}),
             ' 9-Point'
           ])
         ])
