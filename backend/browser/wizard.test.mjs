@@ -279,10 +279,14 @@ console.log('\ncarrying a saved round forward\n');
 
 console.log('\nthe picker offers the group, and never invents a course handicap\n');
 {
+  // DELIBERATELY OUT OF ORDER. Firestore hands the pool back in its own document
+  // order, and this list used to be built straight out of it — which reads as
+  // random on a phone and means scanning eighteen names to find one. A fixture
+  // listed alphabetically would pass whether or not anything sorted it.
   const POOL = [
-    { id: 'ghin:1506580', name: 'Brian Bunch', currentIndex: '7.0', aliases: ['Bunch'] },
-    { id: 'ghin:1586673', name: 'Gary Nunes', currentIndex: '10.4', aliases: ['Gary'] },
     { id: 'ghin:326845', name: 'Tyler Bryan', currentIndex: '+0.3', aliases: ['Tyler'] },
+    { id: 'ghin:1586673', name: 'Gary Nunes', currentIndex: '10.4', aliases: ['Gary'] },
+    { id: 'ghin:1506580', name: 'Brian Bunch', currentIndex: '7.0', aliases: ['Bunch'] },
   ];
   const { page, ctx, errs } = await boot({
     cloud: { user: { uid: 'u', email: 'b@x.com' }, groups: [{ id: 'nunes', name: 'Nunes' }], pool: POOL },
@@ -296,10 +300,17 @@ console.log('\nthe picker offers the group, and never invents a course handicap\
   ])));
 
   const r = await page.evaluate(() => window._bb.Wizard.pickerRoster());
-  check('the group comes first', r.slice(0, 3).map((x) => x.name),
+  check('the group comes first, in alphabetical order', r.slice(0, 3).map((x) => x.name),
     ['Brian Bunch', 'Gary Nunes', 'Tyler Bryan']);
+  check('  which is NOT the order the pool arrived in',
+    r.slice(0, 3).map((x) => x.name).join('|') !== 'Tyler Bryan|Gary Nunes|Brian Bunch', true);
   check('  each with a live index', r.slice(0, 3).map((x) => x.index), ['7.0', '10.4', '+0.3']);
   check('a guest from this phone is still offered', r.map((x) => x.name).includes('Visiting Steve'), true);
+  // Guests sort among themselves and stay AFTER the group. Merging the two
+  // would bury a group member among one-off visitors, and the group is who is
+  // nearly always playing.
+  check('  and lands after the group, not merged into it',
+    r.map((x) => x.name).indexOf('Visiting Steve') >= 3, true);
   check('  and is not duplicated by the pool', r.filter((x) => x.name === 'Brian Bunch').length, 1);
 
   // The rule that keeps the money right: an index is not a course handicap.

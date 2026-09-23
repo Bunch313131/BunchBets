@@ -42,7 +42,16 @@ const check = (label, got, want) => {
 };
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--headless=new'] });
-const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, serviceWorkers: 'block' });
+// A panel TALLER than the web view, which is the whole situation an opaque
+// status bar creates: screen.height 960, the window the app actually gets 900.
+// Without this the two are identical in headless and "--app-height is the
+// window, not the panel" passes whichever one the app reads — a green tick over
+// the exact regression.
+const ctx = await browser.newContext({
+  viewport: { width: 420, height: 900 },
+  screen: { width: 420, height: 960 },
+  serviceWorkers: 'block',
+});
 const page = await ctx.newPage();
 const errs = [];
 page.on('pageerror', (e) => errs.push(e.message));
@@ -127,6 +136,44 @@ check('  light mode moves it', followed.augustaLight !== followed.augustaDark, t
 check('  and so does changing theme', followed.tourLight !== followed.augustaLight, true);
 check('  none of them is the old hardcoded black',
   [followed.augustaDark, followed.augustaLight, followed.tourLight].includes('#000000'), false);
+
+console.log('\nthe app is the size of the window it is in\n');
+
+// The regression 7.20 caused. The body is pinned to --app-height with
+// overflow:hidden, and that was set from screen.height — the whole physical
+// panel. True while the app drew under a translucent status bar; ~50px too tall
+// the moment iOS started insetting the web view below an opaque one. The header
+// went off the top and the nav off the bottom.
+//
+// Headless Chromium has no status bar, so the inset itself cannot be
+// reproduced. What can be is the shape of the fault: an --app-height taller
+// than the window clips the chrome at both ends. So assert the source it is
+// read from, and then assert the consequence directly by forcing a bad value.
+const h = await page.evaluate(() => ({
+  app: parseInt(getComputedStyle(document.documentElement).getPropertyValue('--app-height'), 10),
+  inner: window.innerHeight,
+  screen: window.screen.height,
+  body: Math.round(document.body.getBoundingClientRect().height),
+}));
+check('--app-height is the window, not the panel', h.app, h.inner);
+check('  and the body fits inside the window', h.body <= h.inner, true);
+// The context above makes them differ on purpose. If they were equal the check
+// above would pass whichever value the app read, which is no check at all.
+check('  (panel and window really do differ here, so that proved something)',
+  h.screen - h.inner, 60);
+
+const clipped = await page.evaluate(() => {
+  const root = document.documentElement;
+  const before = root.style.getPropertyValue('--app-height');
+  root.style.setProperty('--app-height', (window.innerHeight + 60) + 'px');
+  const nav = document.querySelector('.bottom-nav');
+  const r = nav ? nav.getBoundingClientRect() : null;
+  const off = !!r && r.bottom > window.innerHeight + 1;
+  root.style.setProperty('--app-height', before);
+  return { hadNav: !!r, off };
+});
+check('a too-tall --app-height really does push the chrome off screen',
+  clipped.hadNav && clipped.off, true);
 
 check('no page errors', errs, []);
 console.log(fail ? `\n${fail} FAILURES` : '\nall checks passed');

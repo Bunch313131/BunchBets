@@ -70,14 +70,36 @@
   });
 })();
 </script>
-<!-- Viewport height fix — must run before body renders to avoid flash -->
+<!-- Viewport height fix — must run before body renders to avoid flash.
+
+     window.innerHeight, NOT screen.height.
+
+     screen.height is the whole physical panel. That was right for exactly as
+     long as the app drew under a translucent status bar and really did occupy
+     the whole panel. 7.20 made the status bar opaque, so iOS now insets the web
+     view below it — and the body went on being forced to the full panel height,
+     ~50px taller than the window it lives in, with overflow:hidden. The header
+     was pushed out of view at the top and the bottom nav off the end: "once you
+     get to gameplay, the black bar is gone from the top and the top header is
+     now cut off."
+
+     innerHeight is the layout viewport, which is exactly the web view. It also
+     does NOT shrink when the keyboard opens (visualViewport.height does, which
+     would collapse the whole app while somebody types a player's name), and in
+     a browser tab it tracks the URL bar the way 100dvh does.
+
+     screen.height survives only as the last-ditch fallback. -->
 <script>
 (function(){
   function setAppHeight(){
-    document.documentElement.style.setProperty('--app-height', screen.height + 'px');
+    var h = window.innerHeight || screen.height;
+    document.documentElement.style.setProperty('--app-height', h + 'px');
   }
   setAppHeight();
   window.addEventListener('resize', setAppHeight);
+  // innerHeight is not always settled while the head is still parsing, and the
+  // status bar inset in particular lands late on a cold launch in standalone.
+  window.addEventListener('load', setAppHeight);
   window.addEventListener('orientationchange', function(){ setTimeout(setAppHeight, 100); });
 })();
 </script>
@@ -754,9 +776,13 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.20';
+const APP_VERSION = '7.21';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.21': [
+    'Fixed: the header was cut off once a round started \u2014 7.20 left the app sized to the whole screen after iOS had already moved it below the status bar',
+    'Your group\u2019s names are now listed alphabetically instead of in whatever order they came back in',
+  ],
   '7.20': [
     'Fixed: the white shading bleeding down from the top of the screen \u2014 iOS 26 changed how it fills the status bar, and the app no longer draws into it',
     'The status bar now matches whichever theme you are on, instead of always being black',
@@ -5013,13 +5039,26 @@ const Wizard = {
                    handicap: ch == null ? lastPlayedOff(g) : ch, fromTee: ch != null });
       });
     }
+    // Sorted, because Cloud.pool arrives in Firestore's document order — which
+    // is neither the order anybody added them nor any order a human can hold in
+    // their head. With eighteen names it reads as random, and finding a man
+    // means scanning the whole list every time.
+    //
+    // Sorted WITHIN the two blocks, not across them: the group still comes
+    // first and guests still come after. Merging them would bury a group member
+    // among one-off visitors, and the group is who is nearly always playing.
+    const byName = (a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' });
+    out.sort(byName);
+
+    const guests = [];
     local.forEach((r) => {
       const k = norm(r.name);
       if (!k || seen[k]) return;
       seen[k] = 1;
-      out.push({ name: r.name, index: null, handicap: r.handicap || 0 });
+      guests.push({ name: r.name, index: null, handicap: r.handicap || 0 });
     });
-    return out;
+    guests.sort(byName);
+    return out.concat(guests);
   },
 
   /**
