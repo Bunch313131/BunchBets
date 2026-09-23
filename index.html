@@ -13,10 +13,35 @@
 <head>
 <meta charset="utf-8" />
 <meta name="color-scheme" content="dark" />
-<meta name="theme-color" content="#000000" />
+<!-- The first-paint value only. UI.syncStatusBarColor() replaces it with the
+     active theme's --status-bar as soon as the menu initialises; this is the
+     default theme's (Augusta, light) so the status bar does not flash black
+     above a green header on a cold launch. -->
+<meta name="theme-color" content="#2d6a3f" />
 <style>html,body{background:#000}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<!-- NOT black-translucent. Safari 26 ("Liquid Glass") stopped painting a fixed
+     colour behind the status bar and started SAMPLING the page pixels under it,
+     falling back to a white wash whenever it cannot read a flat colour there —
+     a semi-transparent header, a textured one, or a transparent root. This
+     app's header is all three at once depending on the theme: a repeating
+     gradient over var(--card), which is rgba() on Midnight.
+
+     The result was a white gradient bleeding down from the top, past the
+     cutout, over the header. iOS 27 made it stronger. It is not ours to fix in
+     CSS — Apple has published nothing, and the behaviour is reverse-engineered
+     — so the fix is to stop putting content up there at all. `default` insets
+     the web view below an opaque status bar, and that bar is filled with
+     `theme-color`, which UI.syncStatusBarColor() keeps matching the header.
+
+     `viewport-fit=cover` stays: it still governs the home indicator, the
+     landscape side insets, and the browser (non-installed) case, and every
+     env(safe-area-inset-*) in this file simply resolves to 0 at the top when
+     the status bar is opaque.
+
+     NOTE FOR WHOEVER TESTS THIS: an already-installed home-screen app keeps
+     the old style. The icon has to be deleted and re-added. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&display=swap" rel="stylesheet">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
@@ -34,8 +59,10 @@
   if (m) m.href = 'manifest.beta.webmanifest';
   var a = document.querySelector('link[rel="apple-touch-icon"]');
   if (a) a.href = 'BunchBetsBeta180.png';
-  var t = document.querySelector('meta[name="theme-color"]');
-  if (t) t.content = '#7f1d1d';
+  // Beta used to stain the status bar red to mark the environment. It cannot
+  // any more: the bar is now a solid band butted against the header, and a red
+  // stripe above a green header reads as a rendering fault rather than a label.
+  // The BETA badge in the header says the same thing without the seam.
   document.addEventListener('DOMContentLoaded', function(){
     document.body.classList.add('is-beta');
     var logo = document.querySelector('.header-brand img');
@@ -75,12 +102,12 @@ if (!window._bbDev) {
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 <style>
 /* Theme 1: Classic (current colors preserved — clean, modern, no frills) */
-:root, :root[data-theme="classic"] { --bg:#0b0e13; --card:#0f1420; --txt:#ecf0f6; --muted:#a3a9b6; --border:#1e2633; --acc:#3b82f6; --success:#16a34a; --danger:#dc2626; --warning:#d97706; --gold:#c9a96e; --radius:14px; --font-display:system-ui,-apple-system,Segoe UI,Roboto,Arial; --header-bg:var(--card); color-scheme: dark; }
-:root[data-theme="classic"].light-mode { --bg:#f5f5f7; --card:#ffffff; --txt:#1d1d1f; --muted:#6e6e73; --border:#d2d2d7; --acc:#3b82f6; --success:#16a34a; --danger:#dc2626; --warning:#d97706; --gold:#a07d3f; color-scheme: light; }
+:root, :root[data-theme="classic"] { --status-bar:#0f1420; --bg:#0b0e13; --card:#0f1420; --txt:#ecf0f6; --muted:#a3a9b6; --border:#1e2633; --acc:#3b82f6; --success:#16a34a; --danger:#dc2626; --warning:#d97706; --gold:#c9a96e; --radius:14px; --font-display:system-ui,-apple-system,Segoe UI,Roboto,Arial; --header-bg:var(--card); color-scheme: dark; }
+:root[data-theme="classic"].light-mode { --status-bar:#ffffff; --bg:#f5f5f7; --card:#ffffff; --txt:#1d1d1f; --muted:#6e6e73; --border:#d2d2d7; --acc:#3b82f6; --success:#16a34a; --danger:#dc2626; --warning:#d97706; --gold:#a07d3f; color-scheme: light; }
 
 /* Theme 2: Augusta — Masters inspired, rich greens, gold accents, serif elegance */
-:root[data-theme="augusta"] { --bg:#0a3d1c; --card:#0f4d26; --txt:#f5f0e1; --muted:#a8c4a0; --border:#1e6e38; --acc:#c8a951; --success:#6fd08c; --danger:#e74c4c; --warning:#daa520; --gold:#c8a951; --radius:6px; --font-display:Georgia,'Times New Roman',serif; --header-bg:linear-gradient(180deg,#0f4d26,#0a3d1c); color-scheme: dark; }
-:root[data-theme="augusta"].light-mode { --bg:#f5f0e1; --card:#fffef8; --txt:#1a2e1d; --muted:#3d5a44; --border:#c5d4b8; --acc:#8b6f2e; --success:#16a34a; --danger:#dc2626; --warning:#b8860b; --gold:#8b6f2e; --header-bg:linear-gradient(180deg,#2d6a3f,#1a5c2e); color-scheme: light; }
+:root[data-theme="augusta"] { --status-bar:#0f4d26; --bg:#0a3d1c; --card:#0f4d26; --txt:#f5f0e1; --muted:#a8c4a0; --border:#1e6e38; --acc:#c8a951; --success:#6fd08c; --danger:#e74c4c; --warning:#daa520; --gold:#c8a951; --radius:6px; --font-display:Georgia,'Times New Roman',serif; --header-bg:linear-gradient(180deg,#0f4d26,#0a3d1c); color-scheme: dark; }
+:root[data-theme="augusta"].light-mode { --status-bar:#2d6a3f; --bg:#f5f0e1; --card:#fffef8; --txt:#1a2e1d; --muted:#3d5a44; --border:#c5d4b8; --acc:#8b6f2e; --success:#16a34a; --danger:#dc2626; --warning:#b8860b; --gold:#8b6f2e; --header-bg:linear-gradient(180deg,#2d6a3f,#1a5c2e); color-scheme: light; }
 /* Augusta structural overrides */
 [data-theme="augusta"] main h2, [data-theme="augusta"] main h3, [data-theme="augusta"] .card h2, [data-theme="augusta"] .card h3 { font-family:Georgia,'Times New Roman',serif; letter-spacing:0.5px; }
 [data-theme="augusta"] .card { border-radius:var(--radius); box-shadow:0 1px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05); border:1px solid var(--border); }
@@ -111,8 +138,8 @@ if (!window._bbDev) {
 [data-theme="augusta"] .theme-g4 .card { outline-color:rgba(99,102,241,.6); background:linear-gradient(0deg,rgba(99,102,241,.15),rgba(99,102,241,.15)) var(--card); }
 
 /* Theme 3: Midnight — dark luxury, neon accents, glass morphism, futuristic */
-:root[data-theme="midnight"] { --bg:#0a0a0f; --card:rgba(20,20,35,0.85); --txt:#e8e8f0; --muted:#7a7a9a; --border:rgba(100,100,180,0.2); --acc:#7c3aed; --success:#10b981; --danger:#f43f5e; --warning:#f59e0b; --gold:#a78bfa; --radius:20px; --font-display:'SF Pro Display',system-ui,-apple-system,Segoe UI; --header-bg:rgba(10,10,15,0.8); color-scheme: dark; }
-:root[data-theme="midnight"].light-mode { --bg:#f0f0f8; --card:rgba(255,255,255,0.9); --txt:#1a1a2e; --muted:#6a6a8a; --border:rgba(100,100,180,0.15); --acc:#7c3aed; --success:#10b981; --danger:#dc2626; --warning:#d97706; --gold:#7c3aed; --header-bg:rgba(240,240,248,0.8); color-scheme: light; }
+:root[data-theme="midnight"] { --status-bar:#0a0a0f; --bg:#0a0a0f; --card:rgba(20,20,35,0.85); --txt:#e8e8f0; --muted:#7a7a9a; --border:rgba(100,100,180,0.2); --acc:#7c3aed; --success:#10b981; --danger:#f43f5e; --warning:#f59e0b; --gold:#a78bfa; --radius:20px; --font-display:'SF Pro Display',system-ui,-apple-system,Segoe UI; --header-bg:rgba(10,10,15,0.8); color-scheme: dark; }
+:root[data-theme="midnight"].light-mode { --status-bar:#f0f0f8; --bg:#f0f0f8; --card:rgba(255,255,255,0.9); --txt:#1a1a2e; --muted:#6a6a8a; --border:rgba(100,100,180,0.15); --acc:#7c3aed; --success:#10b981; --danger:#dc2626; --warning:#d97706; --gold:#7c3aed; --header-bg:rgba(240,240,248,0.8); color-scheme: light; }
 /* Midnight structural overrides — glassmorphism */
 [data-theme="midnight"] .card { border-radius:var(--radius); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid var(--border); box-shadow:0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05); }
 [data-theme="midnight"] header { background:var(--header-bg); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border-bottom:1px solid var(--border); }
@@ -127,8 +154,8 @@ if (!window._bbDev) {
 [data-theme="midnight"] body { background-image:radial-gradient(ellipse at 50% 0%, rgba(124,58,237,0.08) 0%, transparent 60%); }
 
 /* Theme 4: Tour — ESPN/CBS sports broadcast, bold, high-energy */
-:root[data-theme="tour"] { --bg:#0c0c0c; --card:#1a1a1a; --txt:#ffffff; --muted:#999999; --border:#333333; --acc:#ff3b30; --success:#34c759; --danger:#ff3b30; --warning:#ff9500; --gold:#ffcc00; --radius:8px; --font-display:'Helvetica Neue',Helvetica,Arial,sans-serif; --header-bg:#1a1a1a; color-scheme: dark; }
-:root[data-theme="tour"].light-mode { --bg:#f2f2f2; --card:#ffffff; --txt:#000000; --muted:#666666; --border:#dddddd; --acc:#ff3b30; --success:#34c759; --danger:#ff3b30; --warning:#ff9500; --gold:#ff9500; --header-bg:#ffffff; color-scheme: light; }
+:root[data-theme="tour"] { --status-bar:#1a1a1a; --bg:#0c0c0c; --card:#1a1a1a; --txt:#ffffff; --muted:#999999; --border:#333333; --acc:#ff3b30; --success:#34c759; --danger:#ff3b30; --warning:#ff9500; --gold:#ffcc00; --radius:8px; --font-display:'Helvetica Neue',Helvetica,Arial,sans-serif; --header-bg:#1a1a1a; color-scheme: dark; }
+:root[data-theme="tour"].light-mode { --status-bar:#ffffff; --bg:#f2f2f2; --card:#ffffff; --txt:#000000; --muted:#666666; --border:#dddddd; --acc:#ff3b30; --success:#34c759; --danger:#ff3b30; --warning:#ff9500; --gold:#ff9500; --header-bg:#ffffff; color-scheme: light; }
 /* Tour structural overrides — sharp, bold, athletic */
 [data-theme="tour"] h1, [data-theme="tour"] h2, [data-theme="tour"] h3 { font-weight:900; text-transform:uppercase; letter-spacing:1.5px; }
 [data-theme="tour"] .card { border-radius:var(--radius); border-left:4px solid var(--acc); box-shadow:none; }
@@ -727,9 +754,14 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.19';
+const APP_VERSION = '7.20';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.20': [
+    'Fixed: the white shading bleeding down from the top of the screen \u2014 iOS 26 changed how it fills the status bar, and the app no longer draws into it',
+    'The status bar now matches whichever theme you are on, instead of always being black',
+    '\u26a0\ufe0f Delete the home-screen icon and add it again \u2014 an existing install keeps the old status bar',
+  ],
   '7.19': [
     'Fixed: Share results failed outright on any round with KP money \u2014 the sweeps and quads breakdown had been calling a function that was not there since 7.11',
     'Fixed: switching a game\u2019s type to Skins, Wolf or 9-Point did not save or repaint',
@@ -6586,6 +6618,30 @@ const UI = {
     document.body.style.overflow = '';
   },
 
+  /**
+   * Keep the iOS status bar the same colour as the header underneath it.
+   *
+   * With `apple-mobile-web-app-status-bar-style=default` the installed app sits
+   * BELOW an opaque status bar, and iOS fills that bar with `theme-color`. That
+   * meta tag was a hardcoded #000000 written once at load and never touched
+   * again, which was harmless while the app drew under a translucent bar and is
+   * not any more: black over Augusta's green header is a visible seam across
+   * the top of the screen, and on a light theme it is a black stripe.
+   *
+   * Each theme carries a `--status-bar` of its own rather than this trying to
+   * derive one. The header's real background is a repeating gradient over
+   * var(--card), and var(--card) is rgba() on Midnight — there is no single
+   * computed colour to read, and guessing one from a gradient string is the
+   * kind of cleverness that breaks the next time somebody adds a theme.
+   */
+  syncStatusBarColor() {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) return;
+    const c = getComputedStyle(document.documentElement)
+      .getPropertyValue('--status-bar').trim();
+    if (c) meta.setAttribute('content', c);
+  },
+
   initMenu() {
     document.getElementById('menuToggle').onclick = () => this.openMenu();
     document.getElementById('menuClose').onclick = () => this.closeMenu();
@@ -6594,6 +6650,7 @@ const UI = {
     // Theme color scheme (4 themes)
     const savedColorTheme = localStorage.getItem('bunchbets_theme') || 'augusta';
     document.documentElement.dataset.theme = savedColorTheme;
+    this.syncStatusBarColor();
 
     // Highlight active swatch
     const swatches = document.querySelectorAll('.theme-swatch');
@@ -6616,6 +6673,7 @@ const UI = {
         localStorage.setItem('bunchbets_theme', theme);
         gtag('event', 'theme_selected', { theme });
         updateSwatchHighlight(theme);
+        UI.syncStatusBarColor();
       };
     });
 
@@ -6628,9 +6686,13 @@ const UI = {
       document.documentElement.classList.add('light-mode');
       themeToggle.checked = true;
     }
+    // After the light/dark class is settled, not before: --status-bar differs
+    // between the two, and reading it first gives the wrong half of the theme.
+    this.syncStatusBarColor();
     themeToggle.onchange = () => {
       document.documentElement.classList.toggle('light-mode', themeToggle.checked);
       localStorage.setItem('bunchbets-theme', themeToggle.checked ? 'light' : 'dark');
+      UI.syncStatusBarColor();
     };
   },
 
