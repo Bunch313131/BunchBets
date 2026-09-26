@@ -60,22 +60,21 @@ const tapped = await page.evaluate(() => {
 });
 check('the splash was there to tap through', tapped, true);
 await page.waitForTimeout(2200);
-check('a real launch lands on sign-in',
-  await page.evaluate(() => window._bb.Wizard.step), 'signin');
-check('  with the skip offered, not a gate',
-  (await page.textContent('#wizNext')).trim(), 'Continue without an account');
-// The tee panel names its course. Checked here as well as locally because it
-// is the thing Brian actually hit, and because a stale cached index.html would
-// serve the old panel while reporting the new version in the menu.
-await page.evaluate(() => { window._bb.Wizard.step = 'course'; window._bb.Wizard.render(); });
+check('a real launch lands on home',
+  await page.evaluate(() => window._bb.Wizard.step), 'home');
+check('  offering a new round, a live one, and past ones',
+  await page.evaluate(() => ['#wizNewRound', '#wizJoin', '#wizHistory'].map((q) => !!document.querySelector(q))),
+  [true, true, true]);
+// Tees come on their own screen, after the course is committed, and name it.
+// Checked here as well as locally because a stale cached index.html would
+// serve the old screens while reporting the new version in the menu.
+await page.click('#wizNewRound');
 await page.waitForTimeout(800);
-const dock = (await page.textContent('#wizardCourseTee')).replace(/\s+/g, ' ').trim();
-check('the tee panel names its course', /El Macero/i.test(dock), true);
-check('  and is docked outside the scrolling list',
-  await page.evaluate(() => {
-    const l = document.getElementById('wizardCourseList'), d = document.getElementById('wizardCourseTee');
-    return !!(l && d) && !l.contains(d) && getComputedStyle(d).borderTopWidth !== '0px';
-  }), true);
+check('the course screen has no tees on it', await page.locator('.wz-tee-btn').count(), 0);
+await page.click('#wizNext');
+await page.waitForTimeout(800);
+check('the tee screen is headed with the course',
+  (await page.textContent('.wizard-header h2')).trim(), await page.evaluate(() => window._bb.State.data.course.name));
 
 check('no page errors', errs, []);
 console.log(fail ? `\n${fail} FAILURES` : '\nlive beta looks right');

@@ -95,8 +95,11 @@ page.on('console', (m) => {
 page.on('dialog', (d) => d.accept());
 await page.route('**://**', (r) => r.request().url().startsWith(ORIGIN) ? r.continue() : r.abort());
 
-await page.goto(ORIGIN + '/index.html?dev=1', { waitUntil: 'domcontentloaded' });
-await page.evaluate((s) => {
+// Seeded before the app runs, and only on the first load: loading once, writing
+// and reloading raced the blank round the first load saves on a timer.
+await ctx.addInitScript((s) => {
+  if (sessionStorage.getItem('__bbSeeded')) return;
+  sessionStorage.setItem('__bbSeeded', '1');
   localStorage.setItem('nassauV28_complete', JSON.stringify(s));
   localStorage.setItem('bunchbets-installed', 'true');
 }, ROUND);

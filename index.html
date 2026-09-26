@@ -152,8 +152,7 @@ if (!window._bbDev) {
 [data-theme="augusta"].light-mode .hole-scoring-nav .hole-nav-btn { background:rgba(255,255,255,0.2); color:#fff; }
 [data-theme="augusta"].light-mode .hole-dot.current { color:#fff; }
 [data-theme="augusta"].light-mode .scoring-toggle-btn.active { color:#fff; }
-[data-theme="augusta"] .score-drum { border-radius:6px; background:linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(200,169,81,0.06) 40%, rgba(200,169,81,0.06) 60%, rgba(0,0,0,0.4) 100%); box-shadow:inset 0 2px 6px rgba(0,0,0,0.5), inset 0 -2px 6px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.4); border-color:rgba(200,169,81,0.25); }
-[data-theme="augusta"] .score-drum-frame { border-color:var(--gold); border-radius:4px; box-shadow:0 0 8px rgba(200,169,81,0.3), inset 0 0 6px rgba(200,169,81,0.1); background:rgba(200,169,81,0.04); }
+[data-theme="augusta"] .score-step-btn::before { border-radius:4px; }
 [data-theme="augusta"] .theme-g1 .card { outline-color:rgba(22,163,74,.6); background:linear-gradient(0deg,rgba(22,163,74,.15),rgba(22,163,74,.15)) var(--card); }
 [data-theme="augusta"] .theme-g2 .card { outline-color:rgba(220,38,38,.6); background:linear-gradient(0deg,rgba(220,38,38,.15),rgba(220,38,38,.15)) var(--card); }
 [data-theme="augusta"] .theme-g3 .card { outline-color:rgba(217,119,6,.6); background:linear-gradient(0deg,rgba(217,119,6,.15),rgba(217,119,6,.15)) var(--card); }
@@ -171,8 +170,7 @@ if (!window._bbDev) {
 [data-theme="midnight"] .bottom-nav { background:var(--header-bg); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border-top:1px solid var(--border); }
 [data-theme="midnight"] .hole-dot.current { background:linear-gradient(135deg,#7c3aed,#a855f7); border-color:#a855f7; box-shadow:0 0 12px rgba(124,58,237,0.5); }
 [data-theme="midnight"] .scoring-toggle-btn.active { background:linear-gradient(135deg,#7c3aed,#a855f7); }
-[data-theme="midnight"] .score-drum { background:linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(124,58,237,0.05) 40%, rgba(124,58,237,0.05) 60%, rgba(0,0,0,0.5) 100%); box-shadow:inset 0 3px 8px rgba(0,0,0,0.6), inset 0 -3px 8px rgba(0,0,0,0.6), 0 0 20px rgba(124,58,237,0.15), 0 2px 4px rgba(0,0,0,0.4); border-color:rgba(124,58,237,0.3); }
-[data-theme="midnight"] .score-drum-frame { border-color:#a855f7; box-shadow:0 0 16px rgba(124,58,237,0.4), inset 0 0 10px rgba(124,58,237,0.15); background:rgba(124,58,237,0.06); }
+[data-theme="midnight"] .score-step-btn::before { box-shadow:0 0 10px rgba(124,58,237,0.3); }
 [data-theme="midnight"] body { background-image:radial-gradient(ellipse at 50% 0%, rgba(124,58,237,0.08) 0%, transparent 60%); }
 
 /* Theme 4: Tour — ESPN/CBS sports broadcast, bold, high-energy */
@@ -190,8 +188,8 @@ if (!window._bbDev) {
 [data-theme="tour"] .bottom-nav-btn.active { color:var(--acc); }
 [data-theme="tour"] .pill { border-radius:4px; font-weight:800; text-transform:uppercase; }
 [data-theme="tour"] .scoring-toggle-btn.active { background:var(--acc); }
-[data-theme="tour"] .score-drum { border-radius:8px; background:linear-gradient(180deg, rgba(0,0,0,0.6) 0%, rgba(255,59,48,0.03) 40%, rgba(255,59,48,0.03) 60%, rgba(0,0,0,0.6) 100%); box-shadow:inset 0 3px 8px rgba(0,0,0,0.7), inset 0 -3px 8px rgba(0,0,0,0.7), 0 2px 4px rgba(0,0,0,0.5); border-color:rgba(255,59,48,0.2); }
-[data-theme="tour"] .score-drum-frame { border-color:var(--acc); border-width:3px; border-radius:6px; box-shadow:0 0 10px rgba(255,59,48,0.3); }
+[data-theme="tour"] .score-step-btn { color:var(--txt); }
+[data-theme="tour"] .score-step-btn::before { border-radius:5px; border-color:var(--border); background:linear-gradient(180deg, color-mix(in srgb, var(--txt) 12%, var(--card)), color-mix(in srgb, var(--txt) 5%, var(--card))); }
 :root.light-mode input[type="text"], :root.light-mode input[type="tel"], :root.light-mode input[type="number"], :root.light-mode select { background:rgba(0,0,0,0.04); }
 :root.light-mode .menu-item:hover { background:rgba(0,0,0,0.05); }
 .theme-switch { position:relative; width:50px; height:26px; display:inline-block; }
@@ -470,6 +468,53 @@ body.is-beta header { box-shadow: inset 0 3px 0 #dc2626; }
 .wizard-option:hover { border-color:var(--acc); }
 .wizard-option.selected { border-color:var(--acc); background:rgba(59,130,246,0.1); }
 .wizard-option input[type="radio"] { width:18px; height:18px; }
+
+/* New-flow start: home, course, tees & first hole */
+.wz-account { display:flex; align-items:center; gap:12px; padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--card); margin-bottom:18px; }
+.wz-avatar { width:38px; height:38px; border-radius:50%; background:var(--acc); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px; flex:0 0 auto; }
+.wz-account-text { flex:1; min-width:0; }
+.wz-account-name { font-size:15px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wz-account-sub { font-size:12px; color:var(--muted); line-height:1.4; margin-top:2px; }
+.wz-account-btn { flex:0 0 auto; padding:8px 14px; border-radius:999px; border:none; background:var(--acc); color:#fff; font-size:13px; font-weight:700; cursor:pointer; }
+.wz-account-btn:disabled { opacity:.5; cursor:default; }
+.wz-choice { display:flex; align-items:center; gap:14px; width:100%; padding:14px; margin-bottom:10px; border-radius:14px; border:1px solid var(--border); background:var(--card); color:var(--txt); font:inherit; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:transform .1s; }
+.wz-choice:active { transform:scale(.98); }
+.wz-choice::after { content:'\203A'; margin-left:auto; font-size:24px; line-height:1; opacity:.45; }
+.wz-ico { width:44px; height:44px; border-radius:12px; flex:0 0 auto; display:flex; align-items:center; justify-content:center; font-size:22px; background:color-mix(in srgb, var(--acc) 14%, transparent); }
+.wz-choice b { display:block; font-size:16px; }
+.wz-choice .sub { display:block; font-size:12.5px; color:var(--muted); margin-top:2px; line-height:1.35; }
+.wz-choice.primary { background:var(--acc); border-color:var(--acc); color:#fff; }
+.wz-choice.primary .wz-ico { background:rgba(255,255,255,.18); }
+.wz-choice.primary .sub { color:rgba(255,255,255,.85); }
+.wz-link { display:block; width:100%; margin-top:8px; padding:8px; border:none; background:none; color:var(--muted); font-size:13px; text-decoration:underline; cursor:pointer; }
+.wz-search-row { display:flex; gap:8px; }
+.wz-search { flex:1; min-width:0; height:40px; padding:0 12px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--txt); font-size:15px; }
+.wz-chip { flex:0 0 auto; height:40px; padding:0 12px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--txt); font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.wz-chip:disabled { opacity:.5; }
+.wz-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; font-weight:700; margin:16px 2px 6px; }
+.wz-list { border:1px solid var(--border); border-radius:12px; background:var(--card); overflow:hidden; }
+.wz-row { display:flex; align-items:center; gap:10px; width:100%; min-height:48px; padding:10px 14px; border:none; border-top:1px solid var(--border); background:transparent; color:var(--txt); font:inherit; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.wz-row:first-child { border-top:none; }
+.wz-row .nm { flex:1; min-width:0; font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wz-row .meta { font-size:12px; color:var(--muted); white-space:nowrap; }
+.wz-row .tick { width:20px; height:20px; border-radius:50%; border:2px solid var(--border); flex:0 0 auto; display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:800; }
+.wz-row.selected { background:color-mix(in srgb, var(--acc) 10%, transparent); }
+.wz-row.selected .tick { background:var(--acc); border-color:var(--acc); }
+.wz-row.selected .tick::before { content:'\2713'; }
+.wz-row.new .nm { color:var(--acc); }
+.wz-request { display:block; text-align:center; margin:14px 0 4px; font-size:12px; color:var(--muted); text-decoration:none; }
+.wz-tees { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; }
+.wz-tee-btn { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; border:1px solid var(--border); background:var(--card); color:var(--txt); font:inherit; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.wz-tee-btn .dot { width:16px; height:16px; border-radius:50%; flex:0 0 auto; border:1px solid color-mix(in srgb, var(--txt) 30%, transparent); }
+.wz-tee-btn b { display:block; font-size:14.5px; line-height:1.25; overflow-wrap:anywhere; }
+.wz-tee-btn small { display:block; font-size:12px; color:var(--muted); }
+.wz-tee-btn span { min-width:0; }
+.wz-tee-btn.selected { border-color:var(--acc); box-shadow:inset 0 0 0 1px var(--acc); background:color-mix(in srgb, var(--acc) 10%, var(--card)); }
+.wz-caption { margin-top:8px; font-size:12.5px; color:var(--muted); line-height:1.45; }
+.wz-note { padding:12px; border:1px dashed var(--border); border-radius:12px; font-size:13px; color:var(--muted); line-height:1.45; }
+.wz-holes { display:grid; grid-template-columns:repeat(9, minmax(0,1fr)); gap:6px; }
+.wz-hole { aspect-ratio:1; padding:0; border-radius:50%; border:1px solid var(--border); background:var(--card); color:var(--txt); font:inherit; font-size:14px; font-weight:700; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.wz-hole.selected { background:var(--acc); border-color:var(--acc); color:#fff; }
 .wizard-team-zone { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; min-height:100px; text-align:center; }
 .wizard-team-zone h4 { margin:0 0 8px 0; font-size:13px; color:var(--muted); text-align:center; }
 .wizard-player-chip { display:inline-block; background:rgba(59,130,246,0.2); border:1px solid var(--acc); border-radius:20px; padding:6px 12px; margin:4px; font-size:13px; cursor:pointer; }
@@ -583,21 +628,32 @@ body.is-beta header { box-shadow: inset 0 3px 0 #dc2626; }
 .game-status-card { padding:2px 8px; margin-bottom:2px; }
 .game-status-card .card { padding:5px 8px !important; }
 
-/* Score drum picker — 3D wheel effect */
-.score-drum-wrap { display:flex; align-items:center; gap:8px; margin-left:auto; }
-.score-drum { position:relative; width:160px; height:49px; overflow:hidden; border-radius:14px; background:linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(255,255,255,0.03) 40%, rgba(255,255,255,0.03) 60%, rgba(0,0,0,0.3) 100%); box-shadow:inset 0 2px 6px rgba(0,0,0,0.5), inset 0 -2px 6px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.08); }
-.score-drum::before { content:''; position:absolute; inset:0; border-radius:14px; background:linear-gradient(90deg, rgba(0,0,0,0.4) 0%, transparent 20%, transparent 80%, rgba(0,0,0,0.4) 100%); z-index:1; pointer-events:none; }
-.score-drum::after { content:''; position:absolute; top:0; left:0; right:0; height:40%; background:linear-gradient(180deg, rgba(0,0,0,0.15) 0%, transparent 100%); border-radius:14px 14px 0 0; z-index:1; pointer-events:none; }
-.score-drum-track { display:flex; transition:transform 0.2s ease-out; height:100%; align-items:center; }
-.score-drum-num { width:52px; flex-shrink:0; height:41px; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:600; color:var(--muted); opacity:0.5; text-shadow:0 1px 2px rgba(0,0,0,0.3); }
-.score-drum-num.center { font-size:25px; font-weight:800; color:var(--txt); opacity:1; text-shadow:0 1px 0 rgba(255,255,255,0.15), 0 2px 4px rgba(0,0,0,0.3); }
-.score-drum-num.center.eagle, .score-drum-num.center.birdie { color:var(--success); text-shadow:0 0 8px rgba(22,163,74,0.3), 0 1px 0 rgba(255,255,255,0.1); }
-.score-drum-num.center.bogey, .score-drum-num.center.double-bogey { color:var(--danger); text-shadow:0 0 8px rgba(220,38,38,0.3), 0 1px 0 rgba(255,255,255,0.1); }
-.score-drum-frame { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:50px; height:43px; border:2px solid var(--acc); border-radius:12px; pointer-events:none; z-index:4; box-shadow:0 0 12px rgba(59,130,246,0.25), inset 0 0 8px rgba(59,130,246,0.1); background:rgba(59,130,246,0.04); }
-.score-drum-frame.eagle, .score-drum-frame.birdie { border-color:var(--success); box-shadow:0 0 12px rgba(22,163,74,0.3), inset 0 0 8px rgba(22,163,74,0.1); background:rgba(22,163,74,0.04); }
-.score-drum-frame.bogey, .score-drum-frame.double-bogey { border-color:var(--danger); box-shadow:0 0 12px rgba(220,38,38,0.3), inset 0 0 8px rgba(220,38,38,0.1); background:rgba(220,38,38,0.04); }
-.score-drum-touch { position:absolute; inset:0; z-index:5; cursor:grab; }
-.score-drum-touch:active { cursor:grabbing; }
+/* Score stepper. Replaced the swipe drum, which was 160px of mostly-dim
+   neighbouring numbers. The score wears the paper-card marks: circle for a
+   birdie, two for an eagle, a box for a bogey, two for a double or worse. */
+.score-step { display:flex; align-items:center; gap:0; margin-left:auto; flex-shrink:0; }
+/* The button is the full 36x44 tap target; the visible key is a smaller
+   square drawn behind the glyph, so the score is the biggest thing in the row. */
+.score-step-btn { position:relative; isolation:isolate; width:36px; height:44px; padding:0; border:none; background:transparent; color:var(--acc); font-size:18px; font-weight:700; line-height:1; display:flex; align-items:center; justify-content:center; cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+.score-step-btn::before { content:''; position:absolute; top:50%; left:50%; width:28px; height:28px; transform:translate(-50%,-50%); z-index:-1; border-radius:8px; border:1px solid color-mix(in srgb, var(--acc) 40%, var(--border)); background:linear-gradient(180deg, color-mix(in srgb, var(--acc) 20%, var(--card)), color-mix(in srgb, var(--acc) 8%, var(--card))); transition:transform .08s, background .15s; }
+.score-step-btn:active { color:#fff; }
+.score-step-btn:active::before { transform:translate(-50%,-50%) scale(.9); background:var(--acc); }
+.score-step-btn:disabled { opacity:.3; }
+.score-step-val { position:relative; width:46px; height:44px; padding:0; border:none; background:transparent; display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--txt); cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+.score-step-val::before, .score-step-val::after { content:''; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); pointer-events:none; }
+.score-step-val.birdie, .score-step-val.eagle { color:var(--success); }
+.score-step-val.bogey, .score-step-val.double-bogey { color:var(--danger); }
+.score-step-val.birdie::before { width:36px; height:36px; border:2px solid currentColor; border-radius:50%; }
+.score-step-val.eagle::before { width:40px; height:40px; border:2px solid currentColor; border-radius:50%; }
+.score-step-val.eagle::after { width:32px; height:32px; border:2px solid currentColor; border-radius:50%; }
+.score-step-val.bogey::before { width:34px; height:34px; border:2px solid currentColor; border-radius:4px; }
+.score-step-val.double-bogey::before { width:40px; height:40px; border:2px solid currentColor; border-radius:5px; }
+.score-step-val.double-bogey::after { width:32px; height:32px; border:2px solid currentColor; border-radius:3px; }
+/* Not yet entered: par, dimmed, underlined. Tap it to take par. */
+.score-step-val.unscored { color:var(--muted); opacity:.55; font-weight:700; }
+.score-step-val.unscored::before { width:22px; bottom:6px; top:auto; transform:translateX(-50%); border-bottom:2px dashed currentColor; }
+.score-step-val.pop { animation:scorePop .22s ease-out; }
+@keyframes scorePop { 0% { transform:scale(.75); } 60% { transform:scale(1.12); } 100% { transform:scale(1); } }
 /* Scorecard double-rule at Front/Back 9 boundary */
 td:nth-child(11), th:nth-child(11) { border-left:3px double var(--muted); }
 .money { color:var(--gold); font-weight:600; font-family:monospace; }
@@ -776,9 +832,15 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.23';
+const APP_VERSION = '7.24';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.24': [
+    'Fixed: the hole screen showed HCP 0 for everyone but one player \u2014 it was showing the strokes from the first match, not each player\u2019s handicap. The bets were always right',
+    'Scoring is \u2212 / + buttons again instead of the swipe wheel, and takes less room. Birdies get a circle and bogeys a box, like a paper card',
+    'Names on the scoring screens are shortened to \u201cT. Bryan\u201d so they stop getting cut off',
+    'Setup starts with a choice: new round, join a live round, or past rounds. The course and the tees are now separate screens, and the starting hole is one tap',
+  ],
   '7.23': [
     'The suggested matches in setup are smaller and quieter \u2014 lightly tinted instead of solid green and red, with the two sides next to each other, so all three matches fit on one screen',
   ],
@@ -4029,7 +4091,7 @@ const Wizard = {
       if (splash) {
         splash.classList.add('curtain-up');
         setTimeout(() => {
-          this.step = NEW_WIZARD ? 'signin' : 'course';
+          this.step = NEW_WIZARD ? 'home' : 'course';
           // The sign-in button opens a popup, which needs a live tap and cannot
           // wait on a 470KB download (doc 17), so the SDK has to already be on
           // its way by the time the curtain finishes.
@@ -4043,7 +4105,7 @@ const Wizard = {
           }
         }, 1400);
       } else {
-        this.step = NEW_WIZARD ? 'signin' : 'course';
+        this.step = NEW_WIZARD ? 'home' : 'course';
         if (NEW_WIZARD) Cloud.warm();
         this.render();
       }
@@ -4361,8 +4423,9 @@ const Wizard = {
     let content;
     switch(this.step) {
       case 'splash': content = this.renderSplash(); break;
-      case 'signin': content = this.renderSignIn(); break;
-      case 'course': content = this.renderCourse(); break;
+      case 'home': content = this.renderHome(); break;
+      case 'course': content = NEW_WIZARD ? this.renderCoursePick() : this.renderCourse(); break;
+      case 'tee': content = this.renderTee(); break;
       case 'courseSetup': content = this.renderCourseSetup(); break;
       case 'players': content = this.renderPlayers(); break;
       case 'games': content = this.renderGames(); break;
@@ -4375,11 +4438,11 @@ const Wizard = {
 
     // During splash, pre-render the NEXT step behind it so the curtain reveals
     // it. Hardcoding the course screen here meant the new flow advanced its step
-    // to 'signin' and then revealed the course anyway — the sign-in screen never
+    // to 'home' and then revealed the course anyway — the first screen never
     // appeared on a real launch, and a test that set the step directly could not
     // see it.
     if (this.step === 'splash') {
-      const courseContent = NEW_WIZARD ? this.renderSignIn() : this.renderCourse();
+      const courseContent = NEW_WIZARD ? this.renderHome() : this.renderCourse();
       courseContent.style.position = 'absolute';
       courseContent.style.inset = '0';
       courseContent.style.zIndex = '0';
@@ -4518,7 +4581,6 @@ const Wizard = {
       <div class="wizard-content" id="wizardCourseList">
         <div class="wizard-course-locating">Loading courses...</div>
       </div>
-      ${NEW_WIZARD ? '<div id="wizardCourseTee" class="wiz-tee-dock"></div>' : ''}
       <div class="wizard-footer">
         <div style="width:100%;display:flex;align-items:center;gap:10px;margin-bottom:6px;">
           <span style="font-size:13px;font-weight:600;white-space:nowrap;">Starting Hole:</span>
@@ -4673,35 +4735,8 @@ const Wizard = {
           card.classList.add('selected');
           this.data.selectedCourse = card.dataset.course;
           this.data.selectedSource = card.dataset.source || null;
-          // A different course has different tees, or none — show that as soon
-          // as it is picked rather than a screen later.
-          if (NEW_WIZARD) { Wizard.setCourseTees(card.dataset.course); paintTee(); }
         };
       });
-      paintTee();
-    };
-
-    /** The tee row under the course list, on the new flow only. */
-    const paintTee = () => {
-      if (!NEW_WIZARD) return;
-      const slot = div.querySelector('#wizardCourseTee');
-      if (!slot) return;
-      // The card that is selected right now, not the course the last round was
-      // played at — Next is what commits the choice to State.
-      slot.innerHTML = this.teeStrip({ courseName: this.data.selectedCourse || State.data.course.name });
-      const sel = slot.querySelector('#wizardTee');
-      if (sel) sel.onchange = (e) => {
-        State.data.course.teeName = e.target.value;
-        State.scheduleSave();
-        // Re-derive here too. Players are normally picked AFTER this screen, so
-        // it looks like there is nothing yet to re-derive — but Back is one tap
-        // and changing the tee from here would otherwise leave every filled
-        // handicap sitting on the old slope, with the new tee on screen saying
-        // otherwise. repaint:false because this screen redraws its own tee row;
-        // a full render() would rebuild the course list underneath it.
-        Wizard.retee({ repaint: false });
-        paintTee();
-      };
     };
 
     // Event handlers
@@ -4720,26 +4755,7 @@ const Wizard = {
           this.render();
           return;
         }
-        if (this.data.selectedCourse) {
-          // Check DB first, then presets
-          const dbCourse = COURSE_DB.find(c => c.name === this.data.selectedCourse);
-          if (dbCourse) {
-            State.data.course.par = [...dbCourse.par];
-            State.data.course.hcp = [...dbCourse.hcp];
-            State.data.course.name = dbCourse.name;
-          } else {
-            const preset = State.presets[this.data.selectedCourse];
-            if (preset) {
-              State.data.course.par = [...preset.par];
-              State.data.course.hcp = [...preset.hcp];
-              State.data.course.name = this.data.selectedCourse;
-            }
-          }
-          // The tees belong to the course. Leaving the previous course's
-          // ratings attached would compute every handicap off the wrong slope,
-          // with nothing on screen to say so.
-          Wizard.setCourseTees(State.data.course.name);
-        }
+        this.commitCourse();
         this.step = 'players';
         this.render();
       };
@@ -4870,7 +4886,7 @@ const Wizard = {
           };
         }
 
-        this.step = 'players';
+        this.step = NEW_WIZARD ? 'tee' : 'players';
         this.render();
       };
     }, 0);
@@ -4903,6 +4919,33 @@ const Wizard = {
    * without saying whose it is can only be read off the nearest thing on
    * screen — which, in a list of thirty courses, is whatever you scrolled to.
    */
+  /**
+   * Make the selected course the round's course: par, stroke index, and its
+   * own tees. Next on the course screen is the only thing that commits it.
+   */
+  commitCourse() {
+    const name = this.data.selectedCourse;
+    if (!name || name === '__new__') return;
+    // Check DB first, then presets
+    const dbCourse = COURSE_DB.find(c => c.name === name);
+    if (dbCourse) {
+      State.data.course.par = [...dbCourse.par];
+      State.data.course.hcp = [...dbCourse.hcp];
+      State.data.course.name = dbCourse.name;
+    } else {
+      const preset = State.presets[name];
+      if (preset) {
+        State.data.course.par = [...preset.par];
+        State.data.course.hcp = [...preset.hcp];
+        State.data.course.name = name;
+      }
+    }
+    // The tees belong to the course. Leaving the previous course's ratings
+    // attached would compute every handicap off the wrong slope, with nothing
+    // on screen to say so.
+    Wizard.setCourseTees(State.data.course.name);
+  },
+
   teeStrip(opts) {
     const o = opts || {};
     const name = o.courseName || State.data.course.name;
@@ -5108,7 +5151,7 @@ const Wizard = {
    * each time would throw away whatever is half-typed in a name box.
    */
   syncCloud() {
-    if (!this.active || (this.step !== 'players' && this.step !== 'signin')) return;
+    if (!this.active || (this.step !== 'players' && this.step !== 'home')) return;
     const sig = (typeof CLOUD_ENABLED !== 'undefined' && CLOUD_ENABLED)
       ? [!!Cloud.user, Cloud.groups.length, Cloud.pool.length, Cloud.busy, !!Cloud.api].join('|') : '';
     if (sig === this._cloudSig) return;
@@ -5122,7 +5165,7 @@ const Wizard = {
 
   /** Shared chrome so the seven screens cannot drift apart. */
   wizStep(n) {
-    const total = 6;   // signin isn't counted; it is not part of setting up a round
+    const total = 7;   // home isn't counted; it is not part of setting up a round
     let bars = '';
     for (let i = 1; i <= total; i++) {
       bars += '<div style="flex:1;height:3px;border-radius:2px;background:' +
@@ -5146,8 +5189,15 @@ const Wizard = {
       (o.extra || '') + '</div>';
   },
 
-  /** 1 — sign in. Offered, never required. */
-  renderSignIn() {
+  /**
+   * Home: the account, and the three things you open the app to do.
+   *
+   * Sign-in used to be a screen of its own, and Join Live and Old Rounds hung
+   * off the bottom of the course list. Starting, joining and looking back are
+   * different errands, so they are the first choice rather than footnotes to
+   * one of them. Signing in is still offered, never required.
+   */
+  renderHome() {
     const div = document.createElement('div');
     div.className = 'wizard-screen';
     const esc = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -5156,41 +5206,225 @@ const Wizard = {
     // there fetches the auth SDK on every launch — breaking the promise that a
     // launch costs nothing for someone who never signs in. The splash advance
     // warms instead, which is ~1.4s before the button can be pressed.
-    if (this.step === 'signin') Cloud.warm();
+    if (this.step === 'home') Cloud.warm();
     this._cloudSig = [!!Cloud.user, Cloud.groups.length, Cloud.pool.length, Cloud.busy, !!Cloud.api].join('|');
 
-    const signedIn = CLOUD_ENABLED && Cloud.user;
-    const body = signedIn
-      ? '<div class="card"><div style="font-weight:700;font-size:15px;">' +
-        esc(Cloud.user.displayName || Cloud.user.email || 'Signed in') + '</div>' +
-        '<div class="muted" style="font-size:12px;margin-top:3px;">' + esc(Cloud.user.email || '') + '</div>' +
-        (Cloud.groups.length
-          ? '<div class="muted" style="font-size:12px;margin-top:8px;">' + esc(Cloud.groups[0].name) +
-            ' \u00b7 ' + Cloud.pool.length + ' golfer(s), with live indexes</div>'
-          : '<div class="muted" style="font-size:12px;margin-top:8px;">Not in a group yet.</div>') +
-        '</div>'
-      : '<div class="card"><div class="muted" style="font-size:13px;line-height:1.5;">' +
-        'Sign in and your group\u2019s golfers come with you \u2014 current GHIN indexes, rounds saved off this phone, and season standings.' +
-        '</div>' +
-        (CLOUD_ENABLED
-          ? '<button class="btn primary" id="wizSignIn" style="width:100%;margin-top:12px;padding:12px;"' +
-            (Cloud.api && !Cloud.busy ? '' : ' disabled') + '>' +
-            (Cloud.busy ? 'Waiting for Google\u2026' : Cloud.api ? 'Continue with Google' : 'Preparing\u2026') +
-            '</button>'
-          : '<div class="note" style="margin-top:10px;">Accounts are not switched on in this build.</div>') +
-        '</div>';
+    let account = '';
+    if (CLOUD_ENABLED && Cloud.user) {
+      const nm = Cloud.user.displayName || Cloud.user.email || 'Signed in';
+      account = '<div class="wz-account"><div class="wz-avatar">' + esc(nm.trim().charAt(0).toUpperCase() || '?') + '</div>' +
+        '<div class="wz-account-text"><div class="wz-account-name">' + esc(nm) + '</div>' +
+        '<div class="wz-account-sub">' + (Cloud.groups.length
+          ? esc(Cloud.groups[0].name) + ' · ' + Cloud.pool.length + ' golfer(s), with live indexes'
+          : 'Not in a group yet.') + '</div></div></div>';
+    } else if (CLOUD_ENABLED) {
+      account = '<div class="wz-account"><div class="wz-account-text"><div class="wz-account-name">Not signed in</div>' +
+        '<div class="wz-account-sub">Your group’s golfers, current GHIN indexes and standings.</div></div>' +
+        '<button class="wz-account-btn" id="wizSignIn"' + (Cloud.api && !Cloud.busy ? '' : ' disabled') + '>' +
+        (Cloud.busy ? 'Waiting…' : Cloud.api ? 'Sign in' : 'Preparing…') + '</button></div>';
+    }
 
-    div.innerHTML = this.wizStep(0) +
-      this.wizHead("Who's keeping score?", signedIn ? 'You\u2019re all set.' : 'Optional \u2014 scoring works either way.') +
-      '<div class="wizard-content">' + body +
-      '<div class="note" style="text-align:center;margin-top:16px;">' +
-      (signedIn ? '' : 'Skip this and everything stays on this phone.') + '</div></div>' +
-      this.wizFoot(signedIn ? 'Next' : 'Continue without an account', { back: false });
+    const choice = (id, cls, ico, title, sub) =>
+      '<button class="wz-choice' + (cls ? ' ' + cls : '') + '" id="' + id + '"><span class="wz-ico">' + ico + '</span>' +
+      '<span><b>' + title + '</b><span class="sub">' + sub + '</span></span></button>';
+    const today = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+
+    div.innerHTML = this.wizHead('Let’s play', today) +
+      '<div class="wizard-content">' + account +
+      choice('wizNewRound', 'primary', '⛳', 'New round', 'Course, tees, who’s playing and for what') +
+      choice('wizJoin', '', '📡', 'Join a live round', 'Follow a round someone else is scoring') +
+      choice('wizHistory', '', '🗂️', 'Past rounds', 'Results and settlements from earlier rounds') +
+      '<button class="wz-link" id="wizSkip">Advanced setup</button>' +
+      '</div>';
 
     setTimeout(() => {
       const si = div.querySelector('#wizSignIn');
       if (si) si.onclick = () => Cloud.signIn();          // synchronous: the popup needs the tap
-      div.querySelector('#wizNext').onclick = () => { this.step = 'course'; this.render(); };
+      div.querySelector('#wizNewRound').onclick = () => { this.step = 'course'; this.render(); };
+      div.querySelector('#wizJoin').onclick = () => {
+        this.active = false;
+        this.removeOverlay();
+        LiveSync.showJoinModal();
+      };
+      div.querySelector('#wizHistory').onclick = () => History.show();
+      div.querySelector('#wizSkip').onclick = () => this.skip();
+    }, 0);
+    return div;
+  },
+
+  /**
+   * 1 — the course, and only the course.
+   *
+   * The tees used to share this screen, docked under a scrolling list of thirty
+   * courses, and read as belonging to whichever one was scrolled to. They are
+   * on the next screen now, after Next has committed the course, so the tee
+   * panel can only ever be talking about the course you chose.
+   */
+  renderCoursePick() {
+    const div = document.createElement('div');
+    div.className = 'wizard-screen';
+    const esc = (t) => String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const loc = this._courseLoc || null;
+
+    const presetNames = Object.keys(State.presets || {});
+    const mine = presetNames.map((name) => {
+      const db = COURSE_DB.find((c) => c.name === name);
+      return { name, source: 'preset', par: State.presets[name].par,
+               distance: loc && db ? haversineMi(loc.lat, loc.lng, db.lat, db.lng) : null };
+    });
+    const rest = COURSE_DB.filter((c) => !presetNames.includes(c.name)).map((c) => ({
+      name: c.name, source: 'db', par: c.par,
+      distance: loc ? haversineMi(loc.lat, loc.lng, c.lat, c.lng) : null,
+    }));
+    if (loc) rest.sort((a, b) => (a.distance ?? 999) - (b.distance ?? 999));
+    else rest.sort((a, b) => a.name.localeCompare(b.name));
+
+    const row = (c) => {
+      const par = (c.par || []).reduce((a, b) => a + b, 0);
+      const meta = [par ? 'Par ' + par : '', c.distance != null ? c.distance.toFixed(1) + ' mi' : ''].filter(Boolean).join(' · ');
+      return '<button class="wz-row" data-course="' + esc(c.name) + '" data-source="' + c.source + '">' +
+        '<span class="tick"></span><span class="nm">' + esc(c.name) + '</span><span class="meta">' + meta + '</span></button>';
+    };
+    const section = (label, items) => items.length
+      ? '<div class="wz-sec"><div class="wz-label">' + label + '</div><div class="wz-list">' + items.map(row).join('') + '</div></div>' : '';
+
+    div.innerHTML = this.wizStep(1) +
+      this.wizHead('Where are we playing?', 'Pick the course. Tees are next.') +
+      '<div class="wizard-content" id="wizardCourseList">' +
+      '<div class="wz-search-row"><input class="wz-search" id="wizCourseSearch" type="search" placeholder="Search courses" autocomplete="off">' +
+      (!loc && navigator.geolocation ? '<button class="wz-chip" id="wizNearby">📍 Nearby</button>' : '') + '</div>' +
+      section('Your courses', mine) +
+      section(loc ? 'Nearest first' : 'All courses', rest) +
+      '<div class="wz-sec wz-new"><div class="wz-label">Not listed?</div><div class="wz-list">' +
+      '<button class="wz-row new" data-course="__new__"><span class="tick"></span><span class="nm">+ Set up a new course</span></button></div></div>' +
+      '<a class="wz-request" target="_blank" rel="noopener" href="https://docs.google.com/forms/d/e/1FAIpQLSd42m1QbKIdydDACKVW5JHOlTDWbRMbloKPMlkW36_8Pzy_6g/viewform">Or ask for it to be added</a>' +
+      '</div>' + this.wizFoot('Next');
+
+    const rows = () => [...div.querySelectorAll('.wz-row')];
+    const select = (el) => {
+      rows().forEach((r) => r.classList.toggle('selected', r === el));
+      this.data.selectedCourse = el ? el.dataset.course : null;
+      this.data.selectedSource = el ? (el.dataset.source || null) : null;
+    };
+    // Pre-select the course already in play. Coming Back used to re-select the
+    // top of the list, and Next then committed the wrong course's stroke index.
+    const want = this.data.selectedCourse || State.data.course.name;
+    const start = rows().find((r) => r.dataset.course === want) || rows()[0];
+    select(start);
+
+    setTimeout(() => {
+      if (start && want) { try { start.scrollIntoView({ block: 'center' }); } catch (e) {} }
+      rows().forEach((r) => { r.onclick = () => select(r); });
+      const search = div.querySelector('#wizCourseSearch');
+      search.oninput = () => {
+        const q = search.value.trim().toLowerCase();
+        div.querySelectorAll('.wz-sec:not(.wz-new)').forEach((sec) => {
+          let shown = 0;
+          sec.querySelectorAll('.wz-row').forEach((r) => {
+            const hit = !q || r.dataset.course.toLowerCase().includes(q);
+            r.style.display = hit ? '' : 'none';
+            if (hit) shown++;
+          });
+          sec.style.display = shown ? '' : 'none';
+        });
+      };
+      const near = div.querySelector('#wizNearby');
+      if (near) near.onclick = () => {
+        near.textContent = 'Locating…'; near.disabled = true;
+        navigator.geolocation.getCurrentPosition(
+          (pos) => { this._courseLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude }; this.render(); },
+          () => { near.textContent = 'No location'; },
+          { timeout: 8000 });
+      };
+      div.querySelector('#wizBack').onclick = () => { this.step = 'home'; this.render(); };
+      div.querySelector('#wizNext').onclick = () => {
+        if (!this.data.selectedCourse) { Err.toast('Pick a course'); return; }
+        if (this.data.selectedCourse === '__new__') { this.step = 'courseSetup'; this.render(); return; }
+        this.commitCourse();
+        this.step = 'tee';
+        this.render();
+      };
+    }, 0);
+    return div;
+  },
+
+  /** 2 — the tees, and the hole you start on. */
+  renderTee() {
+    const div = document.createElement('div');
+    div.className = 'wizard-screen';
+    const esc = (t) => String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const course = State.data.course;
+    const tees = course.tees || [];
+    const cur = Game.selectedTee(course);
+    const startHole = this.data.startingHole || 0;
+
+    // Tees are mostly named for their markers, so show the marker.
+    const SWATCH = { black: '#111', blue: '#2563eb', white: '#f5f5f5', gold: '#d4a017', yellow: '#facc15',
+      red: '#dc2626', green: '#16a34a', silver: '#c0c0c0', orange: '#f97316', purple: '#7c3aed',
+      copper: '#b87333', bronze: '#a97142', tan: '#d2b48c', teal: '#14b8a6' };
+    // "Blue/White Combo" gets half of each.
+    const swatch = (name) => {
+      const c = String(name || '').toLowerCase().split(/[^a-z]+/).filter((x) => SWATCH[x]).map((x) => SWATCH[x]);
+      if (!c.length) return 'transparent';
+      return c.length === 1 ? c[0] : 'linear-gradient(90deg,' + c[0] + ' 50%,' + c[1] + ' 50%)';
+    };
+
+    const teeHtml = tees.length
+      ? '<div class="wz-tees">' + tees.map((t) =>
+          '<button class="wz-tee-btn' + (cur && t.name === cur.name ? ' selected' : '') + '" data-tee="' + esc(t.name) + '">' +
+          '<i class="dot" style="background:' + swatch(t.name) + ';"></i><span><b>' + esc(t.name) + '</b>' +
+          '<small>' + (t.yardage ? esc(t.yardage) + ' yds' : '') + '</small></span></button>').join('') + '</div>' +
+        (cur ? '<div class="wz-caption">' + esc(cur.yardage) + ' yds · ' + esc(cur.rating) + ' / ' + esc(cur.slope) +
+          (this.canDeriveHandicaps()
+            ? ' — course handicaps come off this tee.'
+            : ' — recorded with the round. Handicaps stay as you type them.') + '</div>' : '')
+      : '<div class="wz-note">No ratings on file for ' + esc(course.name) + ', so handicaps stay as you type them.</div>';
+
+    const holeCaption = (n) => n === 0 ? 'Starting on 1.'
+      : n === 9 ? 'Starting on the back nine.'
+      : 'Shotgun start on ' + (n + 1) + '.';
+    let holes = '';
+    for (let i = 0; i < 18; i++) {
+      holes += '<button class="wz-hole' + (i === startHole ? ' selected' : '') + '" data-hole="' + i + '">' + (i + 1) + '</button>';
+    }
+
+    div.innerHTML = this.wizStep(2) +
+      this.wizHead(course.name || 'Tees', 'Which tees, and where you start.') +
+      '<div class="wizard-content">' +
+      '<div class="wz-label" style="margin-top:4px;">Tees</div>' +
+      '<div id="wizTeeSection">' + teeHtml + '</div>' +
+      '<div class="wz-label">Starting hole</div>' +
+      '<div class="wz-holes">' + holes + '</div>' +
+      '<div class="wz-caption" id="wizHoleCaption">' + holeCaption(startHole) + '</div>' +
+      '</div>' + this.wizFoot('Next');
+
+    setTimeout(() => {
+      div.querySelectorAll('.wz-tee-btn').forEach((b) => {
+        b.onclick = () => {
+          State.data.course.teeName = b.dataset.tee;
+          State.scheduleSave();
+          // Re-derive any handicap that came off the old tee. repaint:false
+          // because this screen redraws itself next.
+          Wizard.retee({ repaint: false });
+          this.render();
+        };
+      });
+      div.querySelectorAll('.wz-hole').forEach((b) => {
+        b.onclick = () => {
+          const n = parseInt(b.dataset.hole, 10) || 0;
+          this.data.startingHole = n;
+          div.querySelectorAll('.wz-hole').forEach((x) => x.classList.toggle('selected', x === b));
+          div.querySelector('#wizHoleCaption').textContent = holeCaption(n);
+        };
+      });
+      div.querySelector('#wizBack').onclick = () => { this.step = 'course'; this.render(); };
+      div.querySelector('#wizNext').onclick = () => {
+        State.data.startingHole = this.data.startingHole || 0;
+        this.step = 'players';
+        this.render();
+      };
     }, 0);
     return div;
   },
@@ -5216,7 +5450,7 @@ const Wizard = {
       ';justify-content:' + (on(t) ? 'flex-end' : 'flex-start') + ';">' +
       '<div style="width:24px;height:24px;border-radius:50%;background:' + (on(t) ? '#fff' : 'var(--muted)') + ';"></div></div></div>';
 
-    div.innerHTML = this.wizStep(3) +
+    div.innerHTML = this.wizStep(4) +
       this.wizHead('What are we playing?', 'Nassau is on. Add anything else you fancy.') +
       '<div class="wizard-content">' + TYPES.map(row).join('') +
       '<div class="note" style="margin-top:12px;line-height:1.5;">Nothing here is remembered against you \u2014 change it any week.</div>' +
@@ -5313,7 +5547,7 @@ const Wizard = {
         '</div>';
     }).join('');
 
-    div.innerHTML = this.wizStep(4) +
+    div.innerHTML = this.wizStep(5) +
       this.wizHead(team.length > 1 ? 'Three matches' : 'Teams?',
         team.length > 1 ? 'The pair plays each of the other three.' : 'Low and high together, the way you always do it.') +
       '<div class="wizard-content">' + matches +
@@ -5363,7 +5597,7 @@ const Wizard = {
       '<div class="note" style="margin-top:10px;line-height:1.5;">KPs need gross par. Sweeps and quads ride on top and show as their own lines.</div>' +
       '</div></div>';
 
-    div.innerHTML = this.wizStep(5) +
+    div.innerHTML = this.wizStep(6) +
       this.wizHead('Playing for?', 'Last week\u2019s numbers, already filled in.') +
       '<div class="wizard-content">' + nassauCard + junkCard + '</div>' +
       this.wizFoot('Next');
@@ -5411,7 +5645,7 @@ const Wizard = {
       .map((x) => (x.teamA || []).map(nameOf).join(' + ') + ' vs ' + (x.teamB || []).map(nameOf).join(' + '))
       .join('<br>');
 
-    div.innerHTML = this.wizStep(6) +
+    div.innerHTML = this.wizStep(7) +
       this.wizHead('Ready', 'Tap anything to go back and change it.') +
       '<div class="wizard-content">' +
       row('course', esc(State.data.course.name) + (tee ? ' \u00b7 ' + esc(tee.name) : ''),
@@ -5595,7 +5829,7 @@ const Wizard = {
       };
 
       document.getElementById('wizardPlayersBack').onclick = () => {
-        this.step = 'course';
+        this.step = NEW_WIZARD ? 'tee' : 'course';
         this.render();
       };
     }, 0);
@@ -6379,6 +6613,48 @@ const UI = {
   },
 
   /**
+   * "T. Bryan" for the scoring screens, where full names ran out of room.
+   * Settlement and sharing keep full names.
+   *
+   * If two players would come out the same ("B. Smith" twice) both keep their
+   * full first name, so a score can never land against the wrong man. One-word
+   * names are left alone, and a trailing Jr./Sr./II/III stays with the surname.
+   */
+  shortName(id) {
+    const abbrev = (name) => {
+      const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+      if (parts.length < 2) return parts.join(' ');
+      let last = parts.length - 1;
+      if (/^(jr|sr|ii|iii|iv)\.?$/i.test(parts[last]) && last > 1) last--;
+      return parts[0][0].toUpperCase() + '.\u00a0' + parts.slice(last).join(' ');
+    };
+    const p = State.data.players.find(x => x.id === id);
+    if (!p) return id;
+    const mine = abbrev(p.name);
+    const clash = State.data.players.some(x => x.id !== id && abbrev(x.name) === mine);
+    return clash ? p.name : mine;
+  },
+
+  /** A short tick on a score change: vibration on Android, a click on iOS. */
+  scoreTick() {
+    try { if (navigator.vibrate) navigator.vibrate(12); } catch(e){}
+    try {
+      if (!this._audioCtx) this._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = this._audioCtx;
+      if (ctx.state === 'suspended') ctx.resume();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 1800;
+      gain.gain.value = 0.08;
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.03);
+    } catch(e){}
+  },
+
+  /**
    * The KP bet as its parts: holes won, then each bonus, per player.
    *
    * These used to arrive as one figure tagged "(Sweeps!)" — which says a bonus
@@ -6468,122 +6744,6 @@ const UI = {
     }
     // Header always visible now (contains hamburger menu)
     root.appendChild(view);
-    // Wire up drum picker swipe handlers — real-time finger tracking
-    requestAnimationFrame(() => {
-      if (UI._drumHandlers) {
-        const CELL = 52; // px per number cell
-        const DRUM_W = 160; // drum visible width
-        // Haptic + audio feedback on score change
-        let _audioCtx = null;
-        const haptic = () => {
-          // Android vibration
-          try { if (navigator.vibrate) navigator.vibrate(12); } catch(e){}
-          // Audio click for iOS (no vibrate support) — short tick sound
-          try {
-            if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = _audioCtx.createOscillator();
-            const gain = _audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(_audioCtx.destination);
-            osc.frequency.value = 1800;
-            gain.gain.value = 0.08;
-            gain.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.03);
-            osc.start(_audioCtx.currentTime);
-            osc.stop(_audioCtx.currentTime + 0.03);
-          } catch(e){}
-        };
-
-        UI._drumHandlers.forEach(({ drumId, currentScore, setScore, centerIdx }) => {
-          const el = document.getElementById(drumId);
-          if (!el) return;
-          const touchEl = el.querySelector('.score-drum-touch');
-          const track = el.querySelector('.score-drum-track');
-          if (!touchEl || !track) return;
-          let startX = 0, dragging = false, dx = 0;
-          // Base offset: centers the currentScore cell in the drum window
-          const baseOffset = (DRUM_W / 2) - (centerIdx * CELL) - (CELL / 2);
-
-          const updateTrack = (offset) => {
-            track.style.transition = 'none';
-            track.style.transform = `translateX(${offset}px)`;
-          };
-          const snapTrack = (offset) => {
-            track.style.transition = 'transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94)';
-            track.style.transform = `translateX(${offset}px)`;
-          };
-          const commit = (newScore) => {
-            haptic();
-            setScore(newScore);
-          };
-
-          // Touch events — first touch unlocks AudioContext for iOS
-          touchEl.ontouchstart = (e) => {
-            startX = e.touches[0].clientX;
-            dragging = true; dx = 0;
-            track.style.transition = 'none';
-            // Unlock AudioContext on first user gesture (iOS requirement)
-            if (!_audioCtx) { try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){} }
-            else if (_audioCtx.state === 'suspended') { try { _audioCtx.resume(); } catch(e){} }
-          };
-          touchEl.ontouchmove = (e) => {
-            if (!dragging) return;
-            dx = e.touches[0].clientX - startX;
-            // Clamp to one cell in each valid direction
-            const maxDrag = currentScore > MIN_SCORE ? CELL : 0;
-            const minDrag = currentScore < MAX_SCORE ? -CELL : 0;
-            const clamped = Math.max(minDrag, Math.min(maxDrag, dx));
-            updateTrack(baseOffset + clamped);
-            if (Math.abs(dx) > 5) e.preventDefault();
-          };
-          touchEl.ontouchend = () => {
-            if (!dragging) return;
-            dragging = false;
-            const threshold = CELL * 0.3;
-            if (dx < -threshold && currentScore < MAX_SCORE) {
-              snapTrack(baseOffset - CELL);
-              setTimeout(() => commit(currentScore + 1), 180);
-            } else if (dx > threshold && currentScore > MIN_SCORE) {
-              snapTrack(baseOffset + CELL);
-              setTimeout(() => commit(currentScore - 1), 180);
-            } else {
-              snapTrack(baseOffset);
-            }
-          };
-          touchEl.ontouchcancel = () => { dragging = false; snapTrack(baseOffset); };
-
-          // Mouse events for desktop
-          touchEl.onmousedown = (e) => {
-            startX = e.clientX; dragging = true; dx = 0;
-            track.style.transition = 'none';
-            e.preventDefault();
-          };
-          touchEl.onmousemove = (e) => {
-            if (!dragging) return;
-            dx = e.clientX - startX;
-            const maxDrag = currentScore > MIN_SCORE ? CELL : 0;
-            const minDrag = currentScore < MAX_SCORE ? -CELL : 0;
-            const clamped = Math.max(minDrag, Math.min(maxDrag, dx));
-            updateTrack(baseOffset + clamped);
-          };
-          touchEl.onmouseup = () => {
-            if (!dragging) return;
-            dragging = false;
-            const threshold = CELL * 0.3;
-            if (dx < -threshold && currentScore < MAX_SCORE) {
-              snapTrack(baseOffset - CELL);
-              setTimeout(() => commit(currentScore + 1), 180);
-            } else if (dx > threshold && currentScore > MIN_SCORE) {
-              snapTrack(baseOffset + CELL);
-              setTimeout(() => commit(currentScore - 1), 180);
-            } else {
-              snapTrack(baseOffset);
-            }
-          };
-          touchEl.onmouseleave = () => { if (dragging) { dragging = false; snapTrack(baseOffset); } };
-        });
-        UI._drumHandlers = [];
-      }
-    });
     // Bottom nav bar
     let bottomNav = document.getElementById('bottomNav');
     if (!bottomNav) {
@@ -7450,24 +7610,6 @@ const UI = {
         if (s > 0) strokeDots.push(h('span',{class:`dot g${gi+1}`}));
       });
 
-      const adjustScore = (delta) => {
-        // Re-entering scores clears the "intentionally cleared" flag
-        if (State.data._clearedHoles) delete State.data._clearedHoles[hole];
-        // Mark hole as user-scored so bet computations include it
-        if (!State.data._scoredHoles) State.data._scoredHoles = {};
-        State.data._scoredHoles[hole] = true;
-        let current = gross;
-        if (current == null) current = par;
-        else current += delta;
-        current = Math.max(MIN_SCORE, Math.min(MAX_SCORE, current));
-        // Set score in ALL games that include this player
-        State.data.games.forEach(gm => {
-          if (gm.gross[p.id]) gm.gross[p.id][hole] = current;
-        });
-        State.scheduleSave();
-        State.scheduleRender();
-      };
-
       const setScore = (value) => {
         if (State.data._clearedHoles) delete State.data._clearedHoles[hole];
         // Mark hole as user-scored so bet computations include it
@@ -7477,6 +7619,8 @@ const UI = {
         State.data.games.forEach(gm => {
           if (gm.gross[p.id]) gm.gross[p.id][hole] = clamped;
         });
+        UI.scoreTick();
+        UI._scorePop = `${p.id}-${hole}`;
         State.scheduleSave();
         State.scheduleRender();
       };
@@ -7503,57 +7647,19 @@ const UI = {
         ]);
       }
 
-      // Drum picker — 5 numbers loaded (2 off-screen), 3 visible, center is selected
-      const currentScore = gross != null ? gross : par;
-      const drumNums = [];
-      for (let n = currentScore - 2; n <= currentScore + 2; n++) {
-        if (n >= MIN_SCORE && n <= MAX_SCORE) drumNums.push(n);
-      }
-      const centerIdx = drumNums.indexOf(currentScore);
-      const centerDiff = currentScore - par;
-      let frameClass = 'score-drum-frame';
-      if (centerDiff <= -2) frameClass += ' eagle';
-      else if (centerDiff === -1) frameClass += ' birdie';
-      else if (centerDiff === 1) frameClass += ' bogey';
-      else if (centerDiff >= 2) frameClass += ' double-bogey';
-
-      // Position track so currentScore is centered in the visible window
-      const CELL = 52;
-      const drumCenter = 80; // half of 160px drum width
-      const trackOffset = drumCenter - (centerIdx * CELL) - (CELL / 2);
-      const drumTrack = h('div',{class:'score-drum-track',style:`transform:translateX(${trackOffset}px);`},
-        drumNums.map((n, i) => {
-          const diff = n - par;
-          let cls = 'score-drum-num';
-          if (i === centerIdx) {
-            cls += ' center';
-            if (diff <= -2) cls += ' eagle';
-            else if (diff === -1) cls += ' birdie';
-            else if (diff === 1) cls += ' bogey';
-            else if (diff >= 2) cls += ' double-bogey';
-          }
-          return h('div',{class:cls},String(n));
-        })
-      );
-
-      // Touch overlay for swipe handling
-      const touchOverlay = h('div',{class:'score-drum-touch'});
-      // Wire up swipe after DOM insertion
-      const drumId = `drum-${p.id}-${hole}`;
-      const drum = h('div',{class:'score-drum',id:drumId},[
-        drumTrack,
-        h('div',{class:frameClass}),
-        touchOverlay
-      ]);
-
-      const scoreDrum = h('div',{class:'score-drum-wrap'},[
-        drum,
+      // Score stepper. Holes arrive pre-filled at par but do not count until
+      // somebody touches one (_scoredHoles), so until then every number shows
+      // dimmed: tap it to take the par, or step from par with - / +.
+      const shown = gross != null ? gross : par;
+      const unscored = gross == null || !State.data._scoredHoles[hole];
+      let valCls = 'score-step-val ' + (unscored ? 'unscored' : scoreClass(gross));
+      if (UI._scorePop === `${p.id}-${hole}`) { valCls += ' pop'; UI._scorePop = null; }
+      const scoreDrum = h('div',{class:'score-step'},[
+        h('button',{class:'score-step-btn','aria-label':'One less',disabled:shown<=MIN_SCORE,onclick:()=>setScore(shown-1)},'\u2212'),
+        h('button',{class:valCls,'aria-label':unscored ? `Take ${shown}` : `Score ${shown}`,onclick:()=>{ if (unscored) setScore(shown); }},String(shown)),
+        h('button',{class:'score-step-btn','aria-label':'One more',disabled:shown>=MAX_SCORE,onclick:()=>setScore(shown+1)},'+'),
         junkInline
       ].filter(Boolean));
-
-      // Store swipe handler data for post-render wiring
-      if (!UI._drumHandlers) UI._drumHandlers = [];
-      UI._drumHandlers.push({ drumId, pid: p.id, currentScore, par, hole, setScore, centerIdx });
 
       // Cumulative to-par label (all scored holes)
       let cumDiff = 0, hasAnyScore = false;
@@ -7567,9 +7673,13 @@ const UI = {
 
       return h('div',{class:'hole-player-row'},[
         h('div',{class:'hole-player-info'},[
-          h('div',{class:'hole-player-name'},p.name),
+          h('div',{class:'hole-player-name'},UI.shortName(p.id)),
           h('div',{style:'display:flex;gap:6px;align-items:center;'},[
-            h('span',{class:'hole-player-hcp'},`HCP ${g.strokesCount[p.id]||0}`),
+            // The player's handicap, not strokesCount. strokesCount is what one
+            // game gives him after its handicap mode, and under team_delta that
+            // is 0 for everyone but the high man on the higher side — so this
+            // read 0 for all but one player. The dots beside it show the strokes.
+            h('span',{class:'hole-player-hcp'},`HCP ${p.handicap||0}`),
             strokeDots.length ? h('span',{class:'hole-stroke-dots'},strokeDots) : null,
             vsParLabel
           ].filter(Boolean))
@@ -7585,7 +7695,7 @@ const UI = {
       const hasKP = ranking.length > 0;
       const kpNames = ranking.map(pid => {
         const p = allPlayers.find(pl => pl.id === pid);
-        return p ? p.name : '?';
+        return p ? UI.shortName(p.id) : '?';
       });
 
       kpSection = h('div',{style:'padding:8px 12px;'},[
@@ -7654,8 +7764,8 @@ const UI = {
 
         // Line 1: Game type + team names + total + thru indicator (bold)
         const typeLabel = isNassau ? 'Nassau' : 'Vegas';
-        const aN = (game.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
-        const bN = (game.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
+        const aN = (game.teamA||[]).map(pid => UI.shortName(pid)).join(' & ');
+        const bN = (game.teamB||[]).map(pid => UI.shortName(pid)).join(' & ');
         const totStr = perPlayer !== 0 ? (perPlayer > 0 ? '+' : '') + Utils.fmt(perPlayer) + '/ea' : 'Even';
         lines.push(h('div',{style:'display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:12px;'},[
           h('span',{},[h('b',{},typeLabel), `: ${aN} vs ${bN}`]),
@@ -7705,7 +7815,7 @@ const UI = {
 
         // Each player: name, skins, take
         const playerLines = players.map(pid => {
-          const name = UI.playerName(pid);
+          const name = UI.shortName(pid);
           const skins = mode === 'gross' ? result.grossSkins[pid] :
                         mode === 'net' ? result.netSkins[pid] :
                         (result.grossSkins[pid] + result.netSkins[pid]);
@@ -7747,7 +7857,7 @@ const UI = {
         const playerLines = players.map(pid => {
           const val = (res.playerNet[pid] || 0) + (junkNet[pid] || 0);
           return h('span',{style:'font-size:11px;' + (val > 0 ? 'color:var(--success);' : val < 0 ? 'color:var(--danger);' : '')},
-            `${UI.playerName(pid)}: ${val > 0 ? '+' : ''}${Utils.fmt(val)}`);
+            `${UI.shortName(pid)}: ${val > 0 ? '+' : ''}${Utils.fmt(val)}`);
         });
         return h('div',{class:`${theme} game-status-card`,style:'margin-bottom:4px;'},[
           h('div',{class:'card',style:'padding:6px 10px;'},[
@@ -7772,7 +7882,7 @@ const UI = {
         const playerLines = players.map(pid => {
           const val = (res.playerNet[pid] || 0) + (junkNet[pid] || 0);
           return h('span',{style:'font-size:11px;' + (val > 0 ? 'color:var(--success);' : val < 0 ? 'color:var(--danger);' : '')},
-            `${UI.playerName(pid)}: ${val > 0 ? '+' : ''}${Utils.fmt(val)}`);
+            `${UI.shortName(pid)}: ${val > 0 ? '+' : ''}${Utils.fmt(val)}`);
         });
         return h('div',{class:`${theme} game-status-card`,style:'margin-bottom:4px;'},[
           h('div',{class:'card',style:'padding:6px 10px;'},[
@@ -7800,9 +7910,9 @@ const UI = {
       ]);
     }).filter(Boolean);
 
-    // Column headers — centered above drum and junk controls
+    // Column headers — centered above the score and junk controls
     const colHeaderItems = [
-      h('div',{class:'hole-col-hdr score',style:'width:160px;text-align:center;'},'Score')
+      h('div',{class:'hole-col-hdr score',style:'width:118px;text-align:center;'},'Score')
     ];
     if (g.withJunk) {
       colHeaderItems.push(h('div',{class:'hole-col-hdr junk',style:'width:69px;text-align:center;margin-left:8px;margin-right:2px;'},'Junk'));
@@ -7838,7 +7948,7 @@ const UI = {
       const wolfResult = Game.computeWolfResult(game);
       const detail = wolfResult.holeDetails[hole] || {};
       const wolfPid = detail.wolf || wolfPlayers[hole % wolfPlayers.length];
-      const wolfName = UI.playerName(wolfPid) || '?';
+      const wolfName = UI.shortName(wolfPid) || '?';
       const currentSel = game.wolfSelections[hole] || '';
       const otherPlayers = wolfPlayers.filter(p => p !== wolfPid);
       const setSel = (val) => { game.wolfSelections[hole] = val; State.scheduleSave(); State.scheduleRender(); };
@@ -7847,7 +7957,7 @@ const UI = {
         h('div',{class:'hole-press-btns'},[
           h('button',{class:`hole-press-btn${currentSel===''?' active':''}`,onclick:()=>setSel('')},'?'),
           ...otherPlayers.map(pid => {
-            const name = UI.playerName(pid) || '?';
+            const name = UI.shortName(pid) || '?';
             const abbr = name.length <= 4 ? name : name.slice(0,3);
             return h('button',{class:`hole-press-btn${currentSel===pid?' active':''}`,onclick:()=>setSel(pid)},abbr);
           }),
@@ -8291,7 +8401,7 @@ const UI = {
     const rows = State.data.players.map((p, ri) => {
       // Ensure gross array exists for this player
       if (!g.gross[p.id]) g.gross[p.id] = Utils.make18(null);
-      const cells = [h('td',{class:'sticky'},p.name)];
+      const cells = [h('td',{class:'sticky'},UI.shortName(p.id))];
       for (let hole = 0; hole < 18; hole++) {
         const tabIdx = (hole * State.data.players.length) + ri + 1;
         const score = g.gross[p.id][hole];
@@ -8425,14 +8535,14 @@ const UI = {
           // Check if all prior holes have selections made - if so, wolf is determined
           const allPriorSelected = Array.from({length: hole}, (_, h) => game.wolfSelections[h]).every(s => s);
           if (allPriorSelected && detail.wolf) {
-            const name = UI.playerName(detail.wolf) || '?';
+            const name = UI.shortName(detail.wolf) || '?';
             displayName = name.length <= 3 ? name : name.slice(0,2);
           } else {
             displayName = 'TBD';
           }
         } else {
           const wolfPid = detail.wolf || wolfPlayers[hole % wolfPlayers.length];
-          const name = UI.playerName(wolfPid) || '?';
+          const name = UI.shortName(wolfPid) || '?';
           displayName = name.length <= 3 ? name : name.slice(0,2);
         }
         wolfNameCells.push(h('td',{style:'font-size:11px;text-align:center;' + (isCatchUp ? 'color:#ca8a04;' : '')},displayName));
@@ -8452,7 +8562,7 @@ const UI = {
         const options = [
           h('option',{value:'',selected:currentSel===''},'?'),
           ...otherPlayers.map(pid => {
-            const name = UI.playerName(pid) || '?';
+            const name = UI.shortName(pid) || '?';
             const abbr = name.length <= 3 ? name : name.slice(0,2);
             return h('option',{value:pid,selected:currentSel===pid},abbr);
           }),
@@ -8544,7 +8654,7 @@ const UI = {
         const totalJunkMoney = Game.computeJunkLadder(game, players).totalJunkMoney;
 
         const playerLines = players.map(pid => {
-          const name = UI.playerName(pid);
+          const name = UI.shortName(pid);
           const skins = mode === 'gross' ? result.grossSkins[pid] :
                         mode === 'net' ? result.netSkins[pid] :
                         (result.grossSkins[pid] + result.netSkins[pid]);
@@ -8579,7 +8689,7 @@ const UI = {
 
         // Build player net $ standings (Wolf + junk pay-up-the-ladder)
         const playerAmts = players.map(pid => {
-          const name = UI.playerName(pid);
+          const name = UI.shortName(pid);
           const abbr = name.length <= 3 ? name : name.slice(0,2);
           const wolfAmt = result.playerNet[pid] || 0;
           const junkAmt = junkNet[pid] || 0;
@@ -8600,7 +8710,7 @@ const UI = {
         const totalJunkMoney9 = __jl.totalJunkMoney;
 
         const playerAmts = players.map(pid => {
-          const name = UI.playerName(pid);
+          const name = UI.shortName(pid);
           const abbr = name.length <= 3 ? name : name.slice(0,2);
           const nineAmt = result.playerNet[pid] || 0;
           const junkAmt = junkNet[pid] || 0;
@@ -8631,8 +8741,8 @@ const UI = {
 
         const perPlayer = isNassau ? result.teamTotals.total / sz : result.totalValue / sz;
         const typeLabel = isNassau ? 'Nassau' : 'Vegas';
-        const aN = (game.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
-        const bN = (game.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
+        const aN = (game.teamA||[]).map(pid => UI.shortName(pid)).join(' & ');
+        const bN = (game.teamB||[]).map(pid => UI.shortName(pid)).join(' & ');
         const totStr = perPlayer !== 0 ? (perPlayer > 0 ? '+' : '') + Utils.fmt(perPlayer) + '/ea' : 'Even';
 
         const buildNineLine = (label, betsStr, junkPts, kpNet, dollarPP) => {
@@ -8777,7 +8887,7 @@ const UI = {
       for (let i = 0; i < 18; i++) head.push(h('th',{id:`junk_col_${gi}_${i}`},String(i+1)));
 
       const rows = pids.map((pid,ri) => {
-        const cells = [h('td',{class:'sticky'},UI.playerName(pid))];
+        const cells = [h('td',{class:'sticky'},UI.shortName(pid))];
         for (let hole = 0; hole < 18; hole++) {
           cells.push(h('td',{},[createInput(pid, hole, ri)]));
         }

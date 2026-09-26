@@ -80,13 +80,13 @@ async function open(host = ORIGIN) {
 
 const heading = (page) => page.evaluate(() => document.querySelector('.wizard-header h2')?.textContent || '(none)');
 
-/** Walk signin -> review with a given lineup, and press Play. */
+/** Walk home -> teams (or stakes) with a given lineup. */
 async function walk(page, players) {
   await page.evaluate((pool) => {
     Object.assign(window._bb.Cloud, { user: { uid: 'u', email: 'b@x.com' },
       groups: [{ id: 'nunes', name: 'Nunes' }], pool });
     const W = window._bb.Wizard;
-    W.active = true; W.step = 'signin';
+    W.active = true; W.step = 'home';
     W.data.players = []; W.data.games = [W.createGameData()];
     W.currentGameIndex = 0;
     W.render();
@@ -95,10 +95,14 @@ async function walk(page, players) {
 
   const seen = [];
   seen.push(await heading(page));
-  await page.click('#wizNext'); await page.waitForTimeout(600);            // -> course
+  await page.click('#wizNewRound'); await page.waitForTimeout(600);        // -> course
   seen.push(await heading(page));
-  const teeOnCourse = await page.locator('#wizardCourseTee #wizardTee').count();
-  await page.click('#wizardCourseNext'); await page.waitForTimeout(600);   // -> players
+  const teeOnCourse = await page.locator('.wz-tee-btn').count();
+  await page.click('#wizNext'); await page.waitForTimeout(600);            // -> tees & first hole
+  seen.push(await heading(page));
+  const teeOnTee = await page.locator('#wizTeeSection .wz-tee-btn').count();
+  await page.click('.wz-hole[data-hole="9"]'); await page.waitForTimeout(150);
+  await page.click('#wizNext'); await page.waitForTimeout(600);            // -> players
   seen.push(await heading(page));
 
   await page.evaluate((ps) => { window._bb.Wizard.data.players = ps; window._bb.Wizard.render(); }, players);
@@ -107,7 +111,7 @@ async function walk(page, players) {
   seen.push(await heading(page));
   await page.click('#wizNext'); await page.waitForTimeout(600);            // -> teams (or stakes)
   seen.push(await heading(page));
-  return { seen, teeOnCourse };
+  return { seen, teeOnCourse, teeOnTee };
 }
 
 // --------------------------------------------------------------------------
@@ -120,7 +124,10 @@ console.log('\nlaunching on beta lands on sign-in, not on the course\n');
   const { page, ctx, errs } = await open();
   await page.evaluate(() => { const s = document.querySelector('.wizard-splash'); if (s) s.click(); });
   await page.waitForTimeout(1900);
-  check('the first screen is sign-in', await heading(page), "Who's keeping score?");
+  check('the first screen is home', await heading(page), 'Let\u2019s play');
+  check('  offering a new round, a live one, and past ones',
+    await page.evaluate(() => ['#wizNewRound', '#wizJoin', '#wizHistory'].map((q) => !!document.querySelector(q))),
+    [true, true, true]);
   check('  and only one screen is mounted',
     await page.evaluate(() => document.querySelectorAll('.wizard-header h2').length), 1);
   check('no page errors', errs, []);
@@ -130,16 +137,16 @@ console.log('\nlaunching on beta lands on sign-in, not on the course\n');
 console.log('\nfive players — the whole flow, and the round it produces\n');
 {
   const { page, ctx, errs } = await open();
-  const { seen, teeOnCourse } = await walk(page, [
+  const { seen, teeOnCourse, teeOnTee } = await walk(page, [
     { name: 'Tyler Bryan', handicap: 0 }, { name: 'Brian Casey', handicap: 6 },
     { name: 'Brian Bunch', handicap: 8 }, { name: 'Kenneth Bernard', handicap: 12 },
     { name: 'Timothy Mar', handicap: 21 },
   ]);
 
   check('the screens come in order', seen,
-    ["Who's keeping score?", 'Select Course', "Who's Playing?", 'What are we playing?', 'Three matches']);
-  check('the tee is on the course screen, where it belongs', teeOnCourse, 1);
-  check('  and no longer on the players screen', await page.locator('.wiz-tee').count(), 0);
+    ['Let\u2019s play', 'Where are we playing?', 'El Macero', "Who's Playing?", 'What are we playing?', 'Three matches']);
+  check('the tees have a screen of their own, after the course', [teeOnCourse, teeOnTee > 0], [0, true]);
+  check('  and are not on the players screen', await page.locator('.wiz-tee').count(), 0);
   check('three matches are laid out', await page.locator('.wizard-content .card').count(), 3);
 
   await page.click('#wizNext'); await page.waitForTimeout(600);
@@ -185,6 +192,7 @@ console.log('\nfive players — the whole flow, and the round it produces\n');
       withJunk: S.games.every((g) => g.withJunk),
       mode: S.games[0].handicapMode,
       hole: S.scoringHole,
+      start: S.startingHole,
       scored: Object.keys(S._scoredHoles || {}).length,
       tee: S.course.teeName,
       players: S.players.map((p) => p.name + ' ' + p.handicap),
@@ -200,8 +208,19 @@ console.log('\nfive players — the whole flow, and the round it produces\n');
   check('team delta, the way this group plays', round.mode, 'team_delta');
   check('the tee is carried onto the round', round.tee, 'White');
   check('five players with their handicaps', round.players.length, 5);
-  check('it starts on hole 1', round.hole, 0);
+  check('it starts on the first hole played', round.hole, 0);
+  check('  which is the 10th, as picked', round.start, 9);
   check('with NOTHING scored', round.scored, 0);
+
+  // The hole screen used to label each player with strokesCount from the first
+  // game — what that one match gives him under team_delta — so it read HCP 0
+  // for everyone but the high man. It must show the player's own handicap.
+  await page.evaluate(() => { const S = window._bb.State; S.data.tab = 'scores'; S.data.scoringView = 'hole'; S.scheduleRender(); });
+  await page.waitForTimeout(500);
+  const rows = await page.evaluate(() => [...document.querySelectorAll('.hole-player-row')].map((r) =>
+    r.querySelector('.hole-player-name').textContent.replace(/\u00a0/g, ' ') + ' ' + r.querySelector('.hole-player-hcp').textContent));
+  check('the hole screen shows each player\'s own handicap, short-named', rows,
+    ['T. Bryan HCP 0', 'B. Casey HCP 6', 'B. Bunch HCP 8', 'K. Bernard HCP 12', 'T. Mar HCP 21']);
 
   check('no page errors', errs, []);
   await ctx.close();
@@ -215,7 +234,7 @@ console.log('\nfour players — one match, and the pairing that balances\n');
     { name: 'Tyler Bryan', handicap: 0 }, { name: 'Brian Casey', handicap: 6 },
     { name: 'Brian Bunch', handicap: 8 }, { name: 'Kenneth Bernard', handicap: 12 },
   ]);
-  check('the teams screen is singular', seen[4], 'Teams?');
+  check('the teams screen is singular', seen[5], 'Teams?');
   check('  and shows one match', await page.locator('.wizard-content .card').count(), 1);
 
   await page.click('#wizNext'); await page.waitForTimeout(500);
