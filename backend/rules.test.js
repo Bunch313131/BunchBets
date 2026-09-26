@@ -18,7 +18,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc,
-  collection, query, where, getDocs,
+  collection, query, where, getDocs, writeBatch,
 } from 'firebase/firestore';
 
 let env;
@@ -212,8 +212,8 @@ describe('groups', () => {
   test('owner may change membership', async () => {
     await assertSucceeds(updateDoc(doc(brian(), 'groups', GROUP_A), { memberUids: [BRIAN, MIKE, STRANGER] }));
   });
-  test('a stranger may append exactly themselves (invite acceptance)', async () => {
-    await assertSucceeds(updateDoc(doc(stranger(), 'groups', GROUP_A), { memberUids: [BRIAN, MIKE, STRANGER] }));
+  test('a stranger may NOT append themselves with no proof (knowing the id is not enough)', async () => {
+    await assertFails(updateDoc(doc(stranger(), 'groups', GROUP_A), { memberUids: [BRIAN, MIKE, STRANGER] }));
   });
   test('a stranger may NOT append themselves and change the owner', async () => {
     await assertFails(updateDoc(doc(stranger(), 'groups', GROUP_A), { memberUids: [BRIAN, MIKE, STRANGER], ownerUid: STRANGER }));
@@ -221,7 +221,170 @@ describe('groups', () => {
   test('a stranger may NOT append someone else too', async () => {
     await assertFails(updateDoc(doc(stranger(), 'groups', GROUP_A), { memberUids: [BRIAN, MIKE, STRANGER, 'uid_extra'] }));
   });
+  test('the owner may hand the group to another member', async () => {
+    await assertSucceeds(updateDoc(doc(brian(), 'groups', GROUP_A), { ownerUid: MIKE }));
+  });
+  test('but not to someone outside it', async () => {
+    await assertFails(updateDoc(doc(brian(), 'groups', GROUP_A), { ownerUid: STRANGER }));
+  });
   test('non-owner cannot delete', async () => { await assertFails(deleteDoc(doc(mike(), 'groups', GROUP_A))); });
+  test('a member may NOT make themselves owner', async () => {
+    await assertFails(updateDoc(doc(mike(), 'groups', GROUP_A), { ownerUid: MIKE }));
+  });
+  test('a member may NOT change the join code', async () => {
+    await assertFails(updateDoc(doc(mike(), 'groups', GROUP_A), { joinCode: 'mine' }));
+  });
+});
+
+describe('joining a group needs proof', () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (c) =>
+      updateDoc(doc(c.firestore(), 'groups', GROUP_B), { kind: 'group', joinCode: 'secret-b' }));
+  });
+  test('the join code from the share link lets you in', async () => {
+    await assertSucceeds(updateDoc(doc(stranger(), 'groups', GROUP_B),
+      { memberUids: [BRIAN, STRANGER], joinProof: 'secret-b' }));
+  });
+  test('a wrong code does not', async () => {
+    await assertFails(updateDoc(doc(stranger(), 'groups', GROUP_B),
+      { memberUids: [BRIAN, STRANGER], joinProof: 'guess' }));
+  });
+  test('a group with no code cannot be joined by code at all', async () => {
+    await assertFails(updateDoc(doc(stranger(), 'groups', GROUP_A),
+      { memberUids: [BRIAN, MIKE, STRANGER], joinProof: '' }));
+  });
+  test('the right code does not let you add someone else', async () => {
+    await assertFails(updateDoc(doc(stranger(), 'groups', GROUP_B),
+      { memberUids: [BRIAN, STRANGER, 'uid_extra'], joinProof: 'secret-b' }));
+  });
+  test('the right code does not let you rename the group on the way in', async () => {
+    await assertFails(updateDoc(doc(stranger(), 'groups', GROUP_B),
+      { memberUids: [BRIAN, STRANGER], joinProof: 'secret-b', name: 'Mine' }));
+  });
+  test('the owner changing the code kills the old link', async () => {
+    await assertSucceeds(updateDoc(doc(brian(), 'groups', GROUP_B), { joinCode: 'new-code' }));
+    await assertFails(updateDoc(doc(stranger(), 'groups', GROUP_B),
+      { memberUids: [BRIAN, STRANGER], joinProof: 'secret-b' }));
+  });
+  test('an emailed invitation to that group lets the invitee in', async () => {
+    const dave = ctx('uid_dave', { email: 'dave@x.com', email_verified: true });
+    await assertSucceeds(updateDoc(doc(dave, 'groups', GROUP_A),
+      { memberUids: [BRIAN, MIKE, 'uid_dave'], joinInvite: 'inv_dave' }));
+  });
+  test('someone else\'s invitation does not', async () => {
+    await assertFails(updateDoc(doc(stranger(), 'groups', GROUP_A),
+      { memberUids: [BRIAN, MIKE, STRANGER], joinInvite: 'inv_dave' }));
+  });
+  test('an invitation to a different group does not', async () => {
+    const dave = ctx('uid_dave', { email: 'dave@x.com', email_verified: true });
+    await assertFails(updateDoc(doc(dave, 'groups', GROUP_B),
+      { memberUids: [BRIAN, 'uid_dave'], joinInvite: 'inv_dave' }));
+  });
+  test('a member may leave', async () => {
+    await assertSucceeds(updateDoc(doc(mike(), 'groups', GROUP_A), { memberUids: [BRIAN] }));
+  });
+  test('but may not take anyone else with them', async () => {
+    await assertFails(updateDoc(doc(mike(), 'groups', GROUP_A), { memberUids: [] }));
+  });
+  test('the owner cannot leave their own group', async () => {
+    await env.withSecurityRulesDisabled(async (c) =>
+      updateDoc(doc(c.firestore(), 'groups', GROUP_A), { ownerUid: MIKE }));
+    await assertFails(updateDoc(doc(mike(), 'groups', GROUP_A), { memberUids: [BRIAN] }));
+  });
+});
+
+describe('starting a group', () => {
+  test('anyone may start a playing group they own', async () => {
+    await assertSucceeds(setDoc(doc(stranger(), 'groups', 'grp_new'),
+      { name: 'Wednesday', ownerUid: STRANGER, memberUids: [STRANGER], kind: 'group', joinCode: 'x' }));
+  });
+  test('not one owned by somebody else', async () => {
+    await assertFails(setDoc(doc(stranger(), 'groups', 'grp_new'),
+      { name: 'Wednesday', ownerUid: BRIAN, memberUids: [STRANGER], kind: 'group' }));
+  });
+  test('not a directory', async () => {
+    await assertFails(setDoc(doc(stranger(), 'groups', 'grp_new'),
+      { name: 'Everyone', ownerUid: STRANGER, memberUids: [STRANGER], kind: 'directory' }));
+  });
+});
+
+describe('your group list only holds groups you are really in', () => {
+  test('a new account starts in no groups', async () => {
+    await assertFails(setDoc(doc(ctx('uid_new'), 'users', 'uid_new'), { groupIds: [GROUP_A] }));
+    await assertSucceeds(setDoc(doc(ctx('uid_new'), 'users', 'uid_new'), { groupIds: [] }));
+  });
+  test('you cannot write yourself into a group you are not in', async () => {
+    await assertFails(updateDoc(doc(stranger(), 'users', STRANGER), { groupIds: [GROUP_A] }));
+  });
+  test('so that trick no longer reads the group\'s golfers', async () => {
+    await updateDoc(doc(stranger(), 'users', STRANGER), { groupIds: [GROUP_A] }).catch(() => {});
+    await assertFails(getDoc(doc(stranger(), 'golfers', G_DAVE)));
+  });
+  test('joining and recording it in one batch works', async () => {
+    await env.withSecurityRulesDisabled(async (c) =>
+      updateDoc(doc(c.firestore(), 'groups', GROUP_B), { kind: 'group', joinCode: 'secret-b' }));
+    const db = stranger();
+    const b = writeBatch(db);
+    b.update(doc(db, 'groups', GROUP_B), { memberUids: [BRIAN, STRANGER], joinProof: 'secret-b' });
+    b.update(doc(db, 'users', STRANGER), { groupIds: [GROUP_B] });
+    await assertSucceeds(b.commit());
+  });
+  test('dropping a group from your own list is always allowed', async () => {
+    await assertSucceeds(updateDoc(doc(mike(), 'users', MIKE), { groupIds: [] }));
+  });
+  test('you may still edit the rest of your own doc', async () => {
+    await assertSucceeds(updateDoc(doc(mike(), 'users', MIKE), { displayName: 'Michael' }));
+  });
+});
+
+describe('building a playing group from the directory', () => {
+  // GROUP_A is the directory (no kind). GROUP_P is a playing group Mike and
+  // Brian are in; the stranger is in neither.
+  const GROUP_P = 'grp_wednesday';
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (c) => {
+      const db = c.firestore();
+      await setDoc(doc(db, 'groups', GROUP_P), { name: 'Wednesday', ownerUid: MIKE, memberUids: [MIKE, BRIAN], kind: 'group' });
+      await updateDoc(doc(db, 'users', MIKE), { groupIds: [GROUP_A, GROUP_P] });
+    });
+  });
+  test('a member adds a directory golfer to their playing group', async () => {
+    await assertSucceeds(updateDoc(doc(mike(), 'golfers', G_DAVE), { poolGroupIds: [GROUP_A, GROUP_P] }));
+  });
+  test('including one who has claimed his record', async () => {
+    await assertSucceeds(updateDoc(doc(mike(), 'golfers', G_BRIAN), { poolGroupIds: [GROUP_A, GROUP_B, GROUP_P] }));
+  });
+  test('but not into a group they are not in', async () => {
+    await assertFails(updateDoc(doc(mike(), 'golfers', G_DAVE), { poolGroupIds: [GROUP_A, GROUP_B] }));
+  });
+  test('and not a golfer they cannot see', async () => {
+    await env.withSecurityRulesDisabled(async (c) =>
+      setDoc(doc(c.firestore(), 'golfers', 'ghin:5555555'), { name: 'Hidden', claimedByUid: null, discoverable: false, poolGroupIds: [GROUP_B] }));
+    await assertFails(updateDoc(doc(mike(), 'golfers', 'ghin:5555555'), { poolGroupIds: [GROUP_B, GROUP_P] }));
+  });
+  test('and not while changing anything else about him', async () => {
+    await assertFails(updateDoc(doc(mike(), 'golfers', G_BRIAN), { poolGroupIds: [GROUP_A, GROUP_B, GROUP_P], name: 'X' }));
+  });
+  test('a member takes a golfer back out of their playing group', async () => {
+    await env.withSecurityRulesDisabled(async (c) =>
+      updateDoc(doc(c.firestore(), 'golfers', G_DAVE), { poolGroupIds: [GROUP_A, GROUP_P] }));
+    await assertSucceeds(updateDoc(doc(mike(), 'golfers', G_DAVE), { poolGroupIds: [GROUP_A] }));
+  });
+  test('but nobody takes a golfer out of the directory', async () => {
+    await assertFails(updateDoc(doc(mike(), 'golfers', G_DAVE), { poolGroupIds: [] }));
+  });
+  test('a new golfer may be created into your own groups', async () => {
+    await assertSucceeds(setDoc(doc(mike(), 'golfers', 'guest:newbie'),
+      { name: 'New Guy', claimedByUid: null, discoverable: false, poolGroupIds: [GROUP_A, GROUP_P] }));
+  });
+  test('but not into a group you are not in', async () => {
+    await assertFails(setDoc(doc(mike(), 'golfers', 'guest:newbie'),
+      { name: 'New Guy', claimedByUid: null, discoverable: false, poolGroupIds: [GROUP_B] }));
+  });
+  test('nor into no group at all', async () => {
+    await assertFails(setDoc(doc(mike(), 'golfers', 'guest:newbie'),
+      { name: 'New Guy', claimedByUid: null, discoverable: false, poolGroupIds: [] }));
+  });
 });
 
 describe('group contacts (phone numbers)', () => {
