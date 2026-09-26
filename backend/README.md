@@ -10,6 +10,7 @@ everything else here is tooling.
 | `rules.test.js` | 86 rules tests against the emulator, weighted toward DENY cases. |
 | `cloud.js` | Auth + Firestore module. Reaches the app through `window.BB`. |
 | `cloud.test.mjs` | 9 integration tests: the real module, in a real browser, against real rules. Needs a real roster CSV. |
+| `email-auth.test.mjs` | 10 integration tests for email + password accounts: sign-up, the unverified window, verify then accept an emailed invite, wrong password, reset. |
 | `groups.test.mjs` | 14 integration tests for groups — create, share link, join, add/remove golfers, leave, emailed invites. Seeds its own data; needs no roster and no GHIN. |
 | `seed.js` | Roster CSV → golfers, group, invitations. Validates every GHIN first. |
 
@@ -35,7 +36,21 @@ FIRESTORE_EMULATOR_HOST=127.0.0.1:8181 node --test rules.test.js
 cd .. && python3 -m http.server 8099 &
 node --test cloud.test.mjs                 # from backend/
 node --test groups.test.mjs                # from backend/
+node --test email-auth.test.mjs            # from backend/
 ```
+
+## Sign-in
+
+Google (popup) and email + password. Email LINK sign-in is deliberately not
+used: on an iPhone the link opens in Safari, whose storage is separate from the
+home-screen app's, so the person ends up signed in to the wrong one. Password
+accounts get Firebase's verify and reset emails; both only change state on the
+server, so it does not matter where they are opened. Until an address is
+verified, emailed invitations cannot match it (share links still work).
+
+The Email/Password provider has to be switched on per project (Authentication
+→ Sign-in method, or the Identity Toolkit admin API). It is on for
+bunchbets-test.
 
 ## Groups
 

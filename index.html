@@ -471,6 +471,24 @@ body.is-beta header { box-shadow: inset 0 3px 0 #dc2626; }
 
 .roster-sec { padding:7px 12px 4px; font-size:10.5px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:var(--muted); background:color-mix(in srgb, var(--txt) 5%, var(--card)); border-bottom:1px solid var(--border); }
 
+/* Sign-in sheet */
+.wz-inline-link { border:none; background:none; padding:0; color:var(--acc); font:inherit; font-weight:700; text-decoration:underline; cursor:pointer; }
+.si-modal .kp-modal-content { max-width:380px; }
+.si-google { display:flex; align-items:center; justify-content:center; gap:10px; width:100%; padding:12px; border-radius:12px; border:1px solid var(--border); background:var(--card); color:var(--txt); font-size:15px; font-weight:700; cursor:pointer; }
+.si-google:disabled { opacity:.5; }
+.si-or { display:flex; align-items:center; gap:10px; margin:14px 0 12px; color:var(--muted); font-size:12px; }
+.si-or::before, .si-or::after { content:''; flex:1; height:1px; background:var(--border); }
+.si-tabs { display:flex; gap:4px; padding:3px; margin-bottom:12px; border-radius:10px; background:color-mix(in srgb, var(--txt) 7%, var(--card)); }
+.si-tab { flex:1; padding:8px; border:none; border-radius:8px; background:transparent; color:var(--muted); font-size:14px; font-weight:700; cursor:pointer; }
+.si-tab.on { background:var(--card); color:var(--txt); box-shadow:0 1px 3px rgba(0,0,0,.15); }
+.si-modal input { width:100%; height:46px; padding:0 12px; margin-bottom:8px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--txt); font-size:16px; box-sizing:border-box; }
+.si-go { width:100%; padding:13px; margin-top:4px; border:none; border-radius:12px; background:var(--acc); color:#fff; font-size:15px; font-weight:700; cursor:pointer; }
+.si-go:disabled { opacity:.6; }
+.si-msg { min-height:18px; margin-top:10px; font-size:13px; line-height:1.4; color:var(--danger); }
+.si-msg.good { color:var(--success); }
+.si-links { display:flex; justify-content:space-between; margin-top:6px; }
+.si-links button { border:none; background:none; padding:6px 0; color:var(--muted); font-size:13px; text-decoration:underline; cursor:pointer; }
+
 /* Groups */
 .wz-groups { margin:-6px 0 16px; }
 .wz-groups-head { display:flex; align-items:center; justify-content:space-between; margin:0 2px 6px; }
@@ -864,9 +882,13 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.25';
+const APP_VERSION = '7.26';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.26': [
+    'No Google account? Sign in with an email and password instead \u2014 Sign in, then New account',
+    'Forgot your password? There\u2019s a reset link on the sign-in screen',
+  ],
   '7.25': [
     'Groups: start your own from the golfers already on file \u2014 Groups on the Home screen, then New group, and tick who\u2019s in it',
     'Invite people with a link. They open it, sign in with Google, and tap Join',
@@ -1236,6 +1258,76 @@ const Cloud = {
    * and the button stays disabled until it is ready; by the time it can be
    * tapped, `this.api` is already in hand and the popup opens synchronously.
    */
+  // ------------------------------------------------------ email + password
+  /** Firebase's error codes, in words someone on the first tee can act on. */
+  authMessage(e) {
+    const code = String((e && e.code) || (e && e.message) || '');
+    if (/invalid-credential|wrong-password|user-not-found|invalid-login/.test(code))
+      return 'That email and password don\u2019t match. Try again, or reset your password.';
+    if (/email-already-in-use/.test(code))
+      return 'There\u2019s already an account for that email. Sign in instead \u2014 or, if you used Google before, continue with Google.';
+    if (/weak-password/.test(code)) return 'Use a password of at least 6 characters.';
+    if (/invalid-email|missing-email/.test(code)) return 'That doesn\u2019t look like an email address.';
+    if (/missing-password/.test(code)) return 'Put in a password.';
+    if (/too-many-requests/.test(code)) return 'Too many tries. Wait a minute and try again.';
+    if (/network-request-failed/.test(code)) return 'No connection. Try again when you have signal.';
+    return 'That didn\u2019t work (' + code + ').';
+  },
+
+  /** mode: 'in' | 'up'. Resolves true on success; failures come back as a message. */
+  async emailAuth(mode, email, password, name) {
+    if (!this.api || this.busy) return { ok: false, msg: 'Still connecting \u2014 try again in a second.' };
+    this.busy = true; this.render();
+    try {
+      if (mode === 'up') await this.api.signUpWithEmail(email, password, name);
+      else await this.api.signInWithEmail(email, password);
+      this.diag('email ' + mode + ' ok');
+      this.settling = true;
+      return { ok: true };
+    } catch (e) {
+      this.diag('email ' + mode + ' failed ' + (e.code || e.message));
+      return { ok: false, msg: this.authMessage(e) };
+    } finally {
+      this.busy = false; this.render();
+    }
+  },
+
+  async resetPassword(email) {
+    if (!this.api) return { ok: false, msg: 'Still connecting \u2014 try again in a second.' };
+    if (!String(email || '').trim()) return { ok: false, msg: 'Put in your email first.' };
+    try {
+      await this.api.sendPasswordReset(email);
+      // Said the same way whether or not there is an account, which is what
+      // Firebase's enumeration protection does too.
+      return { ok: true, msg: 'If there\u2019s an account for that email, a reset link is on its way.' };
+    } catch (e) { return { ok: false, msg: this.authMessage(e) }; }
+  },
+
+  /** Signed up with a password and not yet clicked the verify link. */
+  needsVerify() {
+    return !!(this.user && this.user.email && this.user.emailVerified === false);
+  },
+
+  async checkVerified(quiet) {
+    if (!this.api || !this.needsVerify()) return;
+    try {
+      const ok = await this.api.refreshVerified();
+      if (ok) {
+        this.user = this.api.currentUser();
+        if (!quiet) Err.toast('Email verified');
+        await this.refreshProfile();
+      } else if (!quiet) {
+        Err.toast('Not verified yet \u2014 tap the link in the email first');
+      }
+    } catch (e) {}
+    this.render();
+  },
+
+  async resendVerify() {
+    try { await this.api.resendVerification(); Err.toast('Sent \u2014 check your email'); }
+    catch (e) { Err.toast(this.authMessage(e)); }
+  },
+
   signIn() {
     if (this.busy || !this.api) return;
     const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -1385,7 +1477,7 @@ const Cloud = {
     if (typeof CLOUD_ENABLED === 'undefined' || !CLOUD_ENABLED) return '';
     const a = this.activeGroup();
     return [!!this.user, this.groups.map((g) => g.id + ':' + g.name).join(','), this.pool.length,
-            this.busy, !!this.api, a ? a.id : '', !!this.pendingJoin()].join('|');
+            this.busy, !!this.api, a ? a.id : '', !!this.pendingJoin(), this.needsVerify()].join('|');
   },
 
   /**
@@ -1731,10 +1823,13 @@ const Cloud = {
         '<div class="menu-section-title">Account</div>' +
         '<button class="menu-item primary" id="cloudSignIn"' + (ready && !this.busy && !this.settling ? '' : ' disabled') + '>' +
         label + '</button>' +
+        '<button class="menu-item" id="cloudEmailSignIn"' + (ready && !this.busy && !this.settling ? '' : ' disabled') + '>Sign in with email</button>' +
         '<div class="cloud-note">Optional. Signing in saves your rounds and unlocks group stats \u2014 scoring works exactly the same without it.</div>' +
         note;
       const b = document.getElementById('cloudSignIn');
       if (b) b.onclick = () => Cloud.signIn();
+      const eb = document.getElementById('cloudEmailSignIn');
+      if (eb) eb.onclick = () => { UI.closeMenu(); UI.showSignIn('in'); };
       this.renderDiag(el, esc);
       return;
     }
@@ -1777,6 +1872,12 @@ const Cloud = {
       '<div class="sub">' + esc(this.user.email || '') + '</div>' +
       '<div class="sub" style="margin-top:6px;">' + linked + '</div>' +
       '<div class="sub">' + groupLine + '</div></div>' +
+      (this.needsVerify()
+        ? '<div class="cloud-note"><b>Verify your email.</b> We sent a link to ' + esc(this.user.email) +
+          '. Until it\u2019s tapped, emailed invitations can\u2019t find you (invite links still work).' +
+          '<br><button class="cloud-backup" id="cloudVerified">I\u2019ve done it</button> ' +
+          '<button class="cloud-backup" id="cloudResend">Send it again</button></div>'
+        : '') +
       invites + backup + unlinked + note +
       '<button class="menu-item" id="cloudGroups">Groups</button>' +
       '<button class="menu-item" id="cloudSignOut">Sign out</button>';
@@ -1787,6 +1888,10 @@ const Cloud = {
     if (ln) ln.onclick = () => { UI.closeMenu(); UI.showLinkNames(); };
 
     this.renderDiag(el, esc);
+    const cv = document.getElementById('cloudVerified');
+    if (cv) cv.onclick = () => Cloud.checkVerified(false);
+    const cr = document.getElementById('cloudResend');
+    if (cr) cr.onclick = () => Cloud.resendVerify();
     const grp = document.getElementById('cloudGroups');
     if (grp) grp.onclick = () => { UI.closeMenu(); UI.showGroups(); };
     const out = document.getElementById('cloudSignOut');
@@ -5411,7 +5516,11 @@ const Wizard = {
         '<div class="wz-account-text"><div class="wz-account-name">' + esc(nm) + '</div>' +
         '<div class="wz-account-sub">' + (Cloud.groups.length
           ? Cloud.pool.length + ' golfer(s), with live indexes'
-          : 'Not in a group yet.') + '</div></div></div>';
+          : 'Not in a group yet.') + '</div>' +
+        (Cloud.needsVerify()
+          ? '<div class="wz-account-sub" style="margin-top:4px;">Verify your email: tap the link we sent, then ' +
+            '<button class="wz-inline-link" id="wizVerified">I\u2019ve done it</button></div>'
+          : '') + '</div></div>';
     } else if (CLOUD_ENABLED) {
       account = '<div class="wz-account"><div class="wz-account-text"><div class="wz-account-name">Not signed in</div>' +
         '<div class="wz-account-sub">Your group’s golfers, current GHIN indexes and standings.</div></div>' +
@@ -5460,7 +5569,9 @@ const Wizard = {
 
     setTimeout(() => {
       const si = div.querySelector('#wizSignIn');
-      if (si) si.onclick = () => Cloud.signIn();          // synchronous: the popup needs the tap
+      if (si) si.onclick = () => UI.showSignIn('in');
+      const hv = div.querySelector('#wizVerified');
+      if (hv) hv.onclick = () => Cloud.checkVerified(false);
       div.querySelector('#wizNewRound').onclick = () => { this.step = 'course'; this.render(); };
       div.querySelector('#wizJoin').onclick = () => {
         this.active = false;
@@ -11353,6 +11464,79 @@ const UI = {
    * and starting a new one. Every change goes through Cloud.groupChange, which
    * reloads the profile so the Home screen and the pickers follow.
    */
+  /**
+   * Sign in: Google, or an email and password. The Google button is a direct
+   * tap handler because the popup has to open inside the tap — see
+   * Cloud.signIn. Email sign-in happens entirely in the app, which is why it
+   * is a password and not an emailed link (see js/cloud.js).
+   */
+  showSignIn(mode) {
+    const esc = (t) => String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const old = document.getElementById('signInSheet');
+    if (old) old.remove();
+    Cloud.warm();
+    let tab = mode === 'up' ? 'up' : 'in';
+    const wrap = document.createElement('div');
+    wrap.className = 'kp-modal si-modal';
+    wrap.id = 'signInSheet';
+    document.body.appendChild(wrap);
+    const close = () => wrap.remove();
+    wrap.onclick = (e) => { if (e.target === wrap) close(); };
+
+    const draw = (keep) => {
+      const v = keep || {};
+      wrap.innerHTML = '<div class="kp-modal-content">' +
+        '<h3>Sign in</h3><div class="subtitle">Your group\u2019s golfers, current GHIN indexes and standings. Scoring works without it.</div>' +
+        '<button class="si-google" id="siGoogle"' + (Cloud.api && !Cloud.busy ? '' : ' disabled') + '>' +
+        (Cloud.api ? 'Continue with Google' : 'Preparing\u2026') + '</button>' +
+        '<div class="si-or">or with email</div>' +
+        '<div class="si-tabs"><button class="si-tab' + (tab === 'in' ? ' on' : '') + '" id="siTabIn">Sign in</button>' +
+        '<button class="si-tab' + (tab === 'up' ? ' on' : '') + '" id="siTabUp">New account</button></div>' +
+        (tab === 'up' ? '<input id="siName" placeholder="Your name" autocomplete="name" value="' + esc(v.name) + '">' : '') +
+        '<input id="siEmail" type="email" placeholder="Email" autocomplete="email" autocapitalize="off" value="' + esc(v.email) + '">' +
+        '<input id="siPass" type="password" placeholder="' + (tab === 'up' ? 'Choose a password (6+ characters)' : 'Password') + '" ' +
+        'autocomplete="' + (tab === 'up' ? 'new-password' : 'current-password') + '">' +
+        '<button class="si-go" id="siGo">' + (tab === 'up' ? 'Create account' : 'Sign in') + '</button>' +
+        '<div class="si-msg" id="siMsg"></div>' +
+        '<div class="si-links">' + (tab === 'in' ? '<button id="siForgot">Forgot password?</button>' : '<span></span>') +
+        '<button id="siClose">Not now</button></div></div>';
+
+      const val = (id) => { const el = wrap.querySelector('#' + id); return el ? el.value : ''; };
+      const say = (t, good) => { const m = wrap.querySelector('#siMsg'); m.textContent = t || ''; m.classList.toggle('good', !!good); };
+      const keepNow = () => ({ name: val('siName'), email: val('siEmail') });
+      wrap.querySelector('#siGoogle').onclick = () => { close(); Cloud.signIn(); };
+      wrap.querySelector('#siTabIn').onclick = () => { tab = 'in'; draw(keepNow()); };
+      wrap.querySelector('#siTabUp').onclick = () => { tab = 'up'; draw(keepNow()); };
+      wrap.querySelector('#siClose').onclick = close;
+      const go = wrap.querySelector('#siGo');
+      const submit = async () => {
+        if (tab === 'up' && !val('siName').trim()) { say('Put in your name, as the group knows you.'); return; }
+        go.disabled = true; go.textContent = tab === 'up' ? 'Creating\u2026' : 'Signing in\u2026'; say('');
+        const r = await Cloud.emailAuth(tab, val('siEmail'), val('siPass'), val('siName'));
+        if (r.ok) {
+          close();
+          Err.toast(tab === 'up' ? 'Account made \u2014 check your email to verify it' : 'Signed in');
+          return;
+        }
+        go.disabled = false; go.textContent = tab === 'up' ? 'Create account' : 'Sign in';
+        say(r.msg);
+      };
+      go.onclick = submit;
+      wrap.querySelector('#siPass').onkeydown = (e) => { if (e.key === 'Enter') submit(); };
+      const fg = wrap.querySelector('#siForgot');
+      if (fg) fg.onclick = async () => { const r = await Cloud.resetPassword(val('siEmail')); say(r.msg, r.ok); };
+    };
+    draw();
+    // The SDK may still be arriving; enable the buttons when it does.
+    if (!Cloud.api) {
+      const t = setInterval(() => {
+        if (!document.getElementById('signInSheet')) { clearInterval(t); return; }
+        if (Cloud.api) { clearInterval(t); const g = wrap.querySelector('#siGoogle'); if (g) { g.disabled = false; g.textContent = 'Continue with Google'; } }
+      }, 300);
+    }
+  },
+
   showGroups(opts) {
     const esc = (t) => String(t == null ? '' : t)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -11851,6 +12035,11 @@ State.data.games = State.data.games.map(Game.sanitize);
 
 document.getElementById('historyMenuBtn').onclick = () => { UI.closeMenu(); History.show(); };
 document.getElementById('comboMenuBtn').onclick = () => { UI.closeMenu(); UI.showComboCalc(State.data, null); };
+// Coming back from Mail or Safari after tapping the verify link.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && typeof Cloud !== 'undefined' && Cloud.needsVerify()) Cloud.checkVerified(true);
+});
+
 document.getElementById('standingsMenuBtn').onclick = () => { UI.closeMenu(); UI.showStandings(); };
 
 // Dev-only test surface, gated on _bbDev (localhost, or ?dev). It does not

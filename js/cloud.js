@@ -160,6 +160,63 @@ BB.cloud = {
     return res;
   },
 
+  // --------------------------------------------------------- email + password
+  //
+  // Not everyone has a Google account. Email-LINK sign-in was ruled out: on an
+  // iPhone the emailed link opens in Safari, which has its own storage, so the
+  // person ends up signed in to Safari and still signed out of the home-screen
+  // app. A password is typed into the app itself, so the session lands where
+  // it is used. The two emails Firebase sends — verify, and reset — only
+  // change state on the server, so it does not matter where they are opened.
+
+  /** New account: create it, name it, and send the verify-your-email mail. */
+  async signUpWithEmail(email, password, name) {
+    assertReady();
+    const cred = await state.auth.createUserWithEmailAndPassword(String(email || '').trim(), password);
+    const nm = String(name || '').trim();
+    if (nm) {
+      await cred.user.updateProfile({ displayName: nm });
+      // onAuthStateChanged has usually made the user doc already, before the
+      // name was set, so put the name there too.
+      try {
+        await BB.cloud.ensureUserDoc();
+        await state.db.doc(`users/${cred.user.uid}`).update({ displayName: nm });
+      } catch (e) { /* offline: the name is on the auth profile regardless */ }
+    }
+    try { await cred.user.sendEmailVerification(); } catch (e) { /* can be resent */ }
+    return cred.user;
+  },
+
+  async signInWithEmail(email, password) {
+    assertReady();
+    return (await state.auth.signInWithEmailAndPassword(String(email || '').trim(), password)).user;
+  },
+
+  async sendPasswordReset(email) {
+    assertReady();
+    await state.auth.sendPasswordResetEmail(String(email || '').trim());
+  },
+
+  async resendVerification() {
+    const user = requireUser();
+    await user.sendEmailVerification();
+  },
+
+  /**
+   * Has the address been verified since? The verify link is usually opened in
+   * Mail or Safari, not here, so the app has to ask. A fresh ID token is what
+   * carries email_verified to the security rules — reload() alone is not enough.
+   */
+  async refreshVerified() {
+    const user = requireUser();
+    await user.reload();
+    if (state.auth.currentUser && state.auth.currentUser.emailVerified) {
+      await state.auth.currentUser.getIdToken(true);
+    }
+    state.user = state.auth.currentUser;
+    return !!(state.user && state.user.emailVerified);
+  },
+
   signOut() { assertReady(); return state.auth.signOut(); },
 
   // ------------------------------------------------------------- bootstrap
@@ -195,7 +252,10 @@ BB.cloud = {
    */
   async pendingInvites() {
     const user = requireUser();
-    if (!user.email) return [];
+    // The rules only match invitations against a VERIFIED address. Asking with
+    // an unverified one is refused, which would fail the whole profile load
+    // for anyone who signed up with a password and has not clicked the link.
+    if (!user.email || !user.emailVerified) return [];
     const qs = await state.db.collection('invites')
       .where('email', '==', user.email.toLowerCase())
       .where('status', '==', 'pending')
