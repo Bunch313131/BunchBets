@@ -776,9 +776,12 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.21';
+const APP_VERSION = '7.22';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.22': [
+    'Fixed: the running match cards paid a KP sweep at the turn when one team had won every par 3 so far \u2014 sweeps are for the whole round. Final settlement was never affected',
+  ],
   '7.21': [
     'Fixed: the header was cut off once a round started \u2014 7.20 left the app sized to the whole screen after iOS had already moved it below the status bar',
     'Your group\u2019s names are now listed alphabetically instead of in whatever order they came back in',
@@ -3091,12 +3094,15 @@ const Game = {
       const gross = g.gross[pid] && g.gross[pid][hole];
       return gross != null;
     }));
+    // A sweep is every par 3 of the ROUND. par3s above is only the ones played
+    // so far, so until the last one is reached nobody has swept anything.
+    const allPar3sReached = this.getPar3Holes().every(h => h <= maxHole);
     const totalKPs = teamAKPs + teamBKPs;
     // A dangling carryStack means the last par 3 — or several — were never won
     // by anybody. If nobody won the final KP then nobody won them all, so there
     // is no sweep, and therefore no quads prompt either.
     const allKPsResolved = carryStack === 0;
-    const hasSweeps = anyKPAwarded && totalKPs > 0 && (teamAKPs === 0 || teamBKPs === 0) && allPar3sScored && allKPsResolved;
+    const hasSweeps = anyKPAwarded && totalKPs > 0 && (teamAKPs === 0 || teamBKPs === 0) && allPar3sScored && allPar3sReached && allKPsResolved;
     const sweepsTeam = hasSweeps ? (teamAKPs > 0 ? 'A' : 'B') : null;
 
     let totalKPValue = 0;
