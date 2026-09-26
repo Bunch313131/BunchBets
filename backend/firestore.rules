@@ -29,6 +29,30 @@ service cloud.firestore {
              uid() in get(/databases/$(database)/documents/groups/$(gid)).data.memberUids;
     }
 
+    // The same question asked of the state AFTER the write in progress, so a
+    // batch that joins a group and records it on the user doc can pass.
+    function isMemberAfter(gid) {
+      return signedIn() &&
+             uid() in getAfter(/databases/$(database)/documents/groups/$(gid)).data.memberUids;
+    }
+
+    // Playing groups can have golfers taken out of them. The directory — any
+    // group from before groups had a kind — cannot, from the client.
+    function isPlayingGroup(gid) {
+      return get(/databases/$(database)/documents/groups/$(gid)).data.get('kind', 'directory') == 'group';
+    }
+
+    // What an update changed, as lists: the ids it added and the ids it removed.
+    function addedTo(field) {
+      return request.resource.data.get(field, []).removeAll(resource.data.get(field, []));
+    }
+    function removedFrom(field) {
+      return resource.data.get(field, []).removeAll(request.resource.data.get(field, []));
+    }
+    function onlyChanged(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
     // Shares a group pool with the caller. Basis for reading and maintaining a
     // golfer who has no account and will never claim their own record.
     // NOTE ON A ROUGH EDGE: when the caller belongs to no groups at all,
@@ -39,8 +63,23 @@ service cloud.firestore {
     // identical to a clean false, so this is a diagnostics wart and not a
     // security hole. Worth revisiting if the rules language grows a way to
     // express it; not worth weakening the rule to tidy the log.
+    //
+    // myGroups() comes from the caller's own user doc, which is only safe
+    // because the users rule below lets groupIds gain a group ONLY when the
+    // caller really is in its memberUids. Before that, anyone could write any
+    // group id into their own list and read that group's golfers.
     function sharesPool(data) {
       return signedIn() && data.get('poolGroupIds', []).hasAny(myGroups());
+    }
+
+    // An emailed invitation to this group, still pending, addressed to the
+    // caller's verified address.
+    function inviteLetsMeJoin(gid, inviteId) {
+      return inviteId != '' && verifiedEmail() != '' &&
+        exists(/databases/$(database)/documents/invites/$(inviteId)) &&
+        get(/databases/$(database)/documents/invites/$(inviteId)).data.groupId == gid &&
+        get(/databases/$(database)/documents/invites/$(inviteId)).data.email == verifiedEmail() &&
+        get(/databases/$(database)/documents/invites/$(inviteId)).data.status == 'pending';
     }
 
     // Only a verified address may be used to match invitations. Google supplies
@@ -55,7 +94,19 @@ service cloud.firestore {
     // Private. Nothing here is readable by anyone else; the public face of a
     // person is their golfer document.
     match /users/{userId} {
-      allow read, write: if isAdmin() || (signedIn() && uid() == userId);
+      allow read, delete: if isAdmin() || (signedIn() && uid() == userId);
+
+      // A new account starts in no groups; groups are joined, not declared.
+      allow create: if isAdmin() || (signedIn() && uid() == userId &&
+        request.resource.data.get('groupIds', []).size() == 0);
+
+      // groupIds may gain one group per write, and only one whose memberUids
+      // really contain the caller (after this write, so join + record can be
+      // one batch). Dropping a group is always allowed.
+      allow update: if isAdmin() || (signedIn() && uid() == userId && (
+        addedTo('groupIds').size() == 0 ||
+        (addedTo('groupIds').size() == 1 && isMemberAfter(addedTo('groupIds')[0]))
+      ));
     }
 
     // -------------------------------------------------------------- golfers
@@ -74,9 +125,14 @@ service cloud.firestore {
       // is denied outright rather than silently filtered.
       allow list: if isAdmin() || (signedIn() && sharesPool(resource.data));
 
-      // A newly created golfer may never arrive already discoverable.
+      // A newly created golfer may never arrive already discoverable, and goes
+      // only into pools the caller is in — otherwise anyone could push a record
+      // into a group they cannot even read.
       allow create: if isAdmin() || (signedIn() &&
-        request.resource.data.get('discoverable', false) == false);
+        request.resource.data.get('discoverable', false) == false &&
+        request.resource.data.get('claimedByUid', null) == null &&
+        request.resource.data.get('poolGroupIds', []).size() > 0 &&
+        request.resource.data.get('poolGroupIds', []).hasOnly(myGroups()));
 
       allow update: if isAdmin() || (signedIn() && (
         // the owner may change anything, including turning discovery on
@@ -106,7 +162,27 @@ service cloud.firestore {
          sharesPool(resource.data) &&
          request.resource.data.get('discoverable', false) == false &&
          request.resource.data.get('claimedByUid', null) == null &&
-         request.resource.data.get('poolGroupIds', []) == resource.data.get('poolGroupIds', []))
+         request.resource.data.get('poolGroupIds', []) == resource.data.get('poolGroupIds', [])) ||
+
+        // SHARING into a group. Someone who can already see a golfer may put
+        // him in a group they belong to — that is how a playing group is built
+        // from the directory. One group per write, nothing else touched, and it
+        // applies to claimed golfers too: being in a group is not something
+        // the golfer owns. It grants nobody anything they could not already
+        // read, since only members of the new group gain sight of him.
+        (onlyChanged(['poolGroupIds']) &&
+         removedFrom('poolGroupIds').size() == 0 &&
+         addedTo('poolGroupIds').size() == 1 &&
+         sharesPool(resource.data) &&
+         isMember(addedTo('poolGroupIds')[0])) ||
+
+        // and taking him out of a PLAYING group you are in. Never out of the
+        // directory: that is the list everyone picks from.
+        (onlyChanged(['poolGroupIds']) &&
+         addedTo('poolGroupIds').size() == 0 &&
+         removedFrom('poolGroupIds').size() == 1 &&
+         isMember(removedFrom('poolGroupIds')[0]) &&
+         isPlayingGroup(removedFrom('poolGroupIds')[0]))
       ));
 
       allow delete: if isAdmin();   // golfers are referenced by rounds forever
@@ -116,21 +192,46 @@ service cloud.firestore {
     match /groups/{groupId} {
       allow get, list: if isAdmin() || (signedIn() && uid() in resource.data.memberUids);
 
+      // Anyone may start a playing group, owning it and as its only member.
+      // The directory is created by the seeding tools, not from the app.
       allow create: if isAdmin() || (signedIn()
                     && request.resource.data.ownerUid == uid()
-                    && request.resource.data.memberUids == [uid()]);
+                    && request.resource.data.memberUids == [uid()]
+                    && request.resource.data.get('kind', '') == 'group');
 
       allow update: if isAdmin() || (signedIn() && (
-        // members may edit the pool and the name, but not the membership list
+        // members may edit the pool and the name — not the membership, not the
+        // owner, not the join code. Changing ownerUid used to be allowed here,
+        // which made every member one write away from owning the group.
         (uid() in resource.data.memberUids &&
-         request.resource.data.memberUids == resource.data.memberUids) ||
-        // the owner may change membership
-        uid() == resource.data.ownerUid ||
-        // anyone may append exactly themselves — the invite acceptance path.
-        // Everything else about the document must be untouched.
-        (request.resource.data.memberUids == resource.data.memberUids.concat([uid()]) &&
+         request.resource.data.memberUids == resource.data.memberUids &&
          request.resource.data.ownerUid == resource.data.ownerUid &&
-         request.resource.data.name == resource.data.name)
+         request.resource.data.get('kind', null) == resource.data.get('kind', null) &&
+         request.resource.data.get('joinCode', null) == resource.data.get('joinCode', null)) ||
+
+        // the owner may change anything, including membership and the join code,
+        // so long as whoever owns it afterwards is still in it. Otherwise the
+        // owner could walk out and leave a group nobody can manage.
+        (uid() == resource.data.ownerUid &&
+         request.resource.data.ownerUid in request.resource.data.memberUids) ||
+
+        // JOINING: append exactly yourself, and prove you were asked. This used
+        // to need nothing at all — anyone who learnt a group id could add
+        // themselves. The proof is either the group's join code (from the share
+        // link; the owner can change it to kill an old link), or an emailed
+        // invitation to this group addressed to the caller's verified address.
+        (request.resource.data.memberUids == resource.data.memberUids.concat([uid()]) &&
+         onlyChanged(['memberUids', 'joinProof', 'joinInvite']) &&
+         ((resource.data.get('joinCode', '') != '' &&
+           request.resource.data.get('joinProof', '') == resource.data.joinCode) ||
+          inviteLetsMeJoin(groupId, request.resource.data.get('joinInvite', '')))) ||
+
+        // LEAVING: take exactly yourself out. The owner cannot leave their own
+        // group this way — it would be left with nobody able to manage it.
+        (uid() in resource.data.memberUids &&
+         uid() != resource.data.ownerUid &&
+         request.resource.data.memberUids == resource.data.memberUids.removeAll([uid()]) &&
+         onlyChanged(['memberUids']))
       ));
 
       allow delete: if isAdmin() || (signedIn() && uid() == resource.data.ownerUid);

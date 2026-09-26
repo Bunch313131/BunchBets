@@ -469,6 +469,38 @@ body.is-beta header { box-shadow: inset 0 3px 0 #dc2626; }
 .wizard-option.selected { border-color:var(--acc); background:rgba(59,130,246,0.1); }
 .wizard-option input[type="radio"] { width:18px; height:18px; }
 
+.roster-sec { padding:7px 12px 4px; font-size:10.5px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:var(--muted); background:color-mix(in srgb, var(--txt) 5%, var(--card)); border-bottom:1px solid var(--border); }
+
+/* Groups */
+.wz-groups { margin:-6px 0 16px; }
+.wz-groups-head { display:flex; align-items:center; justify-content:space-between; margin:0 2px 6px; }
+.wz-groups-head .wz-label { margin:0; }
+.wz-groups-manage { border:none; background:none; color:var(--acc); font-size:13px; font-weight:700; cursor:pointer; padding:4px 0; }
+.wz-group-chips { display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; padding-bottom:2px; }
+.wz-group-chips::-webkit-scrollbar { display:none; }
+.wz-group-chip { flex:0 0 auto; padding:8px 14px; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--txt); font-size:13.5px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.wz-group-chip.on { background:var(--acc); border-color:var(--acc); color:#fff; }
+.wz-join-banner { padding:12px; margin-bottom:14px; border-radius:12px; border:1px solid var(--acc); background:color-mix(in srgb, var(--acc) 10%, var(--card)); font-size:14px; line-height:1.4; }
+.wz-join-banner .row2 { display:flex; gap:8px; margin-top:10px; }
+.wz-join-banner button { flex:1; padding:9px; border-radius:10px; font-size:14px; font-weight:700; cursor:pointer; border:1px solid var(--border); background:var(--card); color:var(--txt); }
+.wz-join-banner button.go { background:var(--acc); border-color:var(--acc); color:#fff; }
+.grp-body { padding:12px 16px 24px; }
+.grp-row { display:flex; align-items:center; gap:10px; width:100%; min-height:52px; padding:10px 14px; border:none; border-top:1px solid var(--border); background:transparent; color:var(--txt); font:inherit; text-align:left; cursor:pointer; }
+.grp-row:first-child { border-top:none; }
+.grp-row .nm { flex:1; min-width:0; font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.grp-row .meta { font-size:12px; color:var(--muted); white-space:nowrap; }
+.grp-row .x { flex:0 0 auto; width:30px; height:30px; border-radius:50%; border:1px solid var(--border); background:var(--card); color:var(--muted); font-size:16px; line-height:1; cursor:pointer; }
+.grp-badge { font-size:10.5px; font-weight:800; letter-spacing:.4px; text-transform:uppercase; color:#fff; background:var(--acc); border-radius:999px; padding:3px 8px; }
+.grp-sub { font-size:13px; color:var(--muted); line-height:1.45; margin:2px 2px 12px; }
+.grp-actions { display:flex; gap:8px; margin:0 0 6px; }
+.grp-actions .btn { flex:1; padding:11px 10px; font-size:14px; font-weight:700; border-radius:10px; }
+.grp-input { width:100%; height:44px; padding:0 12px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--txt); font-size:16px; margin-bottom:8px; box-sizing:border-box; }
+.grp-link { display:block; width:100%; margin-top:14px; padding:10px; border:none; background:none; color:var(--muted); font-size:13px; text-decoration:underline; cursor:pointer; }
+.grp-link.danger { color:var(--danger); }
+.grp-new { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.grp-new .grp-input { margin:0; }
+.grp-new .full { grid-column:1 / -1; }
+
 /* New-flow start: home, course, tees & first hole */
 .wz-account { display:flex; align-items:center; gap:12px; padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--card); margin-bottom:18px; }
 .wz-avatar { width:38px; height:38px; border-radius:50%; background:var(--acc); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px; flex:0 0 auto; }
@@ -832,9 +864,15 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.24';
+const APP_VERSION = '7.25';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.25': [
+    'Groups: start your own from the golfers already on file \u2014 Groups on the Home screen, then New group, and tick who\u2019s in it',
+    'Invite people with a link. They open it, sign in with Google, and tap Join',
+    'Pick who you\u2019re playing with on the Home screen. That group\u2019s golfers come first when you pick players, and the round counts in its standings',
+    'Standings has a tab for each of your groups',
+  ],
   '7.24': [
     'Fixed: the hole screen showed HCP 0 for everyone but one player \u2014 it was showing the strokes from the first match, not each player\u2019s handicap. The bets were always right',
     'Scoring is \u2212 / + buttons again instead of the swipe wheel, and takes less room. Birdies get a circle and bogeys a box, like a paper card',
@@ -1049,6 +1087,8 @@ window.BB_BUILD_MARKER = APP_VERSION;
 const CLOUD_SDK = 'https://www.gstatic.com/firebasejs/9.22.0/';
 const CLOUD_REDIRECT_KEY = 'bb-cloud-redirect';
 const CLOUD_DIAG_KEY = 'bb-cloud-diag';
+const CLOUD_ACTIVE_KEY = 'bb-active-group';     // which group this phone is playing with
+const CLOUD_JOIN_KEY = 'bb-pending-join';       // a share link opened before signing in
 
 /**
  * The app's side of the bridge to js/cloud.js.
@@ -1061,7 +1101,7 @@ const CLOUD_DIAG_KEY = 'bb-cloud-diag';
  */
 const Cloud = {
   api: null, user: null, userDoc: null, golfer: null,
-  groups: [], invites: [], pool: [], status: '', busy: false, settling: false,
+  groups: [], pools: {}, invites: [], pool: [], status: '', busy: false, settling: false,
   syncing: false,
   _loading: null,
 
@@ -1104,7 +1144,7 @@ const Cloud = {
         self.user = user;
         self.settling = false;
         if (user) self.refreshProfile();
-        else { self.userDoc = null; self.golfer = null; self.groups = []; self.invites = []; self.render(); }
+        else { self.userDoc = null; self.golfer = null; self.groups = []; self.pools = {}; self.pool = []; self.invites = []; self.render(); }
       });
       self.api = api;
       return api;
@@ -1167,6 +1207,7 @@ const Cloud = {
   /** Called once at startup. Never throws. */
   async boot() {
     if (!CLOUD_ENABLED) return;
+    this.captureJoinLink();
     // Sign-in is popup-only now, so there is no redirect to finish. The only
     // reason to pay for the SDK on a cold start is an existing session; anything
     // else waits until the account panel is opened.
@@ -1239,7 +1280,7 @@ const Cloud = {
   async signOut() {
     try { if (this.api) await this.api.signOut(); } catch (e) {}
     this.user = null; this.userDoc = null; this.golfer = null;
-    this.groups = []; this.invites = []; this.status = '';
+    this.groups = []; this.pools = {}; this.pool = []; this.invites = []; this.status = '';
     this.render();
   },
 
@@ -1257,8 +1298,7 @@ const Cloud = {
       step = 'myGolfer';        this.golfer = await this.api.myGolfer();
       step = 'myGroups';        this.groups = await this.api.myGroups();
       step = 'pendingInvites';  this.invites = await this.api.pendingInvites();
-      step = 'groupPool';       this.pool = this.groups.length
-                                  ? await this.api.groupPool(this.groups[0].id) : [];
+      step = 'groupPool';       await this.loadPools();
       this.status = '';
       this.diag('profile ok invites=' + this.invites.length + ' groups=' + this.groups.length);
     } catch (e) {
@@ -1281,11 +1321,151 @@ const Cloud = {
     try {
       const res = await this.api.acceptInvite(id);
       await this.refreshProfile();
-      Err.toast('Joined ' + ((this.groups[0] && this.groups[0].name) || res.groupId));
+      const joined = this.groups.filter((g) => g.id === res.groupId)[0];
+      Err.toast('Joined ' + ((joined && joined.name) || res.groupId));
     } catch (e) {
       this.status = 'Could not join: ' + (e.code || e.message);
     }
     this.busy = false; this.render();
+  },
+
+  // ------------------------------------------------------------------ groups
+  //
+  // A golfer can be in several groups: the directory (everyone this set of
+  // people plays with) and any number of playing groups built from it. The app
+  // loads every group's golfers, keeps one group "active" for the round being
+  // set up, and files the round there.
+
+  /** Every group's golfers, then the combined list the pickers read. */
+  async loadPools() {
+    const entries = await Promise.all(this.groups.map((g) =>
+      this.api.groupPool(g.id).then((p) => [g.id, p]).catch(() => [g.id, []])));
+    this.pools = {};
+    entries.forEach(([id, p]) => { this.pools[id] = p; });
+    this.rebuildPool();
+  },
+
+  /** One entry per golfer, the active group's first. */
+  rebuildPool() {
+    const active = this.activeGroup();
+    const order = this.groups.slice().sort((a, b) =>
+      (active && a.id === active.id ? -1 : 0) - (active && b.id === active.id ? -1 : 0));
+    const seen = {}, out = [];
+    order.forEach((g) => (this.pools[g.id] || []).forEach((x) => {
+      if (seen[x.id]) return;
+      seen[x.id] = 1;
+      out.push(x);
+    }));
+    this.pool = out;
+  },
+
+  isDirectory(g) { return !!g && g.kind !== 'group'; },
+
+  /**
+   * The group being played with. What this phone last chose, if it is still a
+   * member; otherwise its first playing group; otherwise the directory.
+   */
+  activeGroup() {
+    if (!this.groups.length) return null;
+    let id = null;
+    try { id = localStorage.getItem(CLOUD_ACTIVE_KEY); } catch (e) {}
+    return this.groups.filter((g) => g.id === id)[0]
+      || this.groups.filter((g) => !this.isDirectory(g))[0]
+      || this.groups[0];
+  },
+
+  setActiveGroup(id) {
+    try { localStorage.setItem(CLOUD_ACTIVE_KEY, id); } catch (e) {}
+    this.rebuildPool();
+    this.render();
+  },
+
+  /** What the wizard compares to decide whether cloud state has moved. */
+  sig() {
+    if (typeof CLOUD_ENABLED === 'undefined' || !CLOUD_ENABLED) return '';
+    const a = this.activeGroup();
+    return [!!this.user, this.groups.map((g) => g.id + ':' + g.name).join(','), this.pool.length,
+            this.busy, !!this.api, a ? a.id : '', !!this.pendingJoin()].join('|');
+  },
+
+  /**
+   * A share link is ?group=<id>&code=<code>&name=<name>. It is kept on the
+   * phone rather than acted on, because the person opening it is usually not
+   * signed in yet, and joining needs an account. The Home screen offers it.
+   */
+  captureJoinLink() {
+    try {
+      const q = new URLSearchParams(location.search);
+      const id = q.get('group'), code = q.get('code');
+      if (!id || !code) return;
+      localStorage.setItem(CLOUD_JOIN_KEY, JSON.stringify({ id, code, name: q.get('name') || '' }));
+      q.delete('group'); q.delete('code'); q.delete('name');
+      const rest = q.toString();
+      history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
+    } catch (e) {}
+  },
+
+  pendingJoin() {
+    try {
+      const j = JSON.parse(localStorage.getItem(CLOUD_JOIN_KEY) || 'null');
+      if (!j || !j.id) return null;
+      // Already in it (joined on another device, or twice): nothing to offer.
+      if (this.groups.some((g) => g.id === j.id)) { localStorage.removeItem(CLOUD_JOIN_KEY); return null; }
+      return j;
+    } catch (e) { return null; }
+  },
+
+  dismissJoin() {
+    try { localStorage.removeItem(CLOUD_JOIN_KEY); } catch (e) {}
+    this.render();
+  },
+
+  async joinPending() {
+    const j = this.pendingJoin();
+    if (!j || this.busy || !this.api || !this.user) return;
+    this.busy = true; this.status = 'Joining\u2026'; this.render();
+    try {
+      await this.api.joinGroup(j.id, j.code);
+      try { localStorage.removeItem(CLOUD_JOIN_KEY); localStorage.setItem(CLOUD_ACTIVE_KEY, j.id); } catch (e) {}
+      this.busy = false;
+      await this.refreshProfile();
+      const g = this.groups.filter((x) => x.id === j.id)[0];
+      Err.toast('You\u2019re in ' + ((g && g.name) || j.name || 'the group'));
+    } catch (e) {
+      // A refused join is almost always an old link: the owner reset the code.
+      try { localStorage.removeItem(CLOUD_JOIN_KEY); } catch (e2) {}
+      this.status = /permission/i.test(e.code || e.message || '')
+        ? 'That invite link no longer works. Ask for a new one.'
+        : 'Could not join: ' + (e.code || e.message);
+      Err.toast(this.status);
+    }
+    this.busy = false; this.render();
+  },
+
+  /** Run a group change, then reload so every screen sees it. */
+  async groupChange(fn) {
+    if (!this.api || !this.user) throw new Error('not signed in');
+    this.busy = true; this.render();
+    try {
+      const out = await fn(this.api);
+      this.busy = false;
+      await this.refreshProfile();
+      return out;
+    } catch (e) {
+      Err.toast(e.message || e.code || 'That did not work');
+      throw e;
+    } finally {
+      this.busy = false; this.render();
+    }
+  },
+
+  /** The link that brings someone into a group. Null if this account cannot make one. */
+  async shareLink(groupId) {
+    const code = await this.api.joinCodeFor(groupId);
+    if (!code) return null;
+    const g = this.groups.filter((x) => x.id === groupId)[0];
+    return location.origin + location.pathname + '?group=' + encodeURIComponent(groupId) +
+      '&code=' + encodeURIComponent(code) + '&name=' + encodeURIComponent((g && g.name) || '');
   },
 
   renderDiag(el, esc) {
@@ -1463,7 +1643,8 @@ const Cloud = {
 
     return {
       id: r.id,
-      groupId: this.groups.length ? this.groups[0].id : null,
+      // The group this phone is playing with, so its standings count the round.
+      groupId: (this.activeGroup() || {}).id || null,
       date: r.date,
       courseName: (r.course && r.course.name) || 'Course',
       courseSnapshot: r.course || null,
@@ -1562,12 +1743,13 @@ const Cloud = {
     const linked = this.golfer
       ? esc(this.golfer.name) + (this.golfer.currentIndex ? ' \u00b7 ' + esc(this.golfer.currentIndex) : '')
       : 'No golfer linked yet';
+    const act = this.activeGroup();
     const groupLine = this.groups.length
-      ? this.groups.map((g) => esc(g.name)).join(', ')
+      ? 'Playing with ' + esc(act ? act.name : '') + (this.groups.length > 1 ? ' \u00b7 ' + this.groups.length + ' groups' : '')
       : 'No group yet';
 
     const invites = this.invites.map((inv) =>
-      '<div class="cloud-invite">You have been invited to join <b>' + esc(inv.groupId) + '</b>.' +
+      '<div class="cloud-invite">You have been invited to join <b>' + esc(inv.groupName || inv.groupId) + '</b>.' +
       '<br><span style="color:var(--muted);">Joining also links your scores to the record already on file.</span>' +
       '<button data-invite="' + esc(inv.id) + '"' + (this.busy ? ' disabled' : '') + '>Join</button></div>').join('');
 
@@ -1596,6 +1778,7 @@ const Cloud = {
       '<div class="sub" style="margin-top:6px;">' + linked + '</div>' +
       '<div class="sub">' + groupLine + '</div></div>' +
       invites + backup + unlinked + note +
+      '<button class="menu-item" id="cloudGroups">Groups</button>' +
       '<button class="menu-item" id="cloudSignOut">Sign out</button>';
 
     const bk = document.getElementById('cloudBackup');
@@ -1604,6 +1787,8 @@ const Cloud = {
     if (ln) ln.onclick = () => { UI.closeMenu(); UI.showLinkNames(); };
 
     this.renderDiag(el, esc);
+    const grp = document.getElementById('cloudGroups');
+    if (grp) grp.onclick = () => { UI.closeMenu(); UI.showGroups(); };
     const out = document.getElementById('cloudSignOut');
     if (out) out.onclick = () => Cloud.signOut();
     el.querySelectorAll('[data-invite]').forEach((btn) => {
@@ -5079,15 +5264,20 @@ const Wizard = {
       return ch == null ? lastPlayedOff(g) : ch;
     };
 
-    const out = [], seen = {};
-    if (typeof CLOUD_ENABLED !== 'undefined' && CLOUD_ENABLED && Cloud.user) {
+    const out = [], others = [], seen = {};
+    const cloudOn = typeof CLOUD_ENABLED !== 'undefined' && CLOUD_ENABLED && Cloud.user;
+    const act = cloudOn ? Cloud.activeGroup() : null;
+    if (cloudOn) {
       Cloud.pool.forEach((g) => {
         const k = norm(g.name);
         if (!k || seen[k]) return;
         seen[k] = 1;
         (g.aliases || []).forEach((a) => { const ak = norm(a); if (ak) seen[ak] = 1; });
         const ch = Game.courseHandicap(g.currentIndex, tee);
-        out.push({ name: g.name, index: g.currentIndex || null,
+        // The group being played with comes first; everyone else you can see
+        // (the directory, your other groups) after it, for the odd fill-in.
+        const mine = !act || (g.poolGroupIds || []).indexOf(act.id) !== -1;
+        (mine ? out : others).push({ name: g.name, index: g.currentIndex || null,
                    handicap: ch == null ? lastPlayedOff(g) : ch, fromTee: ch != null });
       });
     }
@@ -5101,6 +5291,7 @@ const Wizard = {
     // among one-off visitors, and the group is who is nearly always playing.
     const byName = (a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' });
     out.sort(byName);
+    others.sort(byName);
 
     const guests = [];
     local.forEach((r) => {
@@ -5110,7 +5301,11 @@ const Wizard = {
       guests.push({ name: r.name, index: null, handicap: r.handicap || 0 });
     });
     guests.sort(byName);
-    return out.concat(guests);
+    // Section labels only when there is more than one section to tell apart.
+    const parts = [[act ? act.name : 'Your group', out], ['Everyone else', others], ['On this phone', guests]]
+      .filter(([, list]) => list.length);
+    if (parts.length > 1) parts.forEach(([label, list]) => list.forEach((r) => { r.section = label; }));
+    return out.concat(others, guests);
   },
 
   /**
@@ -5139,9 +5334,10 @@ const Wizard = {
         esc(Cloud.user.email || '') + '. You are not in a group yet, so only names from this phone are offered.</div></div>';
     }
     const n = Cloud.pool.length;
+    const act = Cloud.activeGroup();
     return '<div class="wiz-cloud"><div class="wiz-cloud-msg">' +
-      (n ? esc(Cloud.groups[0].name) + ' \u2014 ' + n + ' golfer(s) available, with live indexes. Tap a name box to pick one.'
-         : 'Loading ' + esc(Cloud.groups[0].name) + '\u2026') +
+      (n ? esc(act.name) + ' \u2014 ' + n + ' golfer(s) available, with live indexes. Tap a name box to pick one.'
+         : 'Loading ' + esc(act.name) + '\u2026') +
       '</div></div>';
   },
 
@@ -5152,8 +5348,7 @@ const Wizard = {
    */
   syncCloud() {
     if (!this.active || (this.step !== 'players' && this.step !== 'home')) return;
-    const sig = (typeof CLOUD_ENABLED !== 'undefined' && CLOUD_ENABLED)
-      ? [!!Cloud.user, Cloud.groups.length, Cloud.pool.length, Cloud.busy, !!Cloud.api].join('|') : '';
+    const sig = Cloud.sig();
     if (sig === this._cloudSig) return;
     this._cloudSig = sig;
     this.render();
@@ -5207,7 +5402,7 @@ const Wizard = {
     // launch costs nothing for someone who never signs in. The splash advance
     // warms instead, which is ~1.4s before the button can be pressed.
     if (this.step === 'home') Cloud.warm();
-    this._cloudSig = [!!Cloud.user, Cloud.groups.length, Cloud.pool.length, Cloud.busy, !!Cloud.api].join('|');
+    this._cloudSig = Cloud.sig();
 
     let account = '';
     if (CLOUD_ENABLED && Cloud.user) {
@@ -5215,7 +5410,7 @@ const Wizard = {
       account = '<div class="wz-account"><div class="wz-avatar">' + esc(nm.trim().charAt(0).toUpperCase() || '?') + '</div>' +
         '<div class="wz-account-text"><div class="wz-account-name">' + esc(nm) + '</div>' +
         '<div class="wz-account-sub">' + (Cloud.groups.length
-          ? esc(Cloud.groups[0].name) + ' · ' + Cloud.pool.length + ' golfer(s), with live indexes'
+          ? Cloud.pool.length + ' golfer(s), with live indexes'
           : 'Not in a group yet.') + '</div></div></div>';
     } else if (CLOUD_ENABLED) {
       account = '<div class="wz-account"><div class="wz-account-text"><div class="wz-account-name">Not signed in</div>' +
@@ -5224,13 +5419,39 @@ const Wizard = {
         (Cloud.busy ? 'Waiting…' : Cloud.api ? 'Sign in' : 'Preparing…') + '</button></div>';
     }
 
+    // A share link opened on this phone, waiting to be accepted.
+    const pj = CLOUD_ENABLED ? Cloud.pendingJoin() : null;
+    let groupsHtml = '';
+    if (pj) {
+      groupsHtml += '<div class="wz-join-banner">You\u2019ve been invited to <b>' + esc(pj.name || 'a group') + '</b>.' +
+        (Cloud.user
+          ? '<div class="row2"><button id="wizJoinLater">Not now</button><button class="go" id="wizJoinGroup"' +
+            (Cloud.busy || !Cloud.api ? ' disabled' : '') + '>' + (Cloud.busy ? 'Joining\u2026' : 'Join') + '</button></div>'
+          : '<div style="margin-top:6px;color:var(--muted);font-size:13px;">Sign in above to join.</div>') +
+        '</div>';
+    }
+    // Which group this round is for. Its golfers come first on the players
+    // screen, and the round counts in its standings.
+    if (CLOUD_ENABLED && Cloud.user) {
+      const act = Cloud.activeGroup();
+      groupsHtml += '<div class="wz-groups"><div class="wz-groups-head"><div class="wz-label">' +
+        (Cloud.groups.length ? 'Playing with' : 'Groups') + '</div>' +
+        '<button class="wz-groups-manage" id="wizGroups">' + (Cloud.groups.length ? 'Groups \u203a' : 'Start a group \u203a') + '</button></div>' +
+        (Cloud.groups.length
+          ? '<div class="wz-group-chips">' + Cloud.groups.map((g) =>
+              '<button class="wz-group-chip' + (act && g.id === act.id ? ' on' : '') + '" data-gid="' + esc(g.id) + '">' +
+              esc(g.name) + '</button>').join('') + '</div>'
+          : '') +
+        '</div>';
+    }
+
     const choice = (id, cls, ico, title, sub) =>
       '<button class="wz-choice' + (cls ? ' ' + cls : '') + '" id="' + id + '"><span class="wz-ico">' + ico + '</span>' +
       '<span><b>' + title + '</b><span class="sub">' + sub + '</span></span></button>';
     const today = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
     div.innerHTML = this.wizHead('Let’s play', today) +
-      '<div class="wizard-content">' + account +
+      '<div class="wizard-content">' + account + groupsHtml +
       choice('wizNewRound', 'primary', '⛳', 'New round', 'Course, tees, who’s playing and for what') +
       choice('wizJoin', '', '📡', 'Join a live round', 'Follow a round someone else is scoring') +
       choice('wizHistory', '', '🗂️', 'Past rounds', 'Results and settlements from earlier rounds') +
@@ -5248,6 +5469,13 @@ const Wizard = {
       };
       div.querySelector('#wizHistory').onclick = () => History.show();
       div.querySelector('#wizSkip').onclick = () => this.skip();
+      const gm = div.querySelector('#wizGroups');
+      if (gm) gm.onclick = () => UI.showGroups();
+      div.querySelectorAll('.wz-group-chip').forEach((b) => { b.onclick = () => Cloud.setActiveGroup(b.dataset.gid); });
+      const jg = div.querySelector('#wizJoinGroup');
+      if (jg) jg.onclick = () => Cloud.joinPending();
+      const jl = div.querySelector('#wizJoinLater');
+      if (jl) jl.onclick = () => Cloud.dismissJoin();
     }, 0);
     return div;
   },
@@ -5682,8 +5910,7 @@ const Wizard = {
     // the sign-in popup must be opened by a live tap and cannot wait on a 470KB
     // download, so it has to already be warm when the button is pressed.
     if (typeof CLOUD_ENABLED !== 'undefined' && CLOUD_ENABLED) Cloud.warm();
-    this._cloudSig = (typeof CLOUD_ENABLED !== 'undefined' && CLOUD_ENABLED)
-      ? [!!Cloud.user, Cloud.groups.length, Cloud.pool.length, Cloud.busy, !!Cloud.api].join('|') : '';
+    this._cloudSig = Cloud.sig();
 
     const div = document.createElement('div');
     div.className = 'wizard-screen';
@@ -5734,7 +5961,11 @@ const Wizard = {
           !usedNames.includes(r.name.toLowerCase())
         );
         if (!matches.length) { dropdown.style.display = 'none'; return; }
+        let lastSection = null;
         dropdown.innerHTML = matches.map(r => {
+          const head = r.section && r.section !== lastSection
+            ? '<div class="roster-sec">' + r.section.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</div>' : '';
+          lastSection = r.section || lastSection;
           // Two different numbers, never conflated. The index is what GHIN says
           // about the golfer; HCP is what this phone last played them off. A
           // course handicap is derived from the index and the tee, which the app
@@ -5742,12 +5973,13 @@ const Wizard = {
           const right = r.index != null
             ? '<span style="color:var(--acc);font-size:12px;">Index ' + r.index + '</span>'
             : '<span style="color:var(--muted);font-size:12px;">HCP ' + (r.handicap || 0) + '</span>';
-          return '<div class="roster-pick" data-name="' + r.name + '" data-hcp="' +
+          const row = '<div class="roster-pick" data-name="' + r.name + '" data-hcp="' +
             (r.handicap == null ? '' : r.handicap) +
             '" data-from-tee="' + (r.fromTee ? '1' : '0') +
             '" data-index="' + (r.index == null ? '' : r.index) +
             '" style="padding:10px 12px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
             '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + r.name + '</span>' + right + '</div>';
+          return head + row;
         }).join('');
         dropdown.style.display = 'block';
         dropdown.querySelectorAll('.roster-pick').forEach(pick => {
@@ -11115,6 +11347,226 @@ const UI = {
    * about people who never played each other (doc 08 \u00a73). Scoring is just golf
    * and carries no such restriction.
    */
+  /**
+   * Groups: the directory everyone picks from, and the playing groups built
+   * from it. One overlay, four views — the list, a group, adding golfers to it,
+   * and starting a new one. Every change goes through Cloud.groupChange, which
+   * reloads the profile so the Home screen and the pickers follow.
+   */
+  showGroups(opts) {
+    const esc = (t) => String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const old = document.getElementById('groupsOverlay');
+    if (old) old.remove();
+    const overlay = document.createElement('div');
+    overlay.className = 'history-overlay';
+    overlay.id = 'groupsOverlay';
+    document.body.appendChild(overlay);
+
+    let view = opts && opts.groupId ? { name: 'group', id: opts.groupId } : { name: 'list' };
+    const picked = {};                 // golfer ids ticked on the add / new views
+    const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'en', { sensitivity: 'base' });
+    const groupOf = (id) => Cloud.groups.filter((g) => g.id === id)[0];
+    const go = (v) => { view = v; Object.keys(picked).forEach((k) => delete picked[k]); draw(); };
+
+    const frame = (title, back, body) => {
+      overlay.innerHTML =
+        '<div class="history-header"><button class="history-back" id="grpBack">&larr; ' + back + '</button>' +
+        '<h2>' + esc(title) + '</h2><div style="width:60px;"></div></div>' +
+        '<div class="history-list"><div class="grp-body">' + body + '</div></div>';
+      overlay.querySelector('#grpBack').onclick = () => {
+        if (view.name === 'list') overlay.remove();
+        else if (view.name === 'add') go({ name: 'group', id: view.id });
+        else go({ name: 'list' });
+      };
+    };
+
+    /** A searchable tick-list of golfers. */
+    const checklist = (golfers) =>
+      '<input class="grp-input" id="grpSearch" type="search" placeholder="Search" autocomplete="off">' +
+      (golfers.length
+        ? '<div class="wz-list" id="grpPick">' + golfers.slice().sort(byName).map((g) =>
+            '<button class="wz-row" data-id="' + esc(g.id) + '" data-nm="' + esc(String(g.name).toLowerCase()) + '">' +
+            '<span class="tick"></span><span class="nm">' + esc(g.name) + '</span>' +
+            '<span class="meta">' + (g.currentIndex ? esc(g.currentIndex) : '') + '</span></button>').join('') + '</div>'
+        : '<div class="grp-sub">Nobody else to add.</div>');
+    const wireChecklist = (onChange) => {
+      overlay.querySelectorAll('#grpPick .wz-row').forEach((r) => {
+        r.onclick = () => {
+          if (picked[r.dataset.id]) delete picked[r.dataset.id]; else picked[r.dataset.id] = 1;
+          r.classList.toggle('selected', !!picked[r.dataset.id]);
+          onChange();
+        };
+      });
+      const q = overlay.querySelector('#grpSearch');
+      if (q) q.oninput = () => {
+        const t = q.value.trim().toLowerCase();
+        overlay.querySelectorAll('#grpPick .wz-row').forEach((r) => {
+          r.style.display = !t || r.dataset.nm.indexOf(t) !== -1 ? '' : 'none';
+        });
+      };
+    };
+
+    const draw = () => {
+      if (!CLOUD_ENABLED || !Cloud.user) {
+        frame('Groups', 'Back', '<div class="history-empty">Sign in to see your groups and start new ones.</div>');
+        return;
+      }
+
+      if (view.name === 'list') {
+        const act = Cloud.activeGroup();
+        const rows = Cloud.groups.map((g) => {
+          const n = (Cloud.pools[g.id] || []).length;
+          const meta = (Cloud.isDirectory(g) ? 'Everyone · ' : '') + n + ' golfer' + (n === 1 ? '' : 's') +
+            ' · ' + (g.memberUids || []).length + ' in it';
+          return '<button class="grp-row" data-gid="' + esc(g.id) + '"><span class="nm">' + esc(g.name) + '</span>' +
+            (act && act.id === g.id ? '<span class="grp-badge">Playing</span>' : '<span class="meta">' + meta + '</span>') + '</button>';
+        }).join('');
+        frame('Groups', 'Back',
+          '<div class="grp-sub">A group is who you settle with. Each has its own standings. Build one from ' +
+          'the golfers you already have, then send the others the invite link.</div>' +
+          (rows ? '<div class="wz-list">' + rows + '</div>' : '<div class="grp-sub"><b>You are not in a group yet.</b></div>') +
+          '<button class="btn primary" id="grpNew" style="width:100%;margin-top:14px;padding:12px;font-weight:700;">+ New group</button>');
+        overlay.querySelectorAll('.grp-row').forEach((b) => { b.onclick = () => go({ name: 'group', id: b.dataset.gid }); });
+        overlay.querySelector('#grpNew').onclick = () => go({ name: 'new' });
+        return;
+      }
+
+      if (view.name === 'new') {
+        frame('New group', 'Groups',
+          '<input class="grp-input" id="grpName" placeholder="Name, e.g. Wednesday game" autocomplete="off" maxlength="40">' +
+          '<div class="wz-label">Who’s in it</div>' + checklist(Cloud.pool) +
+          '<button class="btn primary" id="grpCreate" style="width:100%;margin-top:14px;padding:12px;font-weight:700;" disabled>Start group</button>' +
+          '<div class="grp-sub" style="margin-top:10px;">You can add people who aren’t listed on the next screen.</div>');
+        const name = overlay.querySelector('#grpName');
+        const btn = overlay.querySelector('#grpCreate');
+        const sync = () => {
+          const n = Object.keys(picked).length;
+          btn.disabled = !name.value.trim() || Cloud.busy;
+          btn.textContent = 'Start group' + (n ? ' with ' + n : '');
+        };
+        name.oninput = sync;
+        wireChecklist(sync);
+        btn.onclick = async () => {
+          btn.disabled = true; btn.textContent = 'Starting…';
+          try {
+            const id = await Cloud.groupChange((api) => api.createGroup(name.value, Object.keys(picked)));
+            Cloud.setActiveGroup(id);
+            go({ name: 'group', id });
+          } catch (e) { sync(); }
+        };
+        return;
+      }
+
+      const g = groupOf(view.id);
+      if (!g) { go({ name: 'list' }); return; }
+      const dir = Cloud.isDirectory(g);
+      const mine = g.ownerUid === (Cloud.user && Cloud.user.uid);
+      const pool = (Cloud.pools[g.id] || []).slice().sort(byName);
+
+      if (view.name === 'add') {
+        const inIt = {};
+        pool.forEach((x) => { inIt[x.id] = 1; });
+        const dirs = Cloud.groups.filter((x) => Cloud.isDirectory(x) && x.id !== g.id);
+        frame('Add golfers', 'Back',
+          '<div class="wz-label" style="margin-top:0;">Already on file</div>' +
+          checklist(Cloud.pool.filter((x) => !inIt[x.id])) +
+          '<button class="btn primary" id="grpAdd" style="width:100%;margin-top:12px;padding:12px;font-weight:700;" disabled>Add</button>' +
+          '<div class="wz-label">Someone new</div>' +
+          '<div class="grp-new"><input class="grp-input full" id="grpNewName" placeholder="Full name" autocomplete="off">' +
+          '<input class="grp-input" id="grpNewGhin" placeholder="GHIN # (optional)" inputmode="numeric">' +
+          '<input class="grp-input" id="grpNewIdx" placeholder="Index (optional)" inputmode="decimal"></div>' +
+          '<button class="btn" id="grpCreateGolfer" style="width:100%;margin-top:8px;padding:11px;font-weight:700;">Add new golfer</button>' +
+          (dirs.length ? '<div class="grp-sub" style="margin-top:10px;">New golfers also go into ' +
+            dirs.map((d) => esc(d.name)).join(', ') + ', so everyone can pick them.</div>' : ''));
+        const add = overlay.querySelector('#grpAdd');
+        const sync = () => {
+          const n = Object.keys(picked).length;
+          add.disabled = !n || Cloud.busy;
+          add.textContent = n ? 'Add ' + n : 'Add';
+        };
+        wireChecklist(sync);
+        add.onclick = async () => {
+          add.disabled = true; add.textContent = 'Adding…';
+          try {
+            await Cloud.groupChange((api) => api.addToGroup(g.id, Object.keys(picked)));
+            go({ name: 'group', id: g.id });
+          } catch (e) { sync(); }
+        };
+        overlay.querySelector('#grpCreateGolfer').onclick = async () => {
+          const nm = overlay.querySelector('#grpNewName').value.trim();
+          if (!nm) { Err.toast('Put in a name'); return; }
+          const ghin = overlay.querySelector('#grpNewGhin').value.trim();
+          const idx = overlay.querySelector('#grpNewIdx').value.trim();
+          try {
+            await Cloud.groupChange((api) => api.createGolfer({ name: nm, ghinNumber: ghin || null, currentIndex: idx || null },
+              [g.id].concat(dirs.map((d) => d.id))));
+            Err.toast(nm + ' added');
+            go({ name: 'group', id: g.id });
+          } catch (e) {}
+        };
+        return;
+      }
+
+      // view: one group
+      const act = Cloud.activeGroup();
+      const rows = pool.map((x) =>
+        '<div class="grp-row" style="cursor:default;"><span class="nm">' + esc(x.name) + '</span>' +
+        '<span class="meta">' + (x.currentIndex ? esc(x.currentIndex) : '') + '</span>' +
+        (dir ? '' : '<button class="x" data-rm="' + esc(x.id) + '" aria-label="Take ' + esc(x.name) + ' out">×</button>') +
+        '</div>').join('');
+      frame(g.name, 'Groups',
+        '<div class="grp-sub">' + (dir ? 'Everyone you play with. Groups are built from this list.<br>' : '') +
+        pool.length + ' golfer' + (pool.length === 1 ? '' : 's') + ' · ' + (g.memberUids || []).length +
+        ' with the app' + (mine ? ' · you run it' : '') +
+        (act && act.id === g.id ? '<br><b>You’re playing with this group.</b>' : '') + '</div>' +
+        '<div class="grp-actions">' +
+        (act && act.id === g.id ? '' : '<button class="btn" id="grpPlay">Play with this group</button>') +
+        '<button class="btn primary" id="grpInvite">Invite people</button></div>' +
+        '<div class="wz-label">Golfers</div>' +
+        (rows ? '<div class="wz-list">' + rows + '</div>' : '<div class="grp-sub">Nobody yet.</div>') +
+        '<button class="btn" id="grpAddBtn" style="width:100%;margin-top:10px;padding:11px;font-weight:700;">+ Add golfers</button>' +
+        (mine ? '<button class="grp-link" id="grpReset">Stop old invite links working</button>'
+              : '<button class="grp-link danger" id="grpLeave">Leave this group</button>'));
+
+      const play = overlay.querySelector('#grpPlay');
+      if (play) play.onclick = () => { Cloud.setActiveGroup(g.id); draw(); };
+      overlay.querySelector('#grpAddBtn').onclick = () => go({ name: 'add', id: g.id });
+      overlay.querySelector('#grpInvite').onclick = async () => {
+        let url = null;
+        try { url = await Cloud.shareLink(g.id); } catch (e) {}
+        if (!url) {
+          Err.toast(dir ? 'Only whoever runs ' + g.name + ' can invite people to it' : 'Could not make a link');
+          return;
+        }
+        const text = 'Join ' + g.name + ' on Bunch Bets: open this, sign in with Google, and you’re in.';
+        try {
+          if (navigator.share) { await navigator.share({ title: g.name, text, url }); return; }
+        } catch (e) { if (e && e.name === 'AbortError') return; }
+        try { await navigator.clipboard.writeText(url); Err.toast('Invite link copied'); }
+        catch (e) { window.prompt('Copy this link and send it:', url); }
+      };
+      overlay.querySelectorAll('[data-rm]').forEach((b) => {
+        b.onclick = async () => {
+          const who = pool.filter((x) => x.id === b.dataset.rm)[0];
+          if (!confirm('Take ' + (who ? who.name : 'them') + ' out of ' + g.name + '? Their past rounds stay.')) return;
+          try { await Cloud.groupChange((api) => api.removeFromGroup(g.id, b.dataset.rm)); draw(); } catch (e) {}
+        };
+      });
+      const reset = overlay.querySelector('#grpReset');
+      if (reset) reset.onclick = async () => {
+        if (!confirm('Every invite link sent so far will stop working. People already in stay in.')) return;
+        try { await Cloud.groupChange((api) => api.resetJoinCode(g.id)); Err.toast('Old links no longer work'); } catch (e) {}
+      };
+      const leave = overlay.querySelector('#grpLeave');
+      if (leave) leave.onclick = async () => {
+        if (!confirm('Leave ' + g.name + '? You can rejoin with an invite link.')) return;
+        try { await Cloud.groupChange((api) => api.leaveGroup(g.id)); go({ name: 'list' }); } catch (e) {}
+      };
+    };
+    draw();
+  },
+
   async showStandings() {
     const esc = (t) => String(t == null ? '' : t)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -11137,7 +11589,20 @@ const UI = {
     if (!Cloud.api)      { msg('Still connecting\u2026 give it a second and try again.'); return; }
     if (!Cloud.groups.length) { msg('You are not in a group yet.<br><br>A group is what makes money add up \u2014 it is the set of people who actually settle with each other.'); return; }
 
-    const group = Cloud.groups[0];
+    const group = Cloud.activeGroup();
+    // Each group is its own table. Switching here also switches the group this
+    // phone plays with, which is nearly always what someone checking it wants.
+    if (Cloud.groups.length > 1) {
+      const bar = document.createElement('div');
+      bar.className = 'wz-group-chips';
+      bar.style.cssText = 'padding:10px 12px 0;flex-shrink:0;';
+      bar.innerHTML = Cloud.groups.map((g) => '<button class="wz-group-chip' + (g.id === group.id ? ' on' : '') +
+        '" data-gid="' + esc(g.id) + '">' + esc(g.name) + '</button>').join('');
+      body.parentNode.insertBefore(bar, body);
+      bar.querySelectorAll('.wz-group-chip').forEach((b) => {
+        b.onclick = () => { Cloud.setActiveGroup(b.dataset.gid); overlay.remove(); UI.showStandings(); };
+      });
+    }
     msg('Loading ' + esc(group.name) + '\u2026');
 
     let rounds = [];

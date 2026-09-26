@@ -7,9 +7,10 @@ everything else here is tooling.
 |---|---|
 | `firestore.rules` | Security rules. **These are the privacy model** — stats scoping, group visibility and who can see whom are enforced here, not in the client. |
 | `firestore.indexes.json` | Composite indexes the client queries need. |
-| `rules.test.js` | 51 rules tests against the emulator, weighted toward DENY cases. |
+| `rules.test.js` | 86 rules tests against the emulator, weighted toward DENY cases. |
 | `cloud.js` | Auth + Firestore module. Reaches the app through `window.BB`. |
-| `cloud.test.mjs` | 9 integration tests: the real module, in a real browser, against real rules. |
+| `cloud.test.mjs` | 9 integration tests: the real module, in a real browser, against real rules. Needs a real roster CSV. |
+| `groups.test.mjs` | 14 integration tests for groups — create, share link, join, add/remove golfers, leave, emailed invites. Seeds its own data; needs no roster and no GHIN. |
 | `seed.js` | Roster CSV → golfers, group, invitations. Validates every GHIN first. |
 
 ## Why there are two test suites
@@ -33,11 +34,29 @@ FIRESTORE_EMULATOR_HOST=127.0.0.1:8181 node --test rules.test.js
 #   cloud.test.mjs wipes and reseeds Firestore itself.
 cd .. && python3 -m http.server 8099 &
 node --test cloud.test.mjs                 # from backend/
+node --test groups.test.mjs                # from backend/
 ```
 
+## Groups
+
+The group made by `seed.js` (no `kind` field) is the **directory**: everyone
+this set of people plays with. Playing groups are made in the app
+(`kind: 'group'`) from golfers already in the directory, and joined with a
+share link (`?group=<id>&code=<joinCode>`). A golfer can be in any number of
+groups via `poolGroupIds`. The directory's owner makes its share link from the
+app (Groups → the directory → Invite people).
+
+The rules changes that came with groups also close three holes that existed
+before them, so deploy them to beta as well as prod:
+- `users.groupIds` could be written freely, and `sharesPool` trusted it, so
+  anyone who knew a group id could read its golfers.
+- Anyone could append themselves to any group's `memberUids`.
+- Any member could rewrite `ownerUid`.
+
 `vendor/` holds local copies of the compat SDK, because the page must not
-depend on reaching a CDN mid-test. It is gitignored; rebuild it from the repo
-root with:
+depend on reaching a CDN mid-test. It is gitignored. Where gstatic is not
+reachable, `backend/node_modules/firebase/firebase-*-compat.js` are the same
+builds and can be copied in. Otherwise rebuild it from the repo root with:
 
 ```bash
 mkdir -p vendor && for f in firebase-app-compat.js firebase-auth-compat.js \
