@@ -776,9 +776,12 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.22';
+const APP_VERSION = '7.23';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.23': [
+    'The suggested matches in setup are smaller and quieter \u2014 lightly tinted instead of solid green and red, with the two sides next to each other, so all three matches fit on one screen',
+  ],
   '7.22': [
     'Fixed: the running match cards paid a KP sweep at the turn when one team had won every par 3 so far \u2014 sweeps are for the whole round. Final settlement was never affected',
   ],
@@ -5279,14 +5282,17 @@ const Wizard = {
       const p = this.data.players[i];
       return p ? (p.handicap || 0) : 0;
     };
+    // Tinted, not filled: a solid green and red block per side was loud, and at
+    // that size three matches ran off the screen. The sides sit next to each
+    // other so all three fit without scrolling.
     const side = (ids, label, colour) =>
-      '<div style="padding:12px 13px;border-radius:10px;border:1px solid ' + colour +
-      ';background:' + colour.replace('var(--', 'rgba(').replace(')', '') + ';">' +
-      '<div style="font-size:10.5px;color:' + colour + ';text-transform:uppercase;letter-spacing:.6px;font-weight:700;margin-bottom:6px;">' +
+      '<div style="min-width:0;align-self:stretch;padding:7px 8px;border-radius:8px;border-left:3px solid ' + colour +
+      ';background:color-mix(in srgb, ' + colour + ' 12%, transparent);">' +
+      '<div style="font-size:10px;color:' + colour + ';text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:2px;">' +
       label + '</div>' +
-      ids.map((pid) => '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:3px;">' +
-        '<div style="font-size:15px;font-weight:600;">' + esc(nameOf(pid)) + '</div>' +
-        '<div class="muted" style="font-size:13px;font-variant-numeric:tabular-nums;">' + hcpOf(pid) + '</div></div>').join('') +
+      ids.map((pid) => '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;">' +
+        '<div style="font-size:14px;font-weight:600;line-height:1.25;min-width:0;overflow-wrap:anywhere;">' + esc(nameOf(pid)) + '</div>' +
+        '<div class="muted" style="font-size:12px;font-variant-numeric:tabular-nums;">' + hcpOf(pid) + '</div></div>').join('') +
       '</div>';
 
     const matches = team.map((g, i) => {
@@ -5296,12 +5302,14 @@ const Wizard = {
       const strokes = d === 0 ? 'no strokes'
         : (d > 0 ? esc(nameOf((g.teamA || [])[0])) + '\u2019s side gives ' + d
                  : esc(nameOf((g.teamB || [])[0])) + '\u2019s side gives ' + (-d));
-      return '<div class="card" style="margin-bottom:10px;">' +
-        (team.length > 1 ? '<div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:8px;">Match ' + (i + 1) + '</div>' : '') +
-        side(g.teamA || [], 'Team A', '#16a34a') +
-        '<div style="text-align:center;font-size:12px;color:var(--muted);font-weight:700;letter-spacing:1px;margin:8px 0;">VS</div>' +
-        side(g.teamB || [], 'Team B', '#dc2626') +
-        '<div class="muted" style="font-size:12px;margin-top:10px;">' + a + ' v ' + b + ' \u00b7 ' + strokes + '</div>' +
+      return '<div class="card" style="margin-bottom:8px;padding:9px 10px;">' +
+        (team.length > 1 ? '<div class="muted" style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:5px;">Match ' + (i + 1) + '</div>' : '') +
+        '<div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:5px;">' +
+        side(g.teamA || [], 'Team A', 'var(--success)') +
+        '<div style="font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.5px;">VS</div>' +
+        side(g.teamB || [], 'Team B', 'var(--danger)') +
+        '</div>' +
+        '<div class="muted" style="font-size:11.5px;margin-top:6px;">' + a + ' v ' + b + ' \u00b7 ' + strokes + '</div>' +
         '</div>';
     }).join('');
 
