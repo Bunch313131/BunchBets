@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Bunch Bets Admin</title>
+<link rel="icon" href="favicon-32.png">
+<!--
+  Site admin for Bunch Bets: groups, golfers, users, rounds, invitations.
+
+  Not part of the app — nothing in the app links here, and the service worker
+  leaves this path alone. It opens for anyone, but shows nothing to anyone
+  without the `admin` token claim (backend/make-admin.mjs), and the security
+  rules refuse every read and write that matters without it. The page checking
+  the claim is a courtesy; the rules are the protection.
+
+  Environment follows the host, exactly as the app does: bunchbets.com is
+  production, everything else is beta. ?emulator=1&sdk=/vendor is for tests.
+-->
+<style>
+:root { --bg:#f5f5f7; --card:#fff; --txt:#1d1d1f; --muted:#6e6e73; --border:#d2d2d7; --acc:#2563eb;
+        --good:#16a34a; --bad:#dc2626; --warn:#b45309; --hover:#f0f4ff; color-scheme:light; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg:#0b0e13; --card:#12161f; --txt:#ecf0f6; --muted:#9aa3b2; --border:#252d3a;
+        --acc:#3b82f6; --good:#22c55e; --bad:#ef4444; --warn:#f59e0b; --hover:#172033; color-scheme:dark; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--txt); font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+button, input, select { font:inherit; color:inherit; }
+.top { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:12px; padding:10px 16px;
+       background:var(--card); border-bottom:1px solid var(--border); flex-wrap:wrap; }
+.top h1 { margin:0; font-size:17px; }
+.env { font-size:11px; font-weight:800; letter-spacing:.6px; padding:3px 8px; border-radius:6px; color:#fff; }
+.env.beta { background:var(--warn); } .env.prod { background:var(--bad); }
+.top .who { margin-left:auto; color:var(--muted); font-size:13px; }
+.tabs { display:flex; gap:4px; padding:10px 16px 0; overflow-x:auto; }
+.tab { padding:8px 14px; border:1px solid var(--border); border-bottom:none; border-radius:10px 10px 0 0;
+       background:transparent; color:var(--muted); font-weight:700; cursor:pointer; white-space:nowrap; }
+.tab.on { background:var(--card); color:var(--txt); }
+.tab .n { font-weight:600; color:var(--muted); margin-left:4px; }
+main { display:grid; grid-template-columns:minmax(0,1fr) 420px; gap:0; min-height:calc(100vh - 110px); }
+@media (max-width: 900px) { main { grid-template-columns:minmax(0,1fr); } .detail { border-left:none; border-top:1px solid var(--border); } }
+.list, .detail { min-width:0; }
+.list table { min-width:560px; }
+.top .who { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.list { background:var(--card); border-top:1px solid var(--border); padding:12px 16px; overflow:auto; }
+.detail { background:var(--card); border-top:1px solid var(--border); border-left:1px solid var(--border); padding:16px; }
+.bar { display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
+.bar input[type=search] { flex:1; min-width:180px; height:36px; padding:0 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg); }
+.bar label { color:var(--muted); font-size:13px; display:flex; gap:6px; align-items:center; }
+table { width:100%; border-collapse:collapse; }
+th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); font-weight:700;
+     padding:6px 8px; border-bottom:1px solid var(--border); white-space:nowrap; }
+td { padding:8px; border-bottom:1px solid var(--border); vertical-align:top; }
+tr.row { cursor:pointer; } tr.row:hover { background:var(--hover); } tr.row.sel { background:var(--hover); box-shadow:inset 3px 0 0 var(--acc); }
+.muted { color:var(--muted); } .num { text-align:right; font-variant-numeric:tabular-nums; }
+.pill { display:inline-block; font-size:11px; font-weight:700; padding:1px 7px; border-radius:999px; border:1px solid var(--border); margin:0 3px 3px 0; white-space:nowrap; }
+.pill.dir { border-color:var(--acc); color:var(--acc); } .pill.warn { border-color:var(--warn); color:var(--warn); }
+.pill.good { border-color:var(--good); color:var(--good); }
+.detail h2 { margin:0 0 2px; font-size:18px; } .detail .sub { color:var(--muted); margin-bottom:14px; font-size:13px; }
+.sec { margin:16px 0 6px; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); font-weight:800; }
+.field { display:flex; gap:6px; margin-bottom:8px; }
+.field input, .field select { flex:1; min-width:0; height:34px; padding:0 9px; border:1px solid var(--border); border-radius:8px; background:var(--bg); }
+.btn { height:34px; padding:0 12px; border-radius:8px; border:1px solid var(--border); background:var(--card); font-weight:700; cursor:pointer; white-space:nowrap; }
+.btn.primary { background:var(--acc); border-color:var(--acc); color:#fff; }
+.btn.danger { color:var(--bad); border-color:var(--bad); }
+.btn:disabled { opacity:.5; cursor:default; }
+.items { border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+.item { display:flex; align-items:center; gap:8px; padding:7px 10px; border-top:1px solid var(--border); }
+.item:first-child { border-top:none; } .item .grow { flex:1; min-width:0; }
+.x { border:none; background:none; color:var(--bad); font-size:13px; font-weight:700; cursor:pointer; }
+.note { font-size:12.5px; color:var(--muted); margin:6px 0 0; line-height:1.45; }
+.danger-zone { margin-top:22px; padding-top:12px; border-top:1px dashed var(--border); }
+.empty { color:var(--muted); padding:30px 0; text-align:center; }
+.gate { max-width:380px; margin:10vh auto; background:var(--card); border:1px solid var(--border); border-radius:16px; padding:24px; }
+.gate h1 { margin:0 0 4px; font-size:20px; } .gate p { color:var(--muted); margin:0 0 16px; }
+.gate input { width:100%; height:42px; padding:0 12px; margin-bottom:8px; border:1px solid var(--border); border-radius:10px; background:var(--bg); }
+.gate .btn { width:100%; height:42px; margin-bottom:8px; }
+.gate .or { text-align:center; color:var(--muted); font-size:12px; margin:8px 0; }
+#toast { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); background:var(--txt); color:var(--bg);
+         padding:10px 16px; border-radius:10px; font-weight:600; opacity:0; transition:opacity .2s; pointer-events:none; max-width:90vw; }
+#toast.on { opacity:1; } #toast.bad { background:var(--bad); color:#fff; }
+</style>
+</head>
+<body>
+<div id="app"><div class="gate"><h1>Bunch Bets Admin</h1><p>Loading…</p></div></div>
+<div id="toast"></div>
+<script type="module">
+const params = new URLSearchParams(location.search);
+const PROD = location.hostname === 'bunchbets.com' || location.hostname === 'www.bunchbets.com';
+const CONFIG = PROD ? {
+  apiKey: 'AIzaSyDZlbkZMkfmFk1CS1i51JQ1NuknlNae0zo', authDomain: 'bunchbets.firebaseapp.com',
+  projectId: 'bunchbets', appId: '1:267555779116:web:af1e05bacb82f0d4fe5789',
+} : {
+  apiKey: 'AIzaSyCSt28t8rV5taevsl6iVI9QlOV-XR1wrCE', authDomain: 'bunchbets-test.firebaseapp.com',
+  projectId: 'bunchbets-test', appId: '1:820215666223:web:48501679a5540306a998da',
+};
+const EMULATOR = params.has('emulator');
+if (EMULATOR) { CONFIG.projectId = 'bb-test'; CONFIG.apiKey = 'fake-api-key'; }
+const SDK = params.get('sdk') || 'https://www.gstatic.com/firebasejs/9.22.0';
+
+const $ = (sel, el = document) => el.querySelector(sel);
+const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
+const esc = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const norm = (t) => String(t || '').toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
+const app = $('#app');
+
+let toastT = null;
+function toast(msg, bad) {
+  const t = $('#toast');
+  t.textContent = msg; t.className = 'on' + (bad ? ' bad' : '');
+  clearTimeout(toastT); toastT = setTimeout(() => { t.className = ''; }, bad ? 5000 : 2500);
+}
+
+const load = (src) => new Promise((res, rej) => {
+  const s = document.createElement('script');
+  s.src = src; s.onload = res; s.onerror = () => rej(new Error('could not load ' + src));
+  document.head.appendChild(s);
+});
+
+let auth, fs, ops;
+let D = null;                          // everything, from ops.loadAll()
+let tab = 'groups', sel = null, q = '', dupOnly = false;
+
+try {
+  for (const f of ['firebase-app-compat.js', 'firebase-auth-compat.js', 'firebase-firestore-compat.js']) await load(`${SDK}/${f}`);
+  ops = await import('./js/admin.js');
+  const fbApp = firebase.initializeApp(CONFIG, 'bbadmin');
+  auth = fbApp.auth(); fs = fbApp.firestore();
+  if (EMULATOR) { auth.useEmulator('http://127.0.0.1:9099', { disableWarnings: true }); fs.useEmulator('127.0.0.1', 8181); }
+  ops.init(fs, firebase.firestore.FieldValue);
+  // Tests sign in with a custom token; there is no such door off the emulator.
+  if (EMULATOR) window.__adminSignIn = (token) => auth.signInWithCustomToken(token);
+  auth.onAuthStateChanged(onUser);
+} catch (e) {
+  app.innerHTML = '<div class="gate"><h1>Bunch Bets Admin</h1><p>Could not start: ' + esc(e.message) + '</p></div>';
+}
+
+// ---------------------------------------------------------------- sign-in
+async function onUser(user) {
+  if (!user) return gate();
+  // A fresh token, so a claim granted since the last sign-in is seen now.
+  const res = await user.getIdTokenResult(true);
+  if (!res.claims.admin) {
+    app.innerHTML = '<div class="gate"><h1>Not an admin</h1><p>' + esc(user.email || user.uid) +
+      ' is signed in, but is not this site’s admin.</p><button class="btn" id="out">Sign out</button></div>';
+    $('#out').onclick = () => auth.signOut();
+    return;
+  }
+  await refresh();
+}
+
+function gate(msg) {
+  app.innerHTML = '<div class="gate"><h1>Bunch Bets Admin</h1><p>' + (PROD ? 'Production' : 'Beta') + ' — sign in with the admin account.</p>' +
+    '<button class="btn primary" id="g">Continue with Google</button><div class="or">or</div>' +
+    '<input id="em" type="email" placeholder="Email" autocomplete="email"><input id="pw" type="password" placeholder="Password" autocomplete="current-password">' +
+    '<button class="btn" id="e">Sign in with email</button><p class="note" id="m" style="color:var(--bad);">' + esc(msg || '') + '</p></div>';
+  $('#g').onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch((e) => gate(e.code || e.message));
+  const go = () => auth.signInWithEmailAndPassword($('#em').value.trim(), $('#pw').value).catch((e) => gate(
+    /invalid-credential|wrong-password|user-not-found/.test(e.code) ? 'That email and password don’t match.' : (e.code || e.message)));
+  $('#e').onclick = go;
+  $('#pw').onkeydown = (e) => { if (e.key === 'Enter') go(); };
+}
+
+// ------------------------------------------------------------------ data
+async function refresh() {
+  try { D = await ops.loadAll(); }
+  catch (e) { toast('Could not load: ' + (e.code || e.message), true); return; }
+  render();
+}
+
+/** Run a change, report it, reload. Dangerous ones confirm first. */
+async function act(label, fn, confirmText) {
+  if (confirmText && !confirm(confirmText)) return;
+  try {
+    const r = await fn();
+    toast(label + (r && typeof r === 'object' && 'rounds' in r ? ' — ' + r.rounds + ' round(s) updated' : ''));
+  } catch (e) { toast(e.message || e.code || 'That did not work', true); }
+  await refresh();
+}
+
+const byId = (list) => Object.fromEntries((list || []).map((x) => [x.id, x]));
+const userName = (uid) => { const u = D && byId(D.users)[uid]; return u ? (u.displayName || u.email || uid) : (uid ? uid.slice(0, 8) + '…' : '—'); };
+const golferName = (id) => { const g = D && byId(D.golfers)[id]; return g ? g.name : id; };
+const groupName = (id) => { const g = D && byId(D.groups)[id]; return g ? g.name : (id || '—'); };
+const roundsOf = (gid) => D.rounds.filter((r) => (r.golferIds || []).includes(gid));
+
+/** Same GHIN, or the same name once punctuation and case are ignored. */
+function duplicates() {
+  const key = {};
+  D.golfers.forEach((g) => {
+    const ks = [];
+    if (g.ghinNumber) ks.push('ghin:' + g.ghinNumber);
+    const n = norm(g.name); if (n) ks.push('name:' + n);
+    ks.forEach((k) => { (key[k] = key[k] || []).push(g.id); });
+  });
+  const dup = new Set();
+  Object.values(key).forEach((ids) => { if (ids.length > 1) ids.forEach((i) => dup.add(i)); });
+  return dup;
+}
+
+// ---------------------------------------------------------------- render
+function render() {
+  const dups = duplicates();
+  const counts = { groups: D.groups.length, golfers: D.golfers.length, users: D.users.length, rounds: D.rounds.length,
+                   invites: D.invites.filter((i) => i.status === 'pending').length };
+  const me = auth.currentUser;
+  app.innerHTML =
+    '<div class="top"><h1>Bunch Bets Admin</h1><span class="env ' + (PROD ? 'prod' : 'beta') + '">' + (PROD ? 'PRODUCTION' : 'BETA') + '</span>' +
+    '<span class="who">' + esc(me.email || me.uid) + '</span><button class="btn" id="rf">Refresh</button><button class="btn" id="so">Sign out</button></div>' +
+    '<div class="tabs">' + [['groups', 'Groups'], ['golfers', 'Golfers'], ['users', 'Users'], ['rounds', 'Rounds'], ['invites', 'Invitations']]
+      .map(([k, l]) => '<button class="tab' + (tab === k ? ' on' : '') + '" data-tab="' + k + '">' + l +
+        '<span class="n">' + counts[k] + (k === 'golfers' && dups.size ? ' · ' + dups.size + ' dup?' : '') + '</span></button>').join('') + '</div>' +
+    '<main><section class="list" id="list"></section><section class="detail" id="detail"></section></main>';
+  $('#rf').onclick = refresh;
+  $('#so').onclick = () => auth.signOut();
+  $$('.tab').forEach((b) => { b.onclick = () => { tab = b.dataset.tab; sel = null; q = ''; dupOnly = false; render(); }; });
+  ({ groups: listGroups, golfers: listGolfers, users: listUsers, rounds: listRounds, invites: listInvites })[tab](dups);
+}
+
+function listShell(cols, rows, extra) {
+  const L = $('#list');
+  L.innerHTML = '<div class="bar"><input type="search" id="q" placeholder="Search" value="' + esc(q) + '">' + (extra || '') + '</div>' +
+    (rows.length ? '<table><thead><tr>' + cols.map((c) => '<th' + (c.num ? ' class="num"' : '') + '>' + c.h + '</th>').join('') + '</tr></thead><tbody>' +
+      rows.map((r) => '<tr class="row' + (r.id === sel ? ' sel' : '') + '" data-id="' + esc(r.id) + '">' +
+        cols.map((c) => '<td' + (c.num ? ' class="num"' : '') + '>' + c.v(r) + '</td>').join('') + '</tr>').join('') + '</tbody></table>'
+      : '<div class="empty">Nothing here.</div>');
+  const qi = $('#q');
+  qi.oninput = () => { q = qi.value; const pos = qi.selectionStart; render(); const n = $('#q'); n.focus(); n.setSelectionRange(pos, pos); };
+  $$('tr.row', L).forEach((tr) => { tr.onclick = () => { sel = tr.dataset.id; render(); }; });
+}
+const matchQ = (...fields) => !q || fields.some((f) => String(f || '').toLowerCase().includes(q.toLowerCase()));
+
+// ---------------------------------------------------------------- groups
+function listGroups() {
+  const rows = D.groups.filter((g) => matchQ(g.name, userName(g.ownerUid))).sort((a, b) => String(a.name).localeCompare(b.name));
+  listShell([
+    { h: 'Name', v: (g) => '<b>' + esc(g.name) + '</b>' },
+    { h: 'Type', v: (g) => ops.isDirectory(g) ? '<span class="pill dir">Directory</span>' : 'Playing' },
+    { h: 'Owner', v: (g) => esc(userName(g.ownerUid)) },
+    { h: 'Members', num: 1, v: (g) => (g.memberUids || []).length },
+    { h: 'Golfers', num: 1, v: (g) => D.golfers.filter((x) => (x.poolGroupIds || []).includes(g.id)).length },
+    { h: 'Rounds', num: 1, v: (g) => D.rounds.filter((r) => r.groupId === g.id).length },
+  ], rows);
+  const g = byId(D.groups)[sel];
+  const P = $('#detail');
+  if (!g) { P.innerHTML = '<div class="empty">Pick a group.</div>'; return; }
+  const golfers = D.golfers.filter((x) => (x.poolGroupIds || []).includes(g.id)).sort((a, b) => a.name.localeCompare(b.name));
+  const nonMembers = D.users.filter((u) => !(g.memberUids || []).includes(u.id));
+  P.innerHTML =
+    '<h2>' + esc(g.name) + '</h2><div class="sub">' + (ops.isDirectory(g) ? 'Directory' : 'Playing group') + ' · id ' + esc(g.id) + '</div>' +
+    '<div class="sec">Name</div><div class="field"><input id="gName" value="' + esc(g.name) + '"><button class="btn primary" id="gNameSave">Save</button></div>' +
+    '<div class="sec">Type</div><div class="field"><select id="gKind"><option value="directory"' + (ops.isDirectory(g) ? ' selected' : '') +
+      '>Directory — everyone; nobody can be taken out of it in the app</option><option value="group"' + (ops.isDirectory(g) ? '' : ' selected') +
+      '>Playing group</option></select><button class="btn" id="gKindSave">Save</button></div>' +
+    '<div class="sec">Owner</div><div class="field"><select id="gOwner">' + (g.memberUids || []).map((u) =>
+      '<option value="' + esc(u) + '"' + (u === g.ownerUid ? ' selected' : '') + '>' + esc(userName(u)) + '</option>').join('') +
+      '</select><button class="btn" id="gOwnerSave">Save</button></div>' +
+    '<div class="sec">Members (' + (g.memberUids || []).length + ')</div><div class="items">' + (g.memberUids || []).map((u) =>
+      '<div class="item"><span class="grow">' + esc(userName(u)) + (u === g.ownerUid ? ' <span class="pill">owner</span>' : '') + '</span>' +
+      (u === g.ownerUid ? '' : '<button class="x" data-rm="' + esc(u) + '">Remove</button>') + '</div>').join('') + '</div>' +
+    (nonMembers.length ? '<div class="field" style="margin-top:8px;"><select id="gAdd">' + nonMembers.map((u) =>
+      '<option value="' + esc(u.id) + '">' + esc(u.displayName || u.email || u.id) + '</option>').join('') +
+      '</select><button class="btn" id="gAddBtn">Add member</button></div>' : '') +
+    '<div class="sec">Golfers (' + golfers.length + ')</div><div class="note">' + (golfers.map((x) => esc(x.name)).join(', ') || 'None') +
+      '</div><p class="note">Edit who is in it from the Golfers tab.</p>' +
+    '<div class="danger-zone"><div class="sec" style="margin-top:0;">Merge into another group</div>' +
+    '<div class="field"><select id="gInto">' + D.groups.filter((x) => x.id !== g.id).map((x) =>
+      '<option value="' + esc(x.id) + '">' + esc(x.name) + '</option>').join('') + '</select><button class="btn danger" id="gMerge">Merge</button></div>' +
+    '<p class="note">Moves this group’s golfers, members, rounds and invitations into the other one, then deletes this one.</p>' +
+    '<button class="btn danger" id="gDel" style="margin-top:10px;">Delete group</button>' +
+    '<p class="note">Golfers are kept. Its rounds become their scorer’s own rounds. Its invitations are deleted.</p></div>';
+  $('#gNameSave').onclick = () => act('Renamed', () => ops.renameGroup(g.id, $('#gName').value));
+  $('#gKindSave').onclick = () => act('Saved', () => ops.setKind(g.id, $('#gKind').value));
+  $('#gOwnerSave').onclick = () => act('Owner changed', () => ops.setOwner(g.id, $('#gOwner').value));
+  $$('[data-rm]', P).forEach((b) => { b.onclick = () => act('Removed', () => ops.removeMember(g.id, b.dataset.rm), 'Remove ' + userName(b.dataset.rm) + ' from ' + g.name + '?'); });
+  const ab = $('#gAddBtn'); if (ab) ab.onclick = () => act('Added', () => ops.addMember(g.id, $('#gAdd').value));
+  const gm = $('#gMerge');
+  if (gm) gm.onclick = () => { const into = $('#gInto').value; act('Merged', () => ops.mergeGroups(g.id, into).then((r) => { sel = into; return r; }),
+    'Merge ' + g.name + ' into ' + groupName(into) + '? ' + g.name + ' will be deleted.'); };
+  $('#gDel').onclick = () => act('Deleted', () => ops.deleteGroup(g.id).then((r) => { sel = null; return r; }),
+    'Delete ' + g.name + '? This cannot be undone.');
+}
+
+// --------------------------------------------------------------- golfers
+function listGolfers(dups) {
+  const rows = D.golfers.filter((g) => (!dupOnly || dups.has(g.id)) && matchQ(g.name, g.ghinNumber, (g.aliases || []).join(' ')))
+    .sort((a, b) => (norm(a.name).split(' ').pop() + norm(a.name)).localeCompare(norm(b.name).split(' ').pop() + norm(b.name)));
+  listShell([
+    { h: 'Name', v: (g) => '<b>' + esc(g.name) + '</b>' + (dups.has(g.id) ? ' <span class="pill warn">duplicate?</span>' : '') +
+        ((g.aliases || []).length ? '<div class="muted">aka ' + esc(g.aliases.join(', ')) + '</div>' : '') },
+    { h: 'GHIN', v: (g) => esc(g.ghinNumber || '') },
+    { h: 'Index', num: 1, v: (g) => esc(g.currentIndex || '') },
+    { h: 'Groups', v: (g) => (g.poolGroupIds || []).map((id) => '<span class="pill' + (ops.isDirectory(byId(D.groups)[id]) ? ' dir' : '') + '">' + esc(groupName(id)) + '</span>').join('') },
+    { h: 'Account', v: (g) => g.claimedByUid ? '<span class="pill good">' + esc(userName(g.claimedByUid)) + '</span>' : '' },
+    { h: 'Rounds', num: 1, v: (g) => roundsOf(g.id).length },
+  ], rows, '<label><input type="checkbox" id="dupOnly"' + (dupOnly ? ' checked' : '') + '> Possible duplicates only (' + dups.size + ')</label>');
+  $('#dupOnly').onchange = (e) => { dupOnly = e.target.checked; render(); };
+
+  const g = byId(D.golfers)[sel];
+  const P = $('#detail');
+  if (!g) { P.innerHTML = '<div class="empty">Pick a golfer.' + (dups.size ? '<br><br>Tick “Possible duplicates only” to find people entered twice.' : '') + '</div>'; return; }
+  const rounds = roundsOf(g.id);
+  const likely = D.golfers.filter((x) => x.id !== g.id && (
+    (g.ghinNumber && x.ghinNumber === g.ghinNumber) || norm(x.name) === norm(g.name) ||
+    norm(x.name).split(' ').pop() === norm(g.name).split(' ').pop()));
+  const others = D.golfers.filter((x) => x.id !== g.id).sort((a, b) => a.name.localeCompare(b.name));
+  P.innerHTML =
+    '<h2>' + esc(g.name) + '</h2><div class="sub">id ' + esc(g.id) + ' · ' + rounds.length + ' round(s)' +
+      (g.claimedByUid ? ' · account: ' + esc(userName(g.claimedByUid)) : ' · no account') + '</div>' +
+    '<div class="sec">Details</div>' +
+    '<div class="field"><input id="fName" placeholder="Name" value="' + esc(g.name) + '"></div>' +
+    '<div class="field"><input id="fGhin" placeholder="GHIN #" value="' + esc(g.ghinNumber || '') + '"><input id="fIdx" placeholder="Index" value="' + esc(g.currentIndex || '') + '"></div>' +
+    '<div class="field"><input id="fAka" placeholder="Also known as (comma separated)" value="' + esc((g.aliases || []).join(', ')) + '"></div>' +
+    '<button class="btn primary" id="fSave">Save details</button>' +
+    '<div class="sec">Groups</div><div class="items">' + D.groups.map((x) =>
+      '<label class="item"><input type="checkbox" data-grp="' + esc(x.id) + '"' + ((g.poolGroupIds || []).includes(x.id) ? ' checked' : '') + '>' +
+      '<span class="grow">' + esc(x.name) + (ops.isDirectory(x) ? ' <span class="pill dir">Directory</span>' : '') + '</span></label>').join('') + '</div>' +
+    '<button class="btn" id="fGroups" style="margin-top:8px;">Save groups</button>' +
+    '<div class="danger-zone"><div class="sec" style="margin-top:0;">Entered twice? Merge this record into the right one</div>' +
+    '<div class="field"><select id="fInto">' +
+      (likely.length ? '<optgroup label="Likely">' + likely.map((x) => '<option value="' + esc(x.id) + '">' + esc(x.name) + (x.ghinNumber ? ' · ' + esc(x.ghinNumber) : '') + '</option>').join('') + '</optgroup>' : '') +
+      '<optgroup label="Everyone">' + others.map((x) => '<option value="' + esc(x.id) + '">' + esc(x.name) + (x.ghinNumber ? ' · ' + esc(x.ghinNumber) : '') + '</option>').join('') + '</optgroup>' +
+    '</select><button class="btn danger" id="fMerge">Merge</button></div>' +
+    '<p class="note">Every round, standing, account link and invitation pointing at <b>' + esc(g.name) + '</b> is moved to the one you pick, ' +
+      'his groups and names are added to it, and this record is deleted.</p>' +
+    (rounds.length ? '' : '<button class="btn danger" id="fDel" style="margin-top:10px;">Delete golfer</button>') + '</div>';
+  $('#fSave').onclick = () => act('Saved', () => ops.updateGolfer(g.id, {
+    name: $('#fName').value, ghinNumber: $('#fGhin').value, currentIndex: $('#fIdx').value,
+    aliases: $('#fAka').value.split(',').map((s) => s.trim()).filter(Boolean) }));
+  $('#fGroups').onclick = () => act('Groups saved', () => ops.setGolferGroups(g.id, $$('[data-grp]', P).filter((c) => c.checked).map((c) => c.dataset.grp)));
+  $('#fMerge').onclick = () => { const keep = $('#fInto').value; act('Merged', () => ops.mergeGolfers(g.id, keep).then((r) => { sel = keep; return r; }),
+    'Merge ' + g.name + ' into ' + golferName(keep) + '? ' + g.name + '’s record will be deleted.'); };
+  const fd = $('#fDel'); if (fd) fd.onclick = () => act('Deleted', () => ops.deleteGolfer(g.id).then(() => { sel = null; }), 'Delete ' + g.name + '?');
+}
+
+// ----------------------------------------------------------------- users
+function listUsers() {
+  const rows = D.users.filter((u) => matchQ(u.displayName, u.email)).sort((a, b) => String(a.displayName || a.email).localeCompare(b.displayName || b.email));
+  listShell([
+    { h: 'Name', v: (u) => '<b>' + esc(u.displayName || '—') + '</b>' },
+    { h: 'Email', v: (u) => esc(u.email || '') },
+    { h: 'Groups', v: (u) => (u.groupIds || []).map((id) => '<span class="pill">' + esc(groupName(id)) + '</span>').join('') },
+    { h: 'Golfer', v: (u) => u.myGolferId ? esc(golferName(u.myGolferId)) : '<span class="muted">not linked</span>' },
+  ], rows);
+  const u = byId(D.users)[sel];
+  const P = $('#detail');
+  if (!u) { P.innerHTML = '<div class="empty">Pick a person.</div>'; return; }
+  const free = D.golfers.filter((g) => !g.claimedByUid || g.claimedByUid === u.id).sort((a, b) => a.name.localeCompare(b.name));
+  P.innerHTML = '<h2>' + esc(u.displayName || u.email || u.id) + '</h2><div class="sub">' + esc(u.email || '') + ' · uid ' + esc(u.id) + '</div>' +
+    '<div class="sec">Is golfer</div><div class="field"><select id="uG"><option value="">— not linked —</option>' + free.map((g) =>
+      '<option value="' + esc(g.id) + '"' + (g.id === u.myGolferId ? ' selected' : '') + '>' + esc(g.name) + '</option>').join('') +
+      '</select><button class="btn primary" id="uGSave">Save</button></div>' +
+    '<p class="note">Which scored record is this person. Their rounds and standings follow it.</p>' +
+    '<div class="sec">Groups</div><div class="items">' + ((u.groupIds || []).map((gid) =>
+      '<div class="item"><span class="grow">' + esc(groupName(gid)) + '</span>' +
+      ((byId(D.groups)[gid] || {}).ownerUid === u.id ? '<span class="pill">owner</span>' : '<button class="x" data-leave="' + esc(gid) + '">Remove</button>') + '</div>').join('')
+      || '<div class="item muted">None</div>') + '</div>' +
+    '<div class="field" style="margin-top:8px;"><select id="uAdd">' + D.groups.filter((g) => !(u.groupIds || []).includes(g.id)).map((g) =>
+      '<option value="' + esc(g.id) + '">' + esc(g.name) + '</option>').join('') + '</select><button class="btn" id="uAddBtn">Add to group</button></div>';
+  $('#uGSave').onclick = () => act('Linked', () => ops.linkUserGolfer(u.id, $('#uG').value || null));
+  $$('[data-leave]', P).forEach((b) => { b.onclick = () => act('Removed', () => ops.removeMember(b.dataset.leave, u.id), 'Remove from ' + groupName(b.dataset.leave) + '?'); });
+  const ua = $('#uAddBtn'); if (ua && $('#uAdd').value) ua.onclick = () => act('Added', () => ops.addMember($('#uAdd').value, u.id)); else if (ua) ua.disabled = true;
+}
+
+// ---------------------------------------------------------------- rounds
+function listRounds() {
+  const names = (r) => (r.golferIds || []).map((id) => (r.results && r.results[id] && r.results[id].name) || golferName(id));
+  const rows = D.rounds.filter((r) => matchQ(r.courseName, r.date, groupName(r.groupId), names(r).join(' ')))
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  listShell([
+    { h: 'Date', v: (r) => esc(String(r.date || '').slice(0, 10)) },
+    { h: 'Course', v: (r) => esc(r.courseName || '') },
+    { h: 'Group', v: (r) => r.groupId ? esc(groupName(r.groupId)) : '<span class="muted">personal</span>' },
+    { h: 'Players', v: (r) => esc(names(r).join(', ')) + ((r.unmatchedNames || []).length ? ' <span class="pill warn">' + r.unmatchedNames.length + ' unlinked</span>' : '') },
+    { h: 'Scorer', v: (r) => esc(userName(r.createdByUid)) },
+  ], rows);
+  const r = byId(D.rounds)[sel];
+  const P = $('#detail');
+  if (!r) { P.innerHTML = '<div class="empty">Pick a round.</div>'; return; }
+  const res = r.results || {};
+  P.innerHTML = '<h2>' + esc(r.courseName || 'Round') + '</h2><div class="sub">' + esc(String(r.date || '').slice(0, 16)) + ' · id ' + esc(r.id) + '</div>' +
+    '<div class="sec">Results</div><table><thead><tr><th>Player</th><th class="num">Gross</th><th class="num">Money</th></tr></thead><tbody>' +
+    Object.entries(res).map(([gid, x]) => '<tr><td>' + esc(x.name || golferName(gid)) + (gid.startsWith('guest:') ? ' <span class="pill warn">unlinked</span>' : '') + '</td>' +
+      '<td class="num">' + (x.gross == null ? '—' : x.gross) + '</td><td class="num">' + (x.money || 0) + '</td></tr>').join('') + '</tbody></table>' +
+    '<div class="sec">Counts in</div><div class="field"><select id="rG"><option value="">Personal — no group</option>' + D.groups.map((g) =>
+      '<option value="' + esc(g.id) + '"' + (g.id === r.groupId ? ' selected' : '') + '>' + esc(g.name) + '</option>').join('') +
+      '</select><button class="btn primary" id="rGSave">Save</button></div><p class="note">Which group’s standings this round counts in.</p>' +
+    '<div class="danger-zone"><button class="btn danger" id="rDel">Delete round</button><p class="note">For test and junk rounds. The scorer’s phone keeps its own copy.</p></div>';
+  $('#rGSave').onclick = () => act('Saved', () => ops.setRoundGroup(r.id, $('#rG').value || null));
+  $('#rDel').onclick = () => act('Deleted', () => ops.deleteRound(r.id).then(() => { sel = null; }), 'Delete this round? It drops out of every standing.');
+}
+
+// --------------------------------------------------------------- invites
+function listInvites() {
+  const rows = D.invites.filter((i) => matchQ(i.email, groupName(i.groupId), i.status))
+    .sort((a, b) => (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1) || String(a.email).localeCompare(b.email));
+  listShell([
+    { h: 'Email', v: (i) => '<b>' + esc(i.email) + '</b>' },
+    { h: 'Group', v: (i) => esc(groupName(i.groupId)) },
+    { h: 'As golfer', v: (i) => i.golferId ? esc(golferName(i.golferId)) : '' },
+    { h: 'Status', v: (i) => '<span class="pill' + (i.status === 'pending' ? ' warn' : i.status === 'accepted' ? ' good' : '') + '">' + esc(i.status) + '</span>' },
+    { h: 'From', v: (i) => esc(userName(i.invitedByUid)) },
+  ], rows);
+  const i = byId(D.invites)[sel];
+  const P = $('#detail');
+  if (!i) { P.innerHTML = '<div class="empty">Pick an invitation.<br><br>These are the emailed kind, made by the seeding tools. Share links are per group.</div>'; return; }
+  P.innerHTML = '<h2>' + esc(i.email) + '</h2><div class="sub">to ' + esc(groupName(i.groupId)) + (i.golferId ? ' as ' + esc(golferName(i.golferId)) : '') + ' · ' + esc(i.status) + '</div>' +
+    (i.status === 'pending' ? '<button class="btn" id="iRev">Revoke</button> ' : '') + '<button class="btn danger" id="iDel">Delete</button>';
+  const rv = $('#iRev'); if (rv) rv.onclick = () => act('Revoked', () => ops.revokeInvite(i.id));
+  $('#iDel').onclick = () => act('Deleted', () => ops.deleteInvite(i.id).then(() => { sel = null; }), 'Delete this invitation?');
+}
+</script>
+</body>
+</html>

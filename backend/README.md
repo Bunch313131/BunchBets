@@ -11,6 +11,8 @@ everything else here is tooling.
 | `cloud.js` | Auth + Firestore module. Reaches the app through `window.BB`. |
 | `cloud.test.mjs` | 9 integration tests: the real module, in a real browser, against real rules. Needs a real roster CSV. |
 | `email-auth.test.mjs` | 10 integration tests for email + password accounts: sign-up, the unverified window, verify then accept an emailed invite, wrong password, reset. |
+| `admin.test.mjs` | 12 end-to-end tests of `admin.html` against the emulator: a non-admin gets nothing, duplicate golfers merge with their rounds, groups merge and delete, accounts link, rounds move. |
+| `make-admin.mjs` | Grant or revoke the site-admin claim: `node make-admin.mjs <key>.json <email> [--revoke]`. |
 | `groups.test.mjs` | 14 integration tests for groups — create, share link, join, add/remove golfers, leave, emailed invites. Seeds its own data; needs no roster and no GHIN. |
 | `seed.js` | Roster CSV → golfers, group, invitations. Validates every GHIN first. |
 
@@ -37,7 +39,22 @@ cd .. && python3 -m http.server 8099 &
 node --test cloud.test.mjs                 # from backend/
 node --test groups.test.mjs                # from backend/
 node --test email-auth.test.mjs            # from backend/
+node --test admin.test.mjs                 # from backend/
 ```
+
+## Admin page
+
+`/admin.html` — groups, golfers (with a duplicate finder and merge), users,
+rounds and emailed invitations, for the one account holding the `admin` token
+claim (`make-admin.mjs`). It follows the host like the app: bunchbets.com is
+production, everything else beta. Nothing links to it, the service worker
+leaves it alone, and the security rules — not the page — are what refuse
+everyone else. Code: `admin.html` (screens) and `js/admin.js` (operations).
+
+Merging golfers rewrites every round's `golferIds` and `results` key, the
+account link, invitations and contacts, and refuses when both records appear
+in the same round (two different people). Deleting a group keeps its golfers
+and turns its rounds into their scorer's own.
 
 ## Sign-in
 
