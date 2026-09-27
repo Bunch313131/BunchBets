@@ -82,7 +82,8 @@ table.holes { width:auto; margin-bottom:8px; }
 table.holes th, table.holes td { padding:2px; border:none; text-align:center; font-size:11px; }
 table.holes input { width:34px; height:30px; padding:0; text-align:center; border:1px solid var(--border); border-radius:6px; background:var(--bg); }
 table.holes input.bad { border-color:var(--bad); background:color-mix(in srgb, var(--bad) 12%, var(--bg)); }
-table.tees { margin-bottom:8px; }
+table.tees { margin-bottom:8px; table-layout:fixed; }
+table.tees th { padding:2px; font-size:10px; }
 table.tees td { padding:3px 2px; border:none; }
 table.tees input, table.tees select { width:100%; height:30px; padding:0 6px; border:1px solid var(--border); border-radius:6px; background:var(--bg); min-width:0; }
 .problems { color:var(--bad); font-size:13px; margin:8px 0; }
@@ -499,7 +500,8 @@ function listCourses() {
     '<div class="sec">Name</div><div class="field"><input id="cName" value="' + esc(c.name) + '"></div>' +
     '<div class="sec">Holes</div>' + holeTable(0) + holeTable(9) +
     '<p class="note">SI is the stroke index (the hole handicap): which holes strokes fall on. It must use 1 to 18 once each.</p>' +
-    '<div class="sec">Tees</div><table class="tees"><tbody id="cTees">' + c.tees.map(teeRow).join('') + '</tbody></table>' +
+    '<div class="sec">Tees</div><table class="tees"><colgroup><col><col style="width:82px"><col style="width:62px"><col style="width:62px"><col style="width:54px"><col style="width:22px"></colgroup>' +
+    '<thead><tr><th>Name</th><th></th><th>Yds</th><th>Rating</th><th>Slope</th><th></th></tr></thead><tbody id="cTees">' + c.tees.map(teeRow).join('') + '</tbody></table>' +
     '<button class="btn" id="cAddTee">+ Add tee</button>' +
     '<p class="note">The app plays men\u2019s ratings; women\u2019s tees are kept for later.</p>' +
     '<div class="sec">Where (for weather and \u201cNearby\u201d)</div><div class="field"><input id="cLat" placeholder="Latitude" value="' + esc(c.lat) + '"><input id="cLng" placeholder="Longitude" value="' + esc(c.lng) + '"></div>' +
