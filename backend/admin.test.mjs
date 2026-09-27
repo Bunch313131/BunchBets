@@ -85,7 +85,7 @@ describe('who gets in', () => {
     await signIn('uid_brian', { admin: true });
     await page.waitForSelector('.tab');
     const tabs = await tabText();
-    assert.deepStrictEqual(tabs.map((t) => t.replace(/\d.*$/, '')), ['Groups', 'Golfers', 'Users', 'Rounds', 'Invitations']);
+    assert.deepStrictEqual(tabs.map((t) => t.replace(/\d.*$/, '')), ['Groups', 'Golfers', 'Users', 'Rounds', 'Courses', 'Invitations']);
     assert.match(tabs[1], /4 · 2 dup\?/);
   });
 });
@@ -208,3 +208,67 @@ describe('users, rounds, invitations', () => {
     await page.close();
   });
 });
+
+describe('courses', () => {
+  test('the built-in list is read out of the app itself', async () => {
+    await signIn('uid_brian', { admin: true });
+    await page.waitForSelector('.tab');
+    await open('courses');
+    const rows = await page.evaluate(() => [...document.querySelectorAll('tr.row')].map((r) => r.dataset.id));
+    assert.ok(rows.length >= 28, 'all 28 built-in courses: ' + rows.length);
+    assert.ok(rows.includes('b:el macero'));
+  });
+
+  test('a stroke index used twice is refused, and nothing is saved', async () => {
+    await page.click('tr.row[data-id="b:el macero"]');
+    assert.strictEqual(await page.locator('#cTees tr').count(), 8, 'El Macero\'s eight tees come with it');
+    await page.fill('[data-si="0"]', '1');                 // hole 4 is already 1
+    assert.strictEqual(await page.locator('[data-si].bad').count(), 2, 'both clashing boxes are marked');
+    await page.click('#cSave'); await settle();
+    assert.match(await page.textContent('#cProblems'), /uses 1 twice and never 15/);
+    assert.strictEqual((await db.collection('courses').get()).size, 0);
+  });
+
+  test('fixed, it saves a database version with par, stroke index and tees', async () => {
+    await page.fill('[data-si="0"]', '15');
+    await page.fill('#cTees tr:nth-child(4) .tr', '72.3');  // White re-rated
+    await page.click('#cSave'); await settle();
+    const docs = (await db.collection('courses').get()).docs;
+    assert.strictEqual(docs.length, 1);
+    const c = docs[0].data();
+    assert.strictEqual(docs[0].id, 'el-macero-cc');
+    assert.deepStrictEqual(c.hcp, [15,13,9,1,7,3,17,11,5,8,2,16,6,10,12,18,4,14]);
+    assert.strictEqual(c.tees.length, 8);
+    assert.deepStrictEqual([c.tees[3].name, c.tees[3].rating, c.tees[3].slope], ['White', 72.3, 129]);
+    assert.strictEqual(await page.textContent('tr.row[data-id="b:el macero"] .pill'), 'edited');
+  });
+
+  test('a new course can be added', async () => {
+    await page.click('#cNew');
+    await page.fill('#cName', 'Wildhorse Test');
+    for (let i = 0; i < 18; i++) await page.fill(`[data-si="${i}"]`, String(i + 1));
+    await page.click('#cAddTee');
+    await page.fill('#cTees tr:last-child .tn', 'Blue');
+    await page.fill('#cTees tr:last-child .tr', '70.1');
+    await page.fill('#cTees tr:last-child .ts', '121');
+    await page.click('#cSave'); await settle();
+    const c = (await db.doc('courses/wildhorse-test').get()).data();
+    assert.deepStrictEqual([c.name, c.par.reduce((a, b) => a + b, 0), c.tees[0].slope], ['Wildhorse Test', 72, 121]);
+  });
+
+  test('a built-in course can be hidden from the app without editing it', async () => {
+    await page.click('tr.row[data-id="b:mather"]');
+    await page.click('#cHide'); await settle();
+    const c = (await db.doc('courses/mather').get()).data();
+    assert.deepStrictEqual([c.name, c.hidden], ['Mather', true]);
+  });
+
+  test('deleting a database version puts the built-in back', async () => {
+    await page.click('tr.row[data-id="b:el macero"]');
+    await page.click('#cDel'); await settle();
+    assert.strictEqual((await db.doc('courses/el-macero-cc').get()).exists, false);
+    assert.strictEqual(await page.textContent('tr.row[data-id="b:el macero"] td:last-child'), 'built-in');
+    await page.close();
+  });
+});
+

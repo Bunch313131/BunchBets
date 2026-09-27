@@ -419,6 +419,27 @@ describe('invites', () => {
   });
 });
 
+describe('courses are public to read, admin-only to write', () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (c) =>
+      setDoc(doc(c.firestore(), 'courses', 'el-macero'), { name: 'El Macero', par: [], hcp: [] }));
+  });
+  test('anyone may read a course, signed in or not', async () => {
+    await assertSucceeds(getDoc(doc(anon(), 'courses', 'el-macero')));
+    await assertSucceeds(getDocs(collection(anon(), 'courses')));
+  });
+  test('a signed-in member may not change one', async () => {
+    await assertFails(updateDoc(doc(brian(), 'courses', 'el-macero'), { name: 'Mine' }));
+  });
+  test('nor add one', async () => {
+    await assertFails(setDoc(doc(mike(), 'courses', 'new'), { name: 'New' }));
+  });
+  test('the admin may', async () => {
+    await assertSucceeds(updateDoc(doc(admin(), 'courses', 'el-macero'), { name: 'El Macero CC' }));
+    await assertSucceeds(setDoc(doc(admin(), 'courses', 'new'), { name: 'New' }));
+  });
+});
+
 describe('inviteCodes are not enumerable', () => {
   test('signed-in user may read a code they know', async () => {
     await env.withSecurityRulesDisabled(async (c) =>

@@ -78,6 +78,14 @@ tr.row { cursor:pointer; } tr.row:hover { background:var(--hover); } tr.row.sel 
 .gate input { width:100%; height:42px; padding:0 12px; margin-bottom:8px; border:1px solid var(--border); border-radius:10px; background:var(--bg); }
 .gate .btn { width:100%; height:42px; margin-bottom:8px; }
 .gate .or { text-align:center; color:var(--muted); font-size:12px; margin:8px 0; }
+table.holes { width:auto; margin-bottom:8px; }
+table.holes th, table.holes td { padding:2px; border:none; text-align:center; font-size:11px; }
+table.holes input { width:34px; height:30px; padding:0; text-align:center; border:1px solid var(--border); border-radius:6px; background:var(--bg); }
+table.holes input.bad { border-color:var(--bad); background:color-mix(in srgb, var(--bad) 12%, var(--bg)); }
+table.tees { margin-bottom:8px; }
+table.tees td { padding:3px 2px; border:none; }
+table.tees input, table.tees select { width:100%; height:30px; padding:0 6px; border:1px solid var(--border); border-radius:6px; background:var(--bg); min-width:0; }
+.problems { color:var(--bad); font-size:13px; margin:8px 0; }
 #toast { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); background:var(--txt); color:var(--bg);
          padding:10px 16px; border-radius:10px; font-weight:600; opacity:0; transition:opacity .2s; pointer-events:none; max-width:90vw; }
 #toast.on { opacity:1; } #toast.bad { background:var(--bad); color:#fff; }
@@ -122,6 +130,32 @@ const load = (src) => new Promise((res, rej) => {
 let auth, fs, ops;
 let D = null;                          // everything, from ops.loadAll()
 let tab = 'groups', sel = null, q = '', dupOnly = false;
+let BUILTIN = [];                       // the app's own course list, read out of index.html
+
+/**
+ * The built-in courses, read straight out of the app's index.html so this page
+ * can never disagree with what the app ships with. The literals are the app's
+ * own source code, same origin, so evaluating them is no different from the
+ * app running them.
+ */
+async function loadBuiltIns() {
+  try {
+    const src = await (await fetch('./index.html', { cache: 'no-store' })).text();
+    const block = (marker, open, close) => {
+      const i = src.indexOf(marker); if (i < 0) return null;
+      const j = src.indexOf(open, i); let d = 0;
+      for (let k = j; k < src.length; k++) {
+        if (src[k] === open) d++;
+        else if (src[k] === close && --d === 0) return src.slice(j, k + 1);
+      }
+      return null;
+    };
+    const list = new Function('return ' + block('const COURSE_DB = [', '[', ']'))();
+    const deflt = new Function('return ' + block('const BB_DEFAULT_COURSE = {', '{', '}'))();
+    BUILTIN = list.map((c) => ({ ...c, tees: ops.courseKey(c.name) === ops.courseKey(deflt.name)
+      ? deflt.tees.map((t) => ({ ...t, gender: 'Male' })) : [] }));
+  } catch (e) { BUILTIN = []; toast('Could not read the built-in course list: ' + e.message, true); }
+}
 
 try {
   for (const f of ['firebase-app-compat.js', 'firebase-auth-compat.js', 'firebase-firestore-compat.js']) await load(`${SDK}/${f}`);
@@ -165,7 +199,7 @@ function gate(msg) {
 
 // ------------------------------------------------------------------ data
 async function refresh() {
-  try { D = await ops.loadAll(); }
+  try { D = await ops.loadAll(); if (!BUILTIN.length) await loadBuiltIns(); }
   catch (e) { toast('Could not load: ' + (e.code || e.message), true); return; }
   render();
 }
@@ -203,20 +237,20 @@ function duplicates() {
 // ---------------------------------------------------------------- render
 function render() {
   const dups = duplicates();
-  const counts = { groups: D.groups.length, golfers: D.golfers.length, users: D.users.length, rounds: D.rounds.length,
+  const counts = { groups: D.groups.length, golfers: D.golfers.length, users: D.users.length, rounds: D.rounds.length, courses: courseRows().length,
                    invites: D.invites.filter((i) => i.status === 'pending').length };
   const me = auth.currentUser;
   app.innerHTML =
     '<div class="top"><h1>Bunch Bets Admin</h1><span class="env ' + (PROD ? 'prod' : 'beta') + '">' + (PROD ? 'PRODUCTION' : 'BETA') + '</span>' +
     '<span class="who">' + esc(me.email || me.uid) + '</span><button class="btn" id="rf">Refresh</button><button class="btn" id="so">Sign out</button></div>' +
-    '<div class="tabs">' + [['groups', 'Groups'], ['golfers', 'Golfers'], ['users', 'Users'], ['rounds', 'Rounds'], ['invites', 'Invitations']]
+    '<div class="tabs">' + [['groups', 'Groups'], ['golfers', 'Golfers'], ['users', 'Users'], ['rounds', 'Rounds'], ['courses', 'Courses'], ['invites', 'Invitations']]
       .map(([k, l]) => '<button class="tab' + (tab === k ? ' on' : '') + '" data-tab="' + k + '">' + l +
         '<span class="n">' + counts[k] + (k === 'golfers' && dups.size ? ' · ' + dups.size + ' dup?' : '') + '</span></button>').join('') + '</div>' +
     '<main><section class="list" id="list"></section><section class="detail" id="detail"></section></main>';
   $('#rf').onclick = refresh;
   $('#so').onclick = () => auth.signOut();
   $$('.tab').forEach((b) => { b.onclick = () => { tab = b.dataset.tab; sel = null; q = ''; dupOnly = false; render(); }; });
-  ({ groups: listGroups, golfers: listGolfers, users: listUsers, rounds: listRounds, invites: listInvites })[tab](dups);
+  ({ groups: listGroups, golfers: listGolfers, users: listUsers, rounds: listRounds, courses: listCourses, invites: listInvites })[tab](dups);
 }
 
 function listShell(cols, rows, extra) {
@@ -390,6 +424,132 @@ function listRounds() {
     '<div class="danger-zone"><button class="btn danger" id="rDel">Delete round</button><p class="note">For test and junk rounds. The scorer’s phone keeps its own copy.</p></div>';
   $('#rGSave').onclick = () => act('Saved', () => ops.setRoundGroup(r.id, $('#rG').value || null));
   $('#rDel').onclick = () => act('Deleted', () => ops.deleteRound(r.id).then(() => { sel = null; }), 'Delete this round? It drops out of every standing.');
+}
+
+// --------------------------------------------------------------- courses
+/** Built-in courses with any database version laid over them, then database-only ones. */
+function courseRows() {
+  const docs = (D.courses || []).slice();
+  const used = {};
+  const rows = BUILTIN.map((b) => {
+    const k = ops.courseKey(b.name);
+    const d = docs.filter((x) => ops.courseKey(x.name) === k)[0] || null;
+    if (d) used[d.id] = 1;
+    return { id: 'b:' + k, name: b.name, builtin: b, doc: d };
+  });
+  docs.filter((d) => !used[d.id]).forEach((d) => rows.push({ id: 'd:' + d.id, name: d.name, builtin: null, doc: d }));
+  return rows;
+}
+
+/** The values to edit: the database version, filling any gap from its men's tees or the built-in. */
+function courseDraft(row) {
+  const d = row.doc || {}, b = row.builtin || {};
+  const full = (a) => Array.isArray(a) && a.length === 18;
+  const mensTee = (d.tees || []).filter((t) => t.gender !== 'Female' && full(t.parArr) && full(t.hcpArr))[0];
+  return {
+    name: d.name || b.name || '',
+    par: full(d.par) ? d.par : mensTee ? mensTee.parArr : full(b.par) ? b.par : Array(18).fill(4),
+    hcp: full(d.hcp) ? d.hcp : mensTee ? mensTee.hcpArr : full(b.hcp) ? b.hcp : Array(18).fill(''),
+    lat: d.lat != null ? d.lat : (b.lat ?? ''), lng: d.lng != null ? d.lng : (b.lng ?? ''),
+    hidden: !!d.hidden,
+    tees: (d.tees && d.tees.length ? d.tees : (b.tees || [])).map((t) => ({ ...t, _orig: t })),
+  };
+}
+
+function listCourses() {
+  const all = courseRows();
+  const rows = all.filter((r) => matchQ(r.name, r.doc && r.doc.name));
+  const status = (r) => {
+    if (r.doc && r.doc.hidden) return '<span class="pill">hidden</span>';
+    if (r.builtin && r.doc) return '<span class="pill good">edited</span>';
+    if (r.doc) return '<span class="pill dir">added</span>';
+    return '<span class="muted">built-in</span>';
+  };
+  listShell([
+    { h: 'Course', v: (r) => '<b>' + esc(r.name) + '</b>' + (r.doc && r.builtin && r.doc.name !== r.name ? '<div class="muted">database: ' + esc(r.doc.name) + '</div>' : '') },
+    { h: 'Par', num: 1, v: (r) => { const p = courseDraft(r).par; return p.every((n) => Number(n)) ? p.reduce((a, b) => a + Number(b), 0) : '\u2014'; } },
+    { h: "Men's tees", num: 1, v: (r) => courseDraft(r).tees.filter((t) => t.gender !== 'Female').length || '<span class="muted">none</span>' },
+    { h: 'Status', v: status },
+  ], rows, '<button class="btn primary" id="cNew">+ New course</button>');
+  $('#cNew').onclick = () => { sel = 'new'; render(); };
+
+  const P = $('#detail');
+  const row = sel === 'new' ? { id: 'new', name: '', builtin: null, doc: null } : all.filter((r) => r.id === sel)[0];
+  if (!row) { P.innerHTML = '<div class="empty">Pick a course.<br><br>Built-in courses are what the app ships with. Editing one saves a database version that the app uses instead.</div>'; return; }
+  const c = courseDraft(row);
+  const holeTable = (from) => {
+    const idx = [...Array(9).keys()].map((i) => i + from);
+    return '<table class="holes"><tr><th></th>' + idx.map((i) => '<th>' + (i + 1) + '</th>').join('') + '</tr>' +
+      '<tr><th>Par</th>' + idx.map((i) => '<td><input data-par="' + i + '" inputmode="numeric" value="' + esc(c.par[i]) + '"></td>').join('') + '</tr>' +
+      '<tr><th>SI</th>' + idx.map((i) => '<td><input data-si="' + i + '" inputmode="numeric" value="' + esc(c.hcp[i]) + '"></td>').join('') + '</tr></table>';
+  };
+  const teeRow = (t, i) => '<tr data-tee="' + i + '"><td><input class="tn" placeholder="Name" value="' + esc(t.name || '') + '"></td>' +
+    '<td><select class="tg"><option value="Male"' + (t.gender !== 'Female' ? ' selected' : '') + '>Men</option><option value="Female"' + (t.gender === 'Female' ? ' selected' : '') + '>Women</option></select></td>' +
+    '<td><input class="ty" placeholder="Yds" inputmode="numeric" value="' + esc(t.yardage || '') + '"></td>' +
+    '<td><input class="tr" placeholder="Rating" inputmode="decimal" value="' + esc(t.rating || '') + '"></td>' +
+    '<td><input class="ts" placeholder="Slope" inputmode="numeric" value="' + esc(t.slope || '') + '"></td>' +
+    '<td><button class="x" data-rmtee>\u2715</button></td></tr>';
+  const title = row.id === 'new' ? 'New course' : row.name;
+  const builtinOnly = row.builtin && !row.doc;
+  P.innerHTML = '<h2>' + esc(title) + '</h2><div class="sub">' +
+    (row.id === 'new' ? 'Added here, it appears in the app\u2019s course list.'
+      : builtinOnly ? 'Built into the app. Saving makes a database version the app uses instead.'
+      : row.builtin ? 'Built-in, with a database version the app uses instead' + (row.doc.ghinCourseId ? ' \u00b7 GHIN ' + esc(row.doc.ghinCourseId) : '') + '.'
+      : 'Added in the database' + (row.doc.ghinCourseId ? ' \u00b7 GHIN ' + esc(row.doc.ghinCourseId) : '') + '.') + '</div>' +
+    '<div class="sec">Name</div><div class="field"><input id="cName" value="' + esc(c.name) + '"></div>' +
+    '<div class="sec">Holes</div>' + holeTable(0) + holeTable(9) +
+    '<p class="note">SI is the stroke index (the hole handicap): which holes strokes fall on. It must use 1 to 18 once each.</p>' +
+    '<div class="sec">Tees</div><table class="tees"><tbody id="cTees">' + c.tees.map(teeRow).join('') + '</tbody></table>' +
+    '<button class="btn" id="cAddTee">+ Add tee</button>' +
+    '<p class="note">The app plays men\u2019s ratings; women\u2019s tees are kept for later.</p>' +
+    '<div class="sec">Where (for weather and \u201cNearby\u201d)</div><div class="field"><input id="cLat" placeholder="Latitude" value="' + esc(c.lat) + '"><input id="cLng" placeholder="Longitude" value="' + esc(c.lng) + '"></div>' +
+    '<label class="note" style="display:flex;gap:8px;align-items:center;"><input type="checkbox" id="cHidden"' + (c.hidden ? ' checked' : '') + '> Hide from the app</label>' +
+    '<div class="problems" id="cProblems"></div>' +
+    '<button class="btn primary" id="cSave">' + (builtinOnly ? 'Save as database version' : 'Save') + '</button>' +
+    '<div class="danger-zone">' +
+      (builtinOnly ? '<button class="btn danger" id="cHide">Hide from the app</button><p class="note">Keeps it out of the course list without editing it.</p>' : '') +
+      (row.doc ? '<button class="btn danger" id="cDel">Delete database version</button><p class="note">' +
+        (row.builtin ? 'The app goes back to the built-in version.' : 'It disappears from the app\u2019s course list.') + '</p>' : '') +
+    '</div>';
+
+  const tb = $('#cTees');
+  const wireTees = () => $$('[data-rmtee]', tb).forEach((b) => { b.onclick = () => b.closest('tr').remove(); });
+  wireTees();
+  $('#cAddTee').onclick = () => { tb.insertAdjacentHTML('beforeend', teeRow({ gender: 'Male' }, 'new')); wireTees(); };
+  const read = () => {
+    const num = (v) => (String(v).trim() === '' ? NaN : Number(v));
+    return {
+      name: $('#cName').value,
+      par: $$('[data-par]', P).map((x) => num(x.value)),
+      hcp: $$('[data-si]', P).map((x) => num(x.value)),
+      lat: $('#cLat').value.trim(), lng: $('#cLng').value.trim(),
+      hidden: $('#cHidden').checked,
+      tees: $$('#cTees tr', P).map((tr) => ({
+        _orig: tr.dataset.tee === 'new' ? null : (c.tees[Number(tr.dataset.tee)] || {})._orig,
+        name: $('.tn', tr).value, gender: $('.tg', tr).value, yardage: $('.ty', tr).value,
+        rating: $('.tr', tr).value, slope: $('.ts', tr).value,
+      })),
+    };
+  };
+  // Mark the stroke-index boxes that repeat, as they are typed.
+  const markSI = () => {
+    const vals = $$('[data-si]', P).map((x) => x.value.trim());
+    $$('[data-si]', P).forEach((x) => { const v = x.value.trim(); x.classList.toggle('bad', v !== '' && (vals.filter((y) => y === v).length > 1 || !(Number(v) >= 1 && Number(v) <= 18))); });
+  };
+  $$('[data-si]', P).forEach((x) => { x.oninput = markSI; });
+  markSI();
+  $('#cSave').onclick = () => {
+    const draft = read();
+    const probs = ops.courseProblems(draft);
+    $('#cProblems').textContent = probs.join(' ');
+    if (probs.length) return;
+    act('Saved', () => ops.saveCourse(row.doc ? row.doc.id : null, draft).then((id) => {
+      sel = row.builtin ? row.id : 'd:' + id; return null;
+    }));
+  };
+  const hide = $('#cHide'); if (hide) hide.onclick = () => act('Hidden', () => ops.hideBuiltIn(row.builtin), 'Hide ' + row.name + ' from the app\u2019s course list?');
+  const del = $('#cDel'); if (del) del.onclick = () => act('Deleted', () => ops.deleteCourse(row.doc.id).then(() => { if (!row.builtin) sel = null; }),
+    'Delete the database version of ' + row.name + '?');
 }
 
 // --------------------------------------------------------------- invites

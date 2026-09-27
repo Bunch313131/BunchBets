@@ -882,9 +882,12 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.28';
+const APP_VERSION = '7.29';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.29': [
+    'Course details and tees can now be kept up to date without an app release \u2014 new courses and corrected ratings show up in the course list by themselves',
+  ],
   '7.28': [
     'Behind the scenes: an admin page for managing groups, golfers and accounts. Nothing changes in the app',
   ],
@@ -1108,6 +1111,155 @@ const CLOUD_ENABLED = IS_BETA;
 // is the one screen where a surprise costs somebody a round rather than a
 // reload, so production keeps the flow its users already know.
 const NEW_WIZARD = IS_BETA;
+
+/**
+ * Courses: the built-in list (COURSE_DB, plus El Macero's tees in
+ * BB_DEFAULT_COURSE), overridden and extended by the `courses` collection that
+ * the admin page edits.
+ *
+ * Read with ONE plain request to Firestore's REST endpoint, not the Firebase
+ * SDK: courses are public, the rules let anyone read them, and a launch for
+ * someone who never signs in must not cost the 470KB SDK. The result is kept
+ * on the phone, so a course added in the admin page is there offline from the
+ * next launch on, and the built-in list is always the floor underneath it.
+ *
+ * Beta only, like the rest of the cloud: production has no database yet.
+ *
+ * A database course matches a built-in one by name with "CC", "GC", "Golf
+ * Club" and punctuation ignored — so GHIN's "El Macero CC" is the app's "El
+ * Macero" — and keeps the built-in NAME, because saved presets and rounds in
+ * progress refer to it.
+ */
+const Courses = {
+  CACHE_KEY: 'bb-courses-v1',
+  remote: null,          // [{id, name, par, hcp, lat, lng, tees, hidden}] or null before any load
+
+  key(name) {
+    return String(name || '').toLowerCase().replace(/&/g, 'and')
+      .replace(/\b(golf and country club|country club|golf club|golf course|cc|gc)\b/g, '')
+      .replace(/[^a-z0-9]+/g, ' ').trim();
+  },
+
+  /** Firestore REST's typed JSON, into plain values. */
+  decode(v) {
+    if (!v || typeof v !== 'object') return null;
+    if ('stringValue' in v) return v.stringValue;
+    if ('integerValue' in v) return Number(v.integerValue);
+    if ('doubleValue' in v) return Number(v.doubleValue);
+    if ('booleanValue' in v) return v.booleanValue;
+    if ('nullValue' in v) return null;
+    if ('timestampValue' in v) return v.timestampValue;
+    if ('arrayValue' in v) return (v.arrayValue.values || []).map((x) => Courses.decode(x));
+    if ('mapValue' in v) {
+      const o = {};
+      Object.entries(v.mapValue.fields || {}).forEach(([k, x]) => { o[k] = Courses.decode(x); });
+      return o;
+    }
+    return null;
+  },
+
+  /**
+   * One stored course, made safe to play off. Par and stroke index come from
+   * the course, or else from its first men's tee that carries a full set. A
+   * stroke index that is not exactly 1..18 once each is dropped rather than
+   * trusted — it decides every net bet.
+   */
+  clean(id, raw) {
+    const c = raw || {};
+    const valid18 = (a, ok) => Array.isArray(a) && a.length === 18 && a.every(ok);
+    const isSI = (a) => valid18(a, (n) => Number.isInteger(n) && n >= 1 && n <= 18) && new Set(a).size === 18;
+    const isPar = (a) => valid18(a, (n) => Number.isInteger(n) && n >= 3 && n <= 6);
+    const mens = (c.tees || []).filter((t) => t && t.gender !== 'Female' && t.gender !== 'F');
+    const src = mens.filter((t) => isPar(t.parArr) && isSI(t.hcpArr))[0];
+    const par = isPar(c.par) ? c.par.slice() : (src ? src.parArr.slice() : null);
+    const hcp = isSI(c.hcp) ? c.hcp.slice() : (src ? src.hcpArr.slice() : null);
+    // One tee per round and one rating per tee: the app plays men's ratings.
+    const tees = mens.filter((t) => t.name && Number(t.rating) > 0 && Number(t.slope) > 0).map((t) => ({
+      name: String(t.name), yardage: Number(t.yardage) || null, rating: Number(t.rating), slope: Number(t.slope),
+      par: Number(t.par) || (par ? par.reduce((a, b) => a + b, 0) : null),
+    }));
+    return { id, name: String(c.name || id), par, hcp, tees,
+             lat: Number(c.lat) || null, lng: Number(c.lng) || null, hidden: c.hidden === true };
+  },
+
+  loadCache() {
+    try { const j = JSON.parse(localStorage.getItem(this.CACHE_KEY) || 'null'); if (Array.isArray(j)) this.remote = j; } catch (e) {}
+  },
+
+  url() {
+    return 'https://firestore.googleapis.com/v1/projects/' + FIREBASE_CONFIG.projectId +
+      '/databases/(default)/documents/courses?pageSize=300&key=' + FIREBASE_CONFIG.apiKey;
+  },
+
+  /** Fetch in the background. Never throws; offline simply keeps the cache. */
+  async refresh() {
+    if (!CLOUD_ENABLED) return false;
+    try {
+      const r = await fetch(this.url());
+      if (!r.ok) return false;
+      const j = await r.json();
+      const list = (j.documents || []).map((d) => {
+        const fields = {};
+        Object.entries(d.fields || {}).forEach(([k, v]) => { fields[k] = Courses.decode(v); });
+        return Courses.clean(d.name.split('/').pop(), fields);
+      });
+      this.remote = list;
+      try { localStorage.setItem(this.CACHE_KEY, JSON.stringify(list)); } catch (e) {}
+      return true;
+    } catch (e) { return false; }
+  },
+
+  /**
+   * Every playable course: built-in ones, with a database version laid over
+   * any that has one, then database-only ones. Hidden ones are left out.
+   */
+  list() {
+    const remote = (CLOUD_ENABLED && this.remote) || [];
+    const byKey = {};
+    remote.forEach((c) => { byKey[this.key(c.name)] = c; });
+    const out = [], used = {};
+    COURSE_DB.forEach((b) => {
+      const k = this.key(b.name);
+      const r = byKey[k];
+      used[k] = 1;
+      if (r && r.hidden) return;
+      const deflt = k === this.key(BB_DEFAULT_COURSE.name) ? BB_DEFAULT_COURSE.tees : [];
+      out.push({ name: b.name, par: (r && r.par) || b.par, hcp: (r && r.hcp) || b.hcp,
+                 lat: (r && r.lat) || b.lat, lng: (r && r.lng) || b.lng,
+                 tees: r && r.tees.length ? r.tees : JSON.parse(JSON.stringify(deflt)),
+                 source: r ? 'database' : 'built-in' });
+    });
+    remote.forEach((r) => {
+      const k = this.key(r.name);
+      if (used[k] || r.hidden || !r.par || !r.hcp) return;
+      used[k] = 1;
+      out.push({ name: r.name, par: r.par, hcp: r.hcp, lat: r.lat, lng: r.lng, tees: r.tees, source: 'database' });
+    });
+    return out;
+  },
+
+  /**
+   * By exact name. What CHOOSING a course uses: a phone's own preset called
+   * "Del Paso" must stay that preset, not quietly become the listed "Del Paso
+   * CC", whose par and stroke index may differ.
+   */
+  exact(name) {
+    const n = String(name || '').trim().toLowerCase();
+    return n ? this.list().filter((c) => c.name.toLowerCase() === n)[0] || null : null;
+  },
+
+  /**
+   * By exact name, else by the loose match. For things that belong to the
+   * course whatever it is called — its tees, where it is for the weather.
+   */
+  find(name) {
+    const hit = this.exact(name);
+    if (hit) return hit;
+    const k = this.key(name);
+    return k ? this.list().filter((c) => this.key(c.name) === k)[0] || null : null;
+  },
+};
+Courses.loadCache();
 
 // A marker the browser tests assert on, so a test that accidentally loads a
 // DIFFERENT build — the live site, a cached copy — fails loudly instead of
@@ -2814,6 +2966,8 @@ const Game = {
    * when they are.
    */
   teesFor(courseName) {
+    const c = Courses.find(courseName);
+    if (c && c.tees && c.tees.length) return JSON.parse(JSON.stringify(c.tees));
     if (courseName === BB_DEFAULT_COURSE.name) {
       return JSON.parse(JSON.stringify(BB_DEFAULT_COURSE.tees));
     }
@@ -4928,11 +5082,11 @@ const Wizard = {
       // Build separate lists: user presets first, then DB courses
       const presetCourses = [];
       const dbCourses = [];
-      const dbNames = new Set(COURSE_DB.map(c => c.name));
+      const COURSES = Courses.list();
 
       // User presets (shown at top)
       Object.keys(State.presets || {}).forEach(name => {
-        const dbMatch = COURSE_DB.find(c => c.name === name);
+        const dbMatch = Courses.find(name);
         presetCourses.push({
           name, par: State.presets[name].par, hcp: State.presets[name].hcp,
           distance: (hasLocation && dbMatch) ? haversineMi(userLat, userLng, dbMatch.lat, dbMatch.lng) : null,
@@ -4942,7 +5096,7 @@ const Wizard = {
 
       // DB courses not already in presets
       const presetNames = new Set(Object.keys(State.presets || {}));
-      COURSE_DB.forEach(c => {
+      COURSES.forEach(c => {
         if (!presetNames.has(c.name)) {
           dbCourses.push({
             name: c.name, par: c.par, hcp: c.hcp,
@@ -5248,8 +5402,9 @@ const Wizard = {
   commitCourse() {
     const name = this.data.selectedCourse;
     if (!name || name === '__new__') return;
-    // Check DB first, then presets
-    const dbCourse = COURSE_DB.find(c => c.name === name);
+    // The course list first (built-in, with the admin page's edits over it),
+    // then this phone's presets.
+    const dbCourse = Courses.exact(name);
     if (dbCourse) {
       State.data.course.par = [...dbCourse.par];
       State.data.course.hcp = [...dbCourse.hcp];
@@ -5639,12 +5794,13 @@ const Wizard = {
     const loc = this._courseLoc || null;
 
     const presetNames = Object.keys(State.presets || {});
+    const ALL = Courses.list();
     const mine = presetNames.map((name) => {
-      const db = COURSE_DB.find((c) => c.name === name);
+      const db = Courses.find(name);
       return { name, source: 'preset', par: State.presets[name].par,
                distance: loc && db ? haversineMi(loc.lat, loc.lng, db.lat, db.lng) : null };
     });
-    const rest = COURSE_DB.filter((c) => !presetNames.includes(c.name)).map((c) => ({
+    const rest = ALL.filter((c) => !presetNames.includes(c.name)).map((c) => ({
       name: c.name, source: 'db', par: c.par,
       distance: loc ? haversineMi(loc.lat, loc.lng, c.lat, c.lng) : null,
     }));
@@ -7322,7 +7478,7 @@ const UI = {
       onchange:(e) => {
         const val = e.target.value;
         // Check DB first, then presets
-        const dbCourse = COURSE_DB.find(c => c.name === val);
+        const dbCourse = Courses.exact(val);
         if (dbCourse) {
           State.data.course.hcp = [...dbCourse.hcp];
           State.data.course.par = [...dbCourse.par];
@@ -7343,7 +7499,7 @@ const UI = {
     });
     // Add DB courses, then user presets (skip duplicates)
     const addedNames = new Set();
-    COURSE_DB.forEach(c => {
+    Courses.list().forEach(c => {
       presetSel.appendChild(h('option', {value:c.name, selected:c.name===State.data.course.name}, c.name));
       addedNames.add(c.name);
     });
@@ -12086,7 +12242,7 @@ document.getElementById('standingsMenuBtn').onclick = () => { UI.closeMenu(); UI
 // alternative is stubbing Firestore at the network layer, which would mean a
 // leaderboard test that mostly tests Firestore — slower, and it would pass or
 // fail for reasons that have nothing to do with the arithmetic on screen.
-if (window._bbDev) window._bb = { Cloud, UI, State, History, Game, Wizard, NEW_WIZARD };
+if (window._bbDev) window._bb = { Cloud, UI, State, History, Game, Wizard, NEW_WIZARD, Courses };
 
 /**
  * Tapping a number field clears it, showing the old value ghosted behind, so
@@ -12249,6 +12405,13 @@ let joiningViaUrl = false;
 UI.render();
 UI.initMenu();
 Cloud.boot();   // never throws; resolves to a no-op when signed out or offline
+// Course edits from the admin page. Background, never blocks; the cache and the
+// built-in list cover offline. A course screen already open is redrawn so a
+// first-ever launch picks them up without a restart.
+Courses.refresh().then((changed) => {
+  if (changed && typeof Wizard !== 'undefined' && Wizard.active && Wizard.step === 'course' &&
+      !(document.getElementById('wizCourseSearch') || {}).value) Wizard.render();
+});
 
 // === WHAT'S NEW / VERSION CHECK ===
 
@@ -12443,12 +12606,7 @@ window.addEventListener('appinstalled', () => {
     // Match course name to COURSE_DB — fuzzy: "El Macero" matches "El Macero CC"
     const courseName = State.data && State.data.course && State.data.course.name;
     let dbCourse = null;
-    if (courseName && typeof COURSE_DB !== 'undefined') {
-      const lower = courseName.toLowerCase();
-      dbCourse = COURSE_DB.find(c => c.name.toLowerCase() === lower)
-        || COURSE_DB.find(c => c.name.toLowerCase().startsWith(lower))
-        || COURSE_DB.find(c => lower.startsWith(c.name.toLowerCase().replace(/ cc$| gc$| golf club$/,'')));
-    }
+    if (courseName && typeof Courses !== 'undefined') dbCourse = Courses.find(courseName);
     if (dbCourse && dbCourse.lat && dbCourse.lng) {
       fetchWeather(dbCourse.lat, dbCourse.lng);
     } else {

@@ -56,6 +56,25 @@ account link, invitations and contacts, and refuses when both records appear
 in the same round (two different people). Deleting a group keeps its golfers
 and turns its rounds into their scorer's own.
 
+## Courses
+
+`courses/{id}`: `name`, `par[18]`, `hcp[18]` (stroke index), `lat`, `lng`,
+`hidden`, and `tees[{name, gender, yardage, par, rating, slope, …}]` — the same
+shape `pull-course.mjs` writes from GHIN, which adds per-tee `parArr`/`hcpArr`.
+Anyone may read (they are public facts); only the admin may write.
+
+The app fetches the collection with one REST request — no SDK — keeps it on the
+phone, and lays it over the built-in `COURSE_DB`: matched by name with
+"CC"/"GC"/"Golf Club" ignored, keeping the built-in name. A course whose stroke
+index is not 1..18 once each is dropped, missing par/hcp fall back to its first
+men's tee, and only men's tees are offered. Choosing a course matches its name
+exactly, so a phone's own preset is never swapped for a similarly named course.
+Beta only, like the rest of the cloud.
+
+The admin page's Courses tab reads the built-in list out of `index.html` itself,
+edits holes and tees (refusing a bad stroke index), adds courses, and hides
+built-in ones.
+
 ## Sign-in
 
 Google (popup) and email + password. Email LINK sign-in is deliberately not

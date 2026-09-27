@@ -278,6 +278,16 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // -------------------------------------------------------------- courses
+    // Par, stroke index, tees and ratings: public facts about a golf course.
+    // Readable by anyone, signed in or not, so the app can fetch them with one
+    // plain request before anybody signs in. Only the admin page writes them —
+    // a stroke index decides every net bet at that course.
+    match /courses/{courseId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // --------------------------------------------------------------- rounds
     // Two distinct read paths, deliberately separate: Firestore evaluates list
     // rules against the QUERY, which must be provably safe, so an OR across

@@ -58,9 +58,9 @@ export function init(firestore, fieldValue) {
 
 /** Everything, in one go. Fine at club scale; this is an admin screen, not the app. */
 export async function loadAll() {
-  const [groups, golfers, users, rounds, invites] = await Promise.all(
-    ['groups', 'golfers', 'users', 'rounds', 'invites'].map(all));
-  return { groups, golfers, users, rounds, invites };
+  const [groups, golfers, users, rounds, invites, courses] = await Promise.all(
+    ['groups', 'golfers', 'users', 'rounds', 'invites', 'courses'].map(all));
+  return { groups, golfers, users, rounds, invites, courses };
 }
 
 // -------------------------------------------------------------------- groups
@@ -300,4 +300,98 @@ export async function revokeInvite(inviteId) {
 
 export async function deleteInvite(inviteId) {
   await doc(`invites/${inviteId}`).delete();
+}
+
+// ------------------------------------------------------------------- courses
+//
+// courses/{id}: name, par[18], hcp[18] (stroke index), lat, lng, hidden, and
+// tees[{name, gender, yardage, par, rating, slope, ...}]. backend/pull-course.mjs
+// writes the same shape from GHIN (tees only, with per-tee parArr/hcpArr);
+// anything extra it stored is kept when a course is saved here.
+//
+// The app lays these over its built-in list, matched by name with "CC"/"GC"/
+// "Golf Club" ignored, and plays men's ratings only.
+
+/** Same loose name match the app uses (index.html, Courses.key). Keep in step. */
+export const courseKey = (name) => String(name || '').toLowerCase().replace(/&/g, 'and')
+  .replace(/\b(golf and country club|country club|golf club|golf course|cc|gc)\b/g, '')
+  .replace(/[^a-z0-9]+/g, ' ').trim();
+
+const slug = (name) => String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+/**
+ * Everything wrong with a course, in words. Empty means it is safe to play off.
+ * The stroke index is the one that matters: it decides which holes every net
+ * bet gets its strokes on, and the app refuses one that is not 1..18 once each.
+ */
+export function courseProblems(c) {
+  const out = [];
+  if (!String(c.name || '').trim()) out.push('It needs a name.');
+  const par = c.par || [], hcp = c.hcp || [];
+  if (par.length !== 18 || par.some((n) => !Number.isInteger(n) || n < 3 || n > 6)) out.push('Par must be 3 to 6 on all 18 holes.');
+  if (hcp.length !== 18 || hcp.some((n) => !Number.isInteger(n) || n < 1 || n > 18)) out.push('Stroke index must be 1 to 18 on all 18 holes.');
+  else {
+    const seen = {}, dup = [];
+    hcp.forEach((n) => { if (seen[n]) dup.push(n); seen[n] = 1; });
+    const missing = [];
+    for (let n = 1; n <= 18; n++) if (!seen[n]) missing.push(n);
+    if (dup.length) out.push('Stroke index uses ' + [...new Set(dup)].join(', ') + ' twice and never ' + missing.join(', ') + '.');
+  }
+  (c.tees || []).forEach((t, i) => {
+    const label = t.name ? '"' + t.name + '"' : 'Tee ' + (i + 1);
+    if (!String(t.name || '').trim()) out.push(label + ' needs a name.');
+    if (!(Number(t.rating) >= 55 && Number(t.rating) <= 85)) out.push(label + ': course rating should be between 55 and 85.');
+    if (!(Number(t.slope) >= 55 && Number(t.slope) <= 155)) out.push(label + ': slope must be between 55 and 155.');
+  });
+  const names = (c.tees || []).map((t) => String(t.name || '').trim().toLowerCase() + '|' + (t.gender || ''));
+  if (new Set(names).size !== names.length) out.push('Two tees have the same name.');
+  return out;
+}
+
+/** Create or replace a course. Refuses anything courseProblems() objects to. */
+export async function saveCourse(id, course) {
+  const problems = courseProblems(course);
+  if (problems.length) throw new Error(problems.join(' '));
+  const ref = id ? doc(`courses/${id}`) : null;
+  const old = ref ? ((await ref.get()).data() || {}) : {};
+  const data = {
+    ...old,
+    name: String(course.name).trim(),
+    par: course.par.map(Number),
+    hcp: course.hcp.map(Number),
+    lat: course.lat === '' || course.lat == null ? null : Number(course.lat),
+    lng: course.lng === '' || course.lng == null ? null : Number(course.lng),
+    hidden: !!course.hidden,
+    tees: (course.tees || []).map((t) => ({
+      ...(t._orig || {}),
+      name: String(t.name).trim(),
+      gender: t.gender === 'Female' ? 'Female' : 'Male',
+      yardage: Number(t.yardage) || null,
+      par: Number(t.par) || course.par.reduce((a, b) => a + Number(b), 0),
+      rating: Number(t.rating),
+      slope: Number(t.slope),
+    })).map((t) => { delete t._orig; return t; }),
+    updatedAt: new Date().toISOString(),
+  };
+  let target = ref;
+  if (!target) {
+    let base = slug(data.name) || 'course', n = 1, cand = base;
+    while ((await doc(`courses/${cand}`).get()).exists) cand = base + '-' + (++n);
+    target = doc(`courses/${cand}`);
+  }
+  await target.set(data);
+  return target.id;
+}
+
+export async function deleteCourse(id) {
+  await doc(`courses/${id}`).delete();
+}
+
+/** Hide a built-in course from the app without copying it: a stub marked hidden. */
+export async function hideBuiltIn(builtIn) {
+  const existing = (await all('courses')).filter((c) => courseKey(c.name) === courseKey(builtIn.name))[0];
+  if (existing) { await doc(`courses/${existing.id}`).update({ hidden: true }); return existing.id; }
+  const id = slug(builtIn.name);
+  await doc(`courses/${id}`).set({ name: builtIn.name, hidden: true, updatedAt: new Date().toISOString() });
+  return id;
 }
