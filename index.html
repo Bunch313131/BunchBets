@@ -882,9 +882,13 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.26';
+const APP_VERSION = '7.27';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.27': [
+    'Fixed: the suggested matches said the wrong side \u201cgives\u201d the strokes. They now name who gets them \u2014 e.g. \u201cAndy Donald gets 3\u201d. The strokes in play were always right',
+    'Plus handicaps show as +3, not -3',
+  ],
   '7.26': [
     'No Google account? Sign in with an email and password instead \u2014 Sign in, then New account',
     'Forgot your password? There\u2019s a reset link on the sign-in screen',
@@ -2927,6 +2931,31 @@ const Game = {
       for (let j = i + 1; j < rest.length; j++) out.push(match(pair, [rest[i].id, rest[j].id]));
     }
     return out;
+  },
+
+  /**
+   * A handicap as golfers write it: a plus handicap is "+3", not "-3". The
+   * number is stored negative (it gives strokes back), which is right for the
+   * arithmetic and wrong on a screen.
+   */
+  fmtHcp(h) {
+    const n = Number(h) || 0;
+    return n < 0 ? '+' + (-n) : String(n);
+  },
+
+  /**
+   * Who actually receives the strokes in a team-delta match: the highest
+   * handicap on the side with the higher total, exactly as applyHandicapMode
+   * picks him (first one wins a tie). Null when the sides are level.
+   */
+  teamDeltaReceiver(teamA, teamB, hcpOf) {
+    const tot = (t) => (t || []).reduce((s, pid) => s + (hcpOf(pid) || 0), 0);
+    const a = tot(teamA), b = tot(teamB);
+    if (a === b) return null;
+    const side = a > b ? (teamA || []) : (teamB || []);
+    let pid = side[0], best = hcpOf(side[0]) || 0;
+    side.forEach((x) => { if ((hcpOf(x) || 0) > best) { pid = x; best = hcpOf(x) || 0; } });
+    return { pid, strokes: Math.abs(a - b), side: a > b ? 'A' : 'B' };
   },
 
   applyHandicapMode(g) {
@@ -5865,16 +5894,21 @@ const Wizard = {
       label + '</div>' +
       ids.map((pid) => '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;">' +
         '<div style="font-size:14px;font-weight:600;line-height:1.25;min-width:0;overflow-wrap:anywhere;">' + esc(nameOf(pid)) + '</div>' +
-        '<div class="muted" style="font-size:12px;font-variant-numeric:tabular-nums;">' + hcpOf(pid) + '</div></div>').join('') +
+        '<div class="muted" style="font-size:12px;font-variant-numeric:tabular-nums;">' + Game.fmtHcp(hcpOf(pid)) + '</div></div>').join('') +
       '</div>';
 
     const matches = team.map((g, i) => {
       const a = (g.teamA || []).reduce((t, pid) => t + hcpOf(pid), 0);
       const b = (g.teamB || []).reduce((t, pid) => t + hcpOf(pid), 0);
-      const d = a - b;
-      const strokes = d === 0 ? 'no strokes'
-        : (d > 0 ? esc(nameOf((g.teamA || [])[0])) + '\u2019s side gives ' + d
-                 : esc(nameOf((g.teamB || [])[0])) + '\u2019s side gives ' + (-d));
+      // The side with the HIGHER total is the one that gets strokes. This line
+      // used to say that side "gives" them — backwards on every match — though
+      // the strokes themselves were always allocated the right way. Under team
+      // delta they all go to one man, so name him.
+      const r = Game.teamDeltaReceiver(g.teamA, g.teamB, hcpOf);
+      const strokes = !r ? 'no strokes'
+        : g.handicapMode === 'team_delta'
+          ? esc(nameOf(r.pid)) + ' gets ' + r.strokes
+          : esc(nameOf((r.side === 'A' ? g.teamA : g.teamB)[0])) + '\u2019s side gets ' + r.strokes;
       return '<div class="card" style="margin-bottom:8px;padding:9px 10px;">' +
         (team.length > 1 ? '<div class="muted" style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:5px;">Match ' + (i + 1) + '</div>' : '') +
         '<div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:5px;">' +
@@ -5991,7 +6025,7 @@ const Wizard = {
         (tee ? esc(tee.rating) + ' / ' + esc(tee.slope) + ' \u00b7 ' : '') +
         'starting on ' + ((State.data.startingHole || 0) + 1)) +
       row('players', players.length + ' playing',
-        esc(players.map((p) => p.name.split(' ')[0] + ' ' + (p.handicap || 0)).join(' \u00b7 '))) +
+        esc(players.map((p) => p.name.split(' ')[0] + ' ' + Game.fmtHcp(p.handicap)).join(' \u00b7 '))) +
       // History owns the pretty names for game types; Wizard does not have a
       // gameLabel of its own, and the guarded call that looked like it did was
       // quietly falling through to the raw type string.
@@ -6083,7 +6117,7 @@ const Wizard = {
           // cannot do yet, so neither number is presented as the other.
           const right = r.index != null
             ? '<span style="color:var(--acc);font-size:12px;">Index ' + r.index + '</span>'
-            : '<span style="color:var(--muted);font-size:12px;">HCP ' + (r.handicap || 0) + '</span>';
+            : '<span style="color:var(--muted);font-size:12px;">HCP ' + Game.fmtHcp(r.handicap) + '</span>';
           const row = '<div class="roster-pick" data-name="' + r.name + '" data-hcp="' +
             (r.handicap == null ? '' : r.handicap) +
             '" data-from-tee="' + (r.fromTee ? '1' : '0') +
@@ -7813,7 +7847,7 @@ const UI = {
     const rosterRows = roster.map((entry, i) =>
       h('div',{style:'display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);'},[
         h('span',{style:'flex:1;font-size:14px;'},entry.name),
-        h('span',{class:'muted',style:'font-size:12px;width:50px;text-align:center;'},`HCP ${entry.handicap || 0}`),
+        h('span',{class:'muted',style:'font-size:12px;width:50px;text-align:center;'},`HCP ${Game.fmtHcp(entry.handicap)}`),
         h('button',{style:'background:none;border:none;color:var(--danger);font-size:16px;cursor:pointer;padding:4px 8px;',
           onclick:() => {
             roster.splice(i, 1);
@@ -8022,7 +8056,7 @@ const UI = {
             // game gives him after its handicap mode, and under team_delta that
             // is 0 for everyone but the high man on the higher side — so this
             // read 0 for all but one player. The dots beside it show the strokes.
-            h('span',{class:'hole-player-hcp'},`HCP ${p.handicap||0}`),
+            h('span',{class:'hole-player-hcp'},`HCP ${Game.fmtHcp(p.handicap)}`),
             strokeDots.length ? h('span',{class:'hole-stroke-dots'},strokeDots) : null,
             vsParLabel
           ].filter(Boolean))

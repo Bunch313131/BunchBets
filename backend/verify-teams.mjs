@@ -29,7 +29,7 @@ function grab(name) {
   return src.slice(i, j);
 }
 
-const Game = eval('({' + grab('suggestTeams') + '})');
+const Game = eval('({' + ['suggestTeams', 'applyHandicapMode', 'teamDeltaReceiver', 'fmtHcp'].map(grab).join(',') + '})');
 
 let fail = 0;
 const check = (label, got, want) => {
@@ -122,6 +122,60 @@ console.log('\nwhen there is nothing to suggest\n');
   check('six is past what the app plays', Game.suggestTeams([1,2,3,4,5,6].map((n) => P('P' + n, n))), []);
   check('a blank name slot is not a player',
     Game.suggestTeams([P('A', 1), P('B', 2), P('C', 3), { id: 'd', name: '  ', handicap: 9 }]), []);
+}
+
+/**
+ * Who gets the strokes, as the teams screen SAYS it, against who gets them as
+ * the engine ALLOCATES them. The screen said the wrong side "gives" strokes on
+ * every match until 2026-09-27; the allocation was right all along, and the
+ * two had drifted apart because nothing compared them. This does.
+ *
+ * The first case is the one Brian photographed: Ben Corfee is a plus 3.
+ */
+console.log('\nthe strokes caption names the man the engine gives them to\n');
+{
+  const allocate = (players, teamA, teamB) => {
+    globalThis.State = { data: { players } };
+    const g = { handicapMode: 'team_delta', teamA, teamB, strokesCount: {} };
+    Game.applyHandicapMode(g);
+    const got = Object.entries(g.strokesCount).filter(([, n]) => n > 0);
+    return got.length ? { pid: got[0][0], strokes: got[0][1] } : null;
+  };
+  const said = (players, teamA, teamB) => {
+    const h = {}; players.forEach((p) => { h[p.id] = p.handicap; });
+    const r = Game.teamDeltaReceiver(teamA, teamB, (pid) => h[pid]);
+    return r ? { pid: r.pid, strokes: r.strokes } : null;
+  };
+
+  const sat = [P('ben', -3), P('andy', 17), P('brandon', 3), P('aj', 8), P('bunch', 8)];
+  check('Ben +3 & Andy 17 (14) v Brandon & A.J. (11): Andy gets 3',
+    said(sat, ['ben', 'andy'], ['brandon', 'aj']), { pid: 'andy', strokes: 3 });
+  check('  and that is who the engine gives them to',
+    allocate(sat, ['ben', 'andy'], ['brandon', 'aj']), { pid: 'andy', strokes: 3 });
+  check('14 v A.J. & Bunch (16): the OTHER side gets 2 — first of the tied 8s',
+    said(sat, ['ben', 'andy'], ['aj', 'bunch']), { pid: 'aj', strokes: 2 });
+  check('  engine agrees', allocate(sat, ['ben', 'andy'], ['aj', 'bunch']), { pid: 'aj', strokes: 2 });
+  const lvl = sat.concat([P('six', 6)]);
+  check('level sides (14 v 14): nobody', said(lvl, ['ben', 'andy'], ['six', 'aj']), null);
+  check('  engine agrees', allocate(lvl, ['ben', 'andy'], ['six', 'aj']), null);
+
+  // Every two-v-two split of a random five, with plus handicaps in the mix.
+  let seed = 7, agree = 0, total = 0;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let t = 0; t < 400; t++) {
+    const ps = ['a', 'b', 'c', 'd', 'e'].map((id) => P(id, Math.floor(rnd() * 30) - 5));
+    const ids = ps.map((p) => p.id);
+    for (let i = 0; i < 5; i++) for (let j = i + 1; j < 5; j++) {
+      const A = [ids[i], ids[j]], rest = ids.filter((x) => !A.includes(x)), B = rest.slice(0, 2);
+      total++;
+      if (JSON.stringify(said(ps, A, B)) === JSON.stringify(allocate(ps, A, B))) agree++;
+    }
+  }
+  check(`caption and engine agree on all ${total} random matches`, agree, total);
+
+  check('a plus handicap reads +3', Game.fmtHcp(-3), '+3');
+  check('scratch reads 0', Game.fmtHcp(0), '0');
+  check('an ordinary one reads as itself', Game.fmtHcp(17), '17');
 }
 
 console.log(fail ? `\n${fail} FAILURES` : '\nall checks passed');

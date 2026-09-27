@@ -148,6 +148,12 @@ console.log('\nfive players — the whole flow, and the round it produces\n');
   check('the tees have a screen of their own, after the course', [teeOnCourse, teeOnTee > 0], [0, true]);
   check('  and are not on the players screen', await page.locator('.wiz-tee').count(), 0);
   check('three matches are laid out', await page.locator('.wizard-content .card').count(), 3);
+  // Tyler 0 & Timothy 21 (21) v Casey 6 & Bunch 8 (14): the HIGHER side gets
+  // the strokes, and under team delta they all go to its highest man. This
+  // line used to say Tyler's side "gives 7" — the wrong way round.
+  check('the stroke line names who gets them',
+    await page.evaluate(() => document.querySelector('.wizard-content .card').lastElementChild.textContent),
+    '21 v 14 \u00b7 Timothy Mar gets 7');
 
   await page.click('#wizNext'); await page.waitForTimeout(600);
   check('then the money', await heading(page), 'Playing for?');
