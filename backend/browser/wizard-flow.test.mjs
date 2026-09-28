@@ -228,6 +228,21 @@ console.log('\nfive players — the whole flow, and the round it produces\n');
   check('the hole screen shows each player\'s own handicap, short-named', rows,
     ['T. Bryan HCP 0', 'B. Casey HCP 6', 'B. Bunch HCP 8', 'K. Bernard HCP 12', 'T. Mar HCP 21']);
 
+  // The scorecard. Its name column used to stick 12px in from the card's edge
+  // (the card's padding), and the scores scrolled past it showed through in
+  // that strip, to the LEFT of the names.
+  await page.evaluate(() => { const S = window._bb.State; S.data.scoringView = 'table'; S.scheduleRender(); });
+  await page.waitForTimeout(500);
+  check('the table is called Scorecard', await page.evaluate(() =>
+    [...document.querySelectorAll('.scoring-toggle-btn')].map((b) => b.textContent)), ['Hole View', 'Scorecard', 'Junk']);
+  const gap = await page.evaluate(() => {
+    const sc = document.getElementById('scoresScroll');
+    sc.scrollLeft = 200;
+    const b = sc.getBoundingClientRect(), n = sc.querySelector('td.sticky').getBoundingClientRect();
+    return Math.round(n.left - b.left - sc.clientLeft);
+  });
+  check('  scrolled, the name column sits against the edge with no strip beside it', gap, 0);
+
   check('no page errors', errs, []);
   await ctx.close();
 }

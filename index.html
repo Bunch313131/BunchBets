@@ -231,6 +231,10 @@ th.sticky, td.sticky { position:sticky; left:0; background:var(--card); z-index:
 .tabs { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 10px; }
 .tabs .btn.active { background:var(--acc); color:#fff; border-color:var(--acc); }
 .scroll { overflow:auto; }
+/* A scrolling card has no padding. The sticky name column sticks to the inner
+   edge of that padding, so with the card's 12px the scores scrolled past it
+   showed through in a strip on its left. Flush, there is no strip. */
+.card.scroll { padding:0; }
 .note { font-size:12px; color:var(--muted); }
 .error { position:fixed; bottom:8px; left:8px; right:8px; background:#fee2e2; color:#991b1b; border:1px solid #fecaca; border-radius:12px; padding:8px 12px; font-size:12px; display:none; z-index:9999; white-space:pre-wrap; }
 .success-toast { position:fixed; top:70px; right:8px; background:var(--success); color:#fff; border-radius:12px; padding:12px 16px; z-index:9999; animation:slideIn 0.3s; box-shadow:0 4px 12px rgba(0,0,0,0.3); }
@@ -882,9 +886,13 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.29';
+const APP_VERSION = '7.30';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.30': [
+    'Table View is now called Scorecard',
+    'Fixed: scores scrolling past showed through to the left of the names on the scorecard and junk tables',
+  ],
   '7.29': [
     'Course details and tees can now be kept up to date without an app release \u2014 new courses and corrected ratings show up in the course list by themselves',
   ],
@@ -8535,10 +8543,10 @@ const UI = {
       clearBtn
     ].filter(Boolean));
 
-    // Toggle bar for switching between hole view and table view
+    // Toggle bar for switching between hole view and the scorecard
     const toggleBar = h('div',{class:'scoring-toggle'},[
       h('button',{class:'scoring-toggle-btn active',onclick:()=>{}},'Hole View'),
-      h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.scoringView='table';State.scheduleRender();}},'Table View'),
+      h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.scoringView='table';State.scheduleRender();}},'Scorecard'),
       h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.scoringView='junk';State.data.tab='scores';State.scheduleRender();}},'Junk')
     ]);
 
@@ -9341,7 +9349,7 @@ const UI = {
 
     const toggleBar = h('div',{class:'scoring-toggle'},[
       h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.scoringView='hole';State.scheduleRender();}},'Hole View'),
-      h('button',{class:'scoring-toggle-btn active',onclick:()=>{}},'Table View'),
+      h('button',{class:'scoring-toggle-btn active',onclick:()=>{}},'Scorecard'),
       h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.scoringView='junk';State.data.tab='scores';State.scheduleRender();}},'Junk')
     ]);
 
@@ -9455,7 +9463,7 @@ const UI = {
 
     const toggleBar = h('div',{class:'scoring-toggle'},[
       h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.scoringView='hole';State.data.tab='scores';State.scheduleRender();}},'Hole View'),
-      h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.scoringView='table';State.data.tab='scores';State.scheduleRender();}},'Table View'),
+      h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.scoringView='table';State.data.tab='scores';State.scheduleRender();}},'Scorecard'),
       h('button',{class:'scoring-toggle-btn active',onclick:()=>{}},'Junk')
     ]);
 
