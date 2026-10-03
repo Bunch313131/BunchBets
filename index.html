@@ -886,9 +886,12 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.30';
+const APP_VERSION = '7.31';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.31': [
+    'Invited to a group by email? Sign in and the invitation is waiting on the Home screen \u2014 tap Join',
+  ],
   '7.30': [
     'Table View is now called Scorecard',
     'Fixed: scores scrolling past showed through to the left of the names on the scorecard and junk tables',
@@ -1644,7 +1647,8 @@ const Cloud = {
     if (typeof CLOUD_ENABLED === 'undefined' || !CLOUD_ENABLED) return '';
     const a = this.activeGroup();
     return [!!this.user, this.groups.map((g) => g.id + ':' + g.name).join(','), this.pool.length,
-            this.busy, !!this.api, a ? a.id : '', !!this.pendingJoin(), this.needsVerify()].join('|');
+            this.busy, !!this.api, a ? a.id : '', !!this.pendingJoin(), this.needsVerify(),
+            (this.invites || []).length].join('|');
   },
 
   /**
@@ -5734,6 +5738,20 @@ const Wizard = {
           : '<div style="margin-top:6px;color:var(--muted);font-size:13px;">Sign in above to join.</div>') +
         '</div>';
     }
+    // An emailed invitation (made by the seeding tools) waiting for this
+    // account's address. It used to show only in the menu's account panel, so
+    // someone signing in from Home never saw it. Accepting it also links them
+    // to their golfer record, which a share link cannot do.
+    if (CLOUD_ENABLED && Cloud.user && !pj) {
+      const nice = (inv) => inv.groupName ||
+        String(inv.groupId || 'a group').split(/[-_]/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      (Cloud.invites || []).forEach((inv) => {
+        groupsHtml += '<div class="wz-join-banner">You\u2019ve been invited to <b>' + esc(nice(inv)) + '</b>.' +
+          (inv.golferId ? '<div style="margin-top:4px;color:var(--muted);font-size:13px;">Joining links you to your scores already on file.</div>' : '') +
+          '<div class="row2"><button class="go" data-accept="' + esc(inv.id) + '"' + (Cloud.busy ? ' disabled' : '') + '>' +
+          (Cloud.busy ? 'Joining\u2026' : 'Join') + '</button></div></div>';
+      });
+    }
     // Which group this round is for. Its golfers come first on the players
     // screen, and the round counts in its standings.
     if (CLOUD_ENABLED && Cloud.user) {
@@ -5782,6 +5800,7 @@ const Wizard = {
       if (jg) jg.onclick = () => Cloud.joinPending();
       const jl = div.querySelector('#wizJoinLater');
       if (jl) jl.onclick = () => Cloud.dismissJoin();
+      div.querySelectorAll('[data-accept]').forEach((b) => { b.onclick = () => Cloud.acceptInvite(b.dataset.accept); });
     }, 0);
     return div;
   },

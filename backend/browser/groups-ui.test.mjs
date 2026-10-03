@@ -245,6 +245,29 @@ console.log('\nthe invite link, and joining from it\n');
   await ctx.close();
 }
 
+console.log('\nan emailed invitation shows on Home, not only in the menu\n');
+{
+  const { page, ctx, errs } = await open();
+  await page.evaluate(async () => {
+    const C = window._bb.Cloud;
+    window.__accepted = [];
+    C.api.pendingInvites = async () => window.__accepted.length ? [] : [{ id: 'inv_gary', groupId: 'nunes', golferId: 'ghin:7', email: 'g@x.com', status: 'pending' }];
+    C.api.acceptInvite = async (id) => { window.__accepted.push(id); return { groupId: 'dir', golferId: 'ghin:7' }; };
+    await C.refreshProfile();
+    window._bb.Wizard.render();
+  });
+  await page.waitForTimeout(300);
+  const banner = (await page.textContent('.wz-join-banner')).replace(/\s+/g, ' ');
+  check('Home offers it, by the group\'s name', /invited to Nunes/.test(banner), true);
+  check('  and says it links their scores', /links you to your scores/.test(banner), true);
+  await page.click('[data-accept="inv_gary"]');
+  await page.waitForTimeout(500);
+  check('Join accepts exactly that invitation', await page.evaluate(() => window.__accepted), ['inv_gary']);
+  check('  and the banner goes', await page.locator('[data-accept]').count(), 0);
+  check('no page errors', errs, []);
+  await ctx.close();
+}
+
 console.log(fail ? `\n${fail} FAILURES` : '\nall checks passed');
 await browser.close();
 process.exit(fail ? 1 : 0);
