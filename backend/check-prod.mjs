@@ -4,7 +4,7 @@
  * Two things the app needs that nothing on screen would explain if missing:
  *
  *   INDEXES. Every composite index in firestore.indexes.json must exist and be
- *   READY. A missing one makes a query throw, which the app reports as a failed
+ *   READY. --fix creates any that are missing. A missing one makes a query throw, which the app reports as a failed
  *   load of history or invitations rather than as a missing index.
  *
  *   STALE CLAIMS. Auth accounts are per project. copy-project.mjs rewrote only
@@ -45,6 +45,7 @@ const { access_token } = await app.options.credential.getAccessToken();
 const ir = await fetch(`https://firestore.googleapis.com/v1/projects/${key.project_id}` +
   '/databases/(default)/collectionGroups/-/indexes', { headers: { Authorization: 'Bearer ' + access_token } });
 const live = ir.ok ? ((await ir.json()).indexes || []) : null;
+const toCreate = [];
 if (!live) {
   console.log(`  could not list indexes (${ir.status}) — check them in the console`);
   problems++;
@@ -59,8 +60,10 @@ if (!live) {
     const s = sig(w.collectionGroup, w.fields);
     const state = have[s];
     if (state !== 'READY') problems++;
-    console.log(`  ${state === 'READY' ? 'ok     ' : 'MISSING'}  ${s}${state && state !== 'READY' ? '  (' + state + ')' : ''}`);
+    if (!state) toCreate.push(w);
+    console.log(`  ${state === 'READY' ? 'ok     ' : state ? 'BUILDING' : 'MISSING'}  ${s}${state && state !== 'READY' ? '  (' + state + ')' : ''}`);
   }
+  console.log(`  (${live.length} composite index(es) live)`);
 }
 
 // ----------------------------------------------------------------- claims
@@ -107,6 +110,22 @@ for (const grp of groups) {
   if (!real(grp.get('ownerUid'))) problems++;
 }
 
+if (FIX && toCreate.length) {
+  // Creation is asynchronous: Firestore builds each index in the background,
+  // usually within a few minutes on a database this small. Rerun to see READY.
+  for (const w of toCreate) {
+    const r = await fetch(`https://firestore.googleapis.com/v1/projects/${key.project_id}` +
+      `/databases/(default)/collectionGroups/${w.collectionGroup}/indexes`, {
+      method: 'POST', headers: { Authorization: 'Bearer ' + access_token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ queryScope: w.queryScope || 'COLLECTION', fields: w.fields }),
+    });
+    const ok = r.ok || r.status === 409;   // 409: already exists
+    console.log(`\n${ok ? 'CREATING' : 'CREATE FAILED'}  ${w.collectionGroup} index` +
+                (ok ? '' : `: ${r.status} ${(await r.text()).slice(0, 200)}`));
+  }
+  console.log('Indexes build in the background — rerun without --fix in a few minutes to confirm READY.');
+}
+
 if (FIX && (fixes.length || deadMembers.length)) {
   const batch = db.batch();
   for (const { inv, g } of fixes) {
@@ -117,8 +136,8 @@ if (FIX && (fixes.length || deadMembers.length)) {
   await batch.commit();
   console.log(`\nFIXED: ${fixes.length} invitation(s) back to pending, golfers released, ` +
               `${deadMembers.reduce((n, d) => n + d.dead.length, 0)} dead member uid(s) removed`);
-  console.log('Index problems, if any, still need deploying.');
-} else {
-  console.log(`\n${problems ? problems + ' problem(s)' : 'ready'}${problems && !FIX ? ' — rerun with --fix for the claims' : ''}`);
+}
+if (!FIX) {
+  console.log(`\n${problems ? problems + ' problem(s)' : 'ready'}${problems && !FIX ? ' — rerun with --fix' : ''}`);
 }
 process.exit(problems && !FIX ? 1 : 0);
