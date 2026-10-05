@@ -1,0 +1,64 @@
+# Daily GHIN index refresh for every pooled golfer.
+#
+# Runs backend/refresh-indexes.mjs, which verifies each golfer by NAME before
+# writing and refuses any mismatch. Credentials come from repository secrets and
+# are written to the runner's temp dir only for the length of the job.
+#
+# Secrets:
+#   GHIN_CREDS         two lines: "GHIN: <number>" and "password: <password>"
+#   FIREBASE_KEY_TEST  full contents of the bunchbets-test service-account JSON
+#   FIREBASE_KEY_PROD  (optional) same for the bunchbets project; skipped if unset
+name: Refresh GHIN indexes
+
+on:
+  schedule:
+    - cron: '17 12 * * *'   # 12:17 UTC = 5:17am Pacific (4:17am in winter)
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: 'Write changes (untick for a dry run)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refresh-indexes
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [TEST, PROD]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Refresh ${{ matrix.project }}
+        working-directory: backend
+        env:
+          GHIN_CREDS: ${{ secrets.GHIN_CREDS }}
+          FIREBASE_KEY: ${{ matrix.project == 'TEST' && secrets.FIREBASE_KEY_TEST || secrets.FIREBASE_KEY_PROD }}
+          COMMIT_FLAG: ${{ (github.event_name == 'schedule' || inputs.commit) && '--commit' || '' }}
+        run: |
+          if [ -z "$FIREBASE_KEY" ]; then
+            echo "No FIREBASE_KEY_${{ matrix.project }} secret set; skipping."
+            exit 0
+          fi
+          if [ -z "$GHIN_CREDS" ]; then
+            echo "::error::GHIN_CREDS secret is not set"
+            exit 1
+          fi
+          umask 077
+          printf '%s\n' "$GHIN_CREDS"   > "$RUNNER_TEMP/ghin-creds.txt"
+          printf '%s\n' "$FIREBASE_KEY" > "$RUNNER_TEMP/key.json"
+          node refresh-indexes.mjs "$RUNNER_TEMP/key.json" "$RUNNER_TEMP/ghin-creds.txt" $COMMIT_FLAG
+      - name: Remove credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/ghin-creds.txt" "$RUNNER_TEMP/key.json"

@@ -67,6 +67,7 @@ const { access_token } = await (await fetch('https://oauth2.googleapis.com/token
   method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
                               assertion: jh + '.' + jc + '.' + js }) })).json();
+if (!access_token) { console.error('Firebase auth failed — check the service-account key'); process.exit(1); }
 const base = `https://firestore.googleapis.com/v1/projects/${key.project_id}/databases/(default)/documents`;
 const FH = { Authorization: 'Bearer ' + access_token, 'Content-Type': 'application/json' };
 
@@ -121,8 +122,11 @@ console.log(`\n${changed.length} to update, ${refused.length} refused, ${missing
 refused.forEach((r) => console.log('  REFUSED ' + r));
 missing.forEach((m) => console.log('  no GHIN number: ' + m));
 
-if (!changed.length) { console.log('\nnothing to write'); process.exit(0); }
-if (!COMMIT) { console.log('\ndry run — rerun with --commit'); process.exit(0); }
+// A refusal or a failed write exits non-zero, so a scheduled run that needs a
+// human says so (GitHub emails on a failed job) instead of passing quietly.
+const FAIL = refused.length ? 1 : 0;
+if (!changed.length) { console.log('\nnothing to write'); process.exit(FAIL); }
+if (!COMMIT) { console.log('\ndry run — rerun with --commit'); process.exit(FAIL); }
 
 let ok = 0;
 for (const c of changed) {
@@ -141,3 +145,4 @@ for (const c of changed) {
   else console.log(`  FAILED ${c.name}: ${r.status} ${(await r.text()).slice(0, 120)}`);
 }
 console.log(`\nupdated ${ok} of ${changed.length}`);
+if (FAIL || ok < changed.length) process.exit(1);
