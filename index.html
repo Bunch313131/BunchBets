@@ -886,9 +886,12 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '8.0';
+const APP_VERSION = '8.1';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '8.1': [
+    'Past rounds now include rounds you saved on your other phones \u2014 sign in and they appear',
+  ],
   '8.0': [
     '<b>Bunch Bets 8.0 \u2014 group accounts.</b> Sign in with Google or an email and password, and your rounds, groups and standings follow you to any phone',
     '<b>Handicaps straight from GHIN,</b> refreshed every morning, and turned into course handicaps for the tees you pick',
@@ -1933,6 +1936,10 @@ const Cloud = {
       unmatchedNames: unmatched,            // visible, not silently dropped
       games: r.games || [],
       results,
+      // What Past rounds needs to show this round on another phone: the local
+      // player ids the games are keyed by, and each one's money.
+      players: players.map((p) => ({ id: p.id, name: p.name, handicap: p.handicap || 0 })),
+      playerNet: r.playerNet || {},
       appVersion: APP_VERSION,
     };
   },
@@ -1965,6 +1972,87 @@ const Cloud = {
       row.cloudSyncedAt = new Date().toISOString();
       History.save(rounds);
     } catch (e) {}
+  },
+
+  /**
+   * Past rounds is the phone's own list. Rounds this account saved from any
+   * other phone (or from the beta, before the copy to production) are in the
+   * database but not here, so a signed-in phone pulls down the ones it lacks.
+   *
+   * Only rounds this account created: those are the ones it may re-save, and
+   * the name-linking pass re-saves any local round carrying a cloudId.
+   *
+   * Pulled rounds are stamped with cloudId, so backfill never uploads them
+   * again. Returns how many were added.
+   */
+  async pullHistory() {
+    if (!CLOUD_ENABLED || !this.api || !this.user || this._pulling) return 0;
+    this._pulling = true;
+    try {
+      const remote = await this.api.myRounds(HISTORY_MAX);
+      const local = History.load();
+      const have = {};
+      local.forEach((r) => { have[r.id] = 1; if (r.cloudId) have[r.cloudId] = 1; });
+      const added = remote.filter((r) => !have[r.id]).map((r) => this.fromCloud(r)).filter(Boolean);
+      if (!added.length) return 0;
+      const all = local.concat(added).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+      History.save(all);
+      this.diag('history pulled ' + added.length);
+      return added.length;
+    } catch (e) {
+      this.diag('history pull failed ' + (e.code || e.message));
+      return 0;
+    } finally {
+      this._pulling = false;
+    }
+  },
+
+  /**
+   * A database round, back into the shape of a local history record.
+   *
+   * Rounds saved before 8.0 carry no player list. Their games are keyed by the
+   * phone's player ids (p1, p2, ...) while results are keyed by golfer, in the
+   * same order the players were in. When the counts agree and the ids are the
+   * usual pN, that order puts them back together; otherwise the round still
+   * lists with its names and money, and the scorecard shows dashes.
+   */
+  fromCloud(r) {
+    if (!r || !r.date) return null;
+    const games = Array.isArray(r.games) ? r.games : [];
+    const results = r.results || {};
+    const gids = Array.isArray(r.golferIds) ? r.golferIds : Object.keys(results);
+    let players = Array.isArray(r.players) && r.players.length ? r.players : null;
+    let playerNet = r.playerNet && Object.keys(r.playerNet).length ? r.playerNet : null;
+
+    if (!players) {
+      const seen = {}, pids = [];
+      games.forEach((g) => Object.keys((g && g.gross) || {}).forEach((pid) => {
+        if (!seen[pid]) { seen[pid] = 1; pids.push(pid); }
+      }));
+      const ordered = pids.every((pid) => /^p\d+$/.test(pid))
+        ? pids.slice().sort((a, b) => parseInt(a.slice(1), 10) - parseInt(b.slice(1), 10)) : null;
+      const keys = ordered && ordered.length === gids.length ? ordered : gids;
+      players = gids.map((gid, i) => ({
+        id: keys[i], name: (results[gid] && results[gid].name) || gid,
+        handicap: (results[gid] && results[gid].handicap) || 0,
+      }));
+      if (!playerNet) {
+        playerNet = {};
+        gids.forEach((gid, i) => { playerNet[keys[i]] = (results[gid] && results[gid].money) || 0; });
+      }
+    }
+
+    const course = r.courseSnapshot ? JSON.parse(JSON.stringify(r.courseSnapshot)) : { name: r.courseName || 'Course' };
+    if (!Array.isArray(course.par) || course.par.length !== 18) course.par = Array(18).fill(4);
+    if (!Array.isArray(course.hcp) || course.hcp.length !== 18) course.hcp = Array.from({ length: 18 }, (_, i) => i + 1);
+    if (!course.name) course.name = r.courseName || 'Course';
+
+    return {
+      id: r.id, cloudId: r.id, fromCloud: true,
+      date: r.date, course, players, games,
+      playerNet: playerNet || {},
+      startingHole: r.startingHole || 0,
+    };
   },
 
   unsyncedRounds() {
@@ -2720,6 +2808,15 @@ const History = {
           <div class="history-round-net">${netHtml}</div>
         </div>`;
       }).join('');
+    }
+
+    // Signed in: fetch any of this account's rounds the phone has not got, and
+    // redraw once if some arrived. The local list above is already showing.
+    if (typeof CLOUD_ENABLED !== 'undefined' && CLOUD_ENABLED && Cloud.user && Cloud.api && !this._pulledOnce) {
+      Cloud.pullHistory().then((n) => {
+        this._pulledOnce = true;
+        if (n && document.body.contains(overlay)) { overlay.remove(); this.show(); }
+      });
     }
 
     // Event listeners
