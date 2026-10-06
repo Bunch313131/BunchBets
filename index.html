@@ -886,9 +886,12 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.31';
+const APP_VERSION = '7.32';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.32': [
+    'Behind the scenes: getting ready to bring group accounts to everyone',
+  ],
   '7.31': [
     'Invited to a group by email? Sign in and the invitation is waiting on the Home screen \u2014 tap Join',
   ],
@@ -1113,15 +1116,24 @@ const FIREBASE_CONFIG = IS_BETA ? BETA_FIREBASE_CONFIG : PROD_FIREBASE_CONFIG;
 const LIVE_PATH = IS_BETA ? 'beta_games' : 'games';
 
 // === CLOUD ACCOUNTS ===
-// Beta only for now: the production Firebase project has neither Firestore nor
-// Auth configured, so the whole feature stays invisible there. Flip this to
-// `true` once bunchbets has both (project doc 16).
-const CLOUD_ENABLED = IS_BETA;
+// On everywhere in beta. On production only for a device that has opted in
+// with ?cloud=1 (and ?cloud=0 to opt back out), so accounts can be proven
+// against the real bunchbets project before everyone gets them. Sticky, because
+// a home-screen launch drops the query string. Flip to `true` at launch.
+const CLOUD_OPTIN_KEY = 'bb-cloud-optin';
+const CLOUD_ENABLED = IS_BETA || (() => {
+  try {
+    const q = new URLSearchParams(location.search).get('cloud');
+    if (q === '1') localStorage.setItem(CLOUD_OPTIN_KEY, '1');
+    if (q === '0') localStorage.removeItem(CLOUD_OPTIN_KEY);
+    return localStorage.getItem(CLOUD_OPTIN_KEY) === '1';
+  } catch (e) { return false; }
+})();
 
-// The redesigned setup flow. Beta only until it has been played with: a wizard
-// is the one screen where a surprise costs somebody a round rather than a
-// reload, so production keeps the flow its users already know.
-const NEW_WIZARD = IS_BETA;
+// The redesigned setup flow travels with accounts: beta always, production only
+// on a device that has opted in, until both launch together. A wizard is the
+// one screen where a surprise costs somebody a round rather than a reload.
+const NEW_WIZARD = CLOUD_ENABLED;
 
 /**
  * Courses: the built-in list (COURSE_DB, plus El Macero's tees in
@@ -12262,6 +12274,31 @@ document.addEventListener('visibilitychange', () => {
 
 document.getElementById('standingsMenuBtn').onclick = () => { UI.closeMenu(); UI.showStandings(); };
 
+// Accounts opt-in from INSIDE the app, for production. ?cloud=1 alone is not
+// enough on iPhone: the install gate forces a home-screen launch, which opens
+// start_url without the query string and with its own storage, separate from
+// Safari's. Five quick taps on the Offline status line toggle it, with a
+// confirm so a stray tap cannot. Beta always has accounts, so it ignores this.
+(() => {
+  if (IS_BETA) return;
+  const el = document.getElementById('swStatus');
+  if (!el) return;
+  let taps = [];
+  el.addEventListener('click', () => {
+    const now = Date.now();
+    taps = taps.filter((t) => now - t < 3000).concat(now);
+    if (taps.length < 5) return;
+    taps = [];
+    const on = CLOUD_ENABLED;
+    if (!confirm(on ? 'Turn group accounts OFF on this device?' : 'Turn on group accounts (sign-in, group pool, standings) on this device?')) return;
+    try {
+      if (on) localStorage.removeItem(CLOUD_OPTIN_KEY);
+      else localStorage.setItem(CLOUD_OPTIN_KEY, '1');
+    } catch (e) { alert('Could not save the setting on this device.'); return; }
+    location.reload();
+  });
+})();
+
 // Dev-only test surface, gated on _bbDev (localhost, or ?dev). It does not
 // exist on bunchbets.com or on beta.
 //
@@ -12474,7 +12511,11 @@ function showWhatsNew() {
   // Older version — collect all notes the user hasn't seen
   const allNotes = [];
   Object.keys(RELEASE_NOTES).sort(cmpVersion).forEach(v => {
-    if (cmpVersion(v, storedVersion) > 0) allNotes.push(...RELEASE_NOTES[v]);
+    if (cmpVersion(v, storedVersion) <= 0) return;
+    // Notes after 7.16 describe beta features. A production device that has not
+    // opted in has none of them, so it hears only about the current version.
+    if (!CLOUD_ENABLED && cmpVersion(v, '7.16') > 0 && v !== APP_VERSION) return;
+    allNotes.push(...RELEASE_NOTES[v]);
   });
   if (!allNotes.length) {
     localStorage.setItem(VERSION_KEY, APP_VERSION);
