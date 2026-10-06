@@ -886,11 +886,16 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.32';
+const APP_VERSION = '8.0';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
-  '7.32': [
-    'Behind the scenes: getting ready to bring group accounts to everyone',
+  '8.0': [
+    '<b>Bunch Bets 8.0 \u2014 group accounts.</b> Sign in with Google or an email and password, and your rounds, groups and standings follow you to any phone',
+    '<b>Handicaps straight from GHIN,</b> refreshed every morning, and turned into course handicaps for the tees you pick',
+    '<b>A new way to set up a round</b> \u2014 one question per screen: course and tees, players, games, teams, stakes, then a review before anything starts',
+    '<b>Groups</b> \u2014 start a playing group from the golfers on file and invite people with a link',
+    '<b>Standings</b> for each of your groups, built from every round anyone in the group saves',
+    '\u26a0\ufe0f Delete the home-screen icon and add it again so the top of the screen matches your theme',
   ],
   '7.31': [
     'Invited to a group by email? Sign in and the invitation is waiting on the Home screen \u2014 tap Join',
@@ -12507,14 +12512,16 @@ function showWhatsNew() {
     return;
   }
   if (cmpVersion(storedVersion, APP_VERSION) >= 0) return; // Same or newer, nothing new
+  // 8.0's notes are about accounts and the new setup. A production device that
+  // has not opted in has neither yet, so it is told nothing and its stored
+  // version is left alone: the day accounts launch, it sees the 8.0 notes then.
+  if (!CLOUD_ENABLED) return;
 
   // Older version — collect all notes the user hasn't seen
   const allNotes = [];
-  Object.keys(RELEASE_NOTES).sort(cmpVersion).forEach(v => {
+  // Newest first, so the headline of a big release is the first thing read.
+  Object.keys(RELEASE_NOTES).sort((a, b) => cmpVersion(b, a)).forEach(v => {
     if (cmpVersion(v, storedVersion) <= 0) return;
-    // Notes after 7.16 describe beta features. A production device that has not
-    // opted in has none of them, so it hears only about the current version.
-    if (!CLOUD_ENABLED && cmpVersion(v, '7.16') > 0 && v !== APP_VERSION) return;
     allNotes.push(...RELEASE_NOTES[v]);
   });
   if (!allNotes.length) {
