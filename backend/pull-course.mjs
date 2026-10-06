@@ -20,7 +20,12 @@
  * Dry run by default.
  *
  * Usage:
- *   node pull-course.mjs <ghin-creds.rtf> "<course name>" [--key <sa.json>] [--commit]
+ *   node pull-course.mjs <ghin-creds.rtf> "<course name>" [--key <sa.json>] [--name "<app name>"] [--commit]
+ *
+ * --name saves the course under the app's own name instead of GHIN's. The app
+ * lays a database course over its built-in one by name ("CC"/"GC"/"Golf Club"
+ * ignored), so GHIN's "Yocha Dehe GC at Cache Creek" would otherwise arrive as
+ * a second course beside the built-in "Yocha Dehe" rather than giving it tees.
  */
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -32,7 +37,10 @@ const KEY_PATH = keyIdx >= 0 ? args[keyIdx + 1] : null;
 // keyIdx is -1 when --key is absent, and -1 + 1 === 0 would then silently drop
 // the FIRST positional argument. Guard it rather than relying on the arithmetic.
 const keyValueIdx = keyIdx >= 0 ? keyIdx + 1 : -1;
-const positional = args.filter((a, i) => !a.startsWith('--') && i !== keyValueIdx);
+const nameIdx = args.indexOf('--name');
+const nameValueIdx = nameIdx >= 0 ? nameIdx + 1 : -1;
+const APP_NAME = nameIdx >= 0 ? args[nameValueIdx] : null;
+const positional = args.filter((a, i) => !a.startsWith('--') && i !== keyValueIdx && i !== nameValueIdx);
 const [CREDS, NAME] = positional;
 if (!CREDS || !NAME) {
   console.error('usage: pull-course.mjs <ghin-creds.rtf> "<course name>" [--key <sa.json>] [--commit]');
@@ -133,9 +141,11 @@ console.log(`  ${pars.size} distinct par array(s)`);
 // --------------------------------------------------------------- firestore
 if (!KEY_PATH) { console.log('\nno --key given: read-only probe, nothing written'); process.exit(0); }
 
-const slug = String(course.CourseName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const docName = APP_NAME || course.CourseName;
+const slug = String(docName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const doc = {
-  name: course.CourseName,
+  name: docName,
+  ghinName: course.CourseName,
   city: course.City || '',
   state: course.State || '',
   ghinCourseId: String(courseId),
@@ -144,7 +154,7 @@ const doc = {
   pulledAt: new Date().toISOString().slice(0, 10),
 };
 
-console.log(`\nwould write courses/${slug} — ${tees.length} tees`);
+console.log(`\nwould write courses/${slug} as "${docName}" — ${tees.length} tees`);
 if (!COMMIT) { console.log('dry run — rerun with --commit'); process.exit(0); }
 
 const key = JSON.parse(fs.readFileSync(KEY_PATH, 'utf8'));
