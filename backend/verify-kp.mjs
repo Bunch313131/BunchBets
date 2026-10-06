@@ -33,7 +33,7 @@ const PAR3S = [2, 6, 11, 15];                          // holes 3, 7, 12, 16
 
 globalThis.State = { data: { course: { par: PAR }, startingHole: 0, games: [] } };
 
-const Game = eval('({' + [grab('computeKP'), grab('kpTeamSplit')].join(',') + `,
+const Game = eval('({' + [grab('computeKP'), grab('computeKPThroughHole'), grab('kpTeamSplit')].join(',') + `,
   getPar3Holes() { return ${JSON.stringify(PAR3S)}; },
   courseHole(pos) { return pos; },
   strokes(g, pid, hole) { return (g.strokesCount && g.strokesCount[pid]) || 0; }
@@ -205,6 +205,48 @@ console.log('\nsplitting KP from its bonuses\n');
   const none = { hasSweeps: false, hasQuads: false, netA: 0, totalKPValue: 0, grandTotal: 0 };
   check('no KP money is four zeros', Object.values(Game.kpTeamSplit(none, 2, 2)), [0, 0, 0, 0]);
   check('and a missing kp object does not throw', Game.kpTeamSplit(null, 2, 2).total, 0);
+}
+
+/**
+ * The running cards (computeKPThroughHole) and sweeps.
+ *
+ * A sweep is winning EVERY par 3 of the round. The running cards filter the
+ * par 3s to those already played, so at the turn a team that had won both
+ * front-nine par 3s was being paid a sweep it had not earned yet. Replays
+ * 2026-09-25, El Macero, junk $1 front / $2 back.
+ */
+console.log('\nrunning cards do not pay a sweep before the round is over\n');
+{
+  //                       h3 h7 h12 h16
+  const G = {
+    tyler: card([4, 3, 2, 5]),
+    gary:  card([4, 5, 4, 3]),
+    bunch: card([4, 5, 3, 4]),
+    ken:   card([4, 5, 4, 3]),
+    casey: card([5, 3, 3, 3]),
+  };
+  const kp925 = new Array(18).fill(null);
+  kp925[2]  = { ranking: ['bunch'] };            // bogey -> carries
+  kp925[6]  = { ranking: ['casey', 'tyler'] };
+  kp925[11] = { ranking: ['tyler'] };
+  kp925[15] = { ranking: ['gary'] };
+  const mk = (a, b) => ({ ...mkGame(a, b, kp925, G), junkValue: { front: 1, back: 2 } });
+
+  const g = mk(['tyler','gary'], ['bunch','ken']);
+  const turn = Game.computeKPThroughHole(g, 8);
+  check('at the turn: tyler/gary have won every par 3 so far, but no sweep', turn.hasSweeps, false);
+  check('  so the card shows just the hole money', Game.kpTeamSplit(turn, 2, 2).total, 4);
+
+  const full = Game.computeKPThroughHole(g, 17);
+  check('through 18: now it is a sweep', [full.hasSweeps, full.sweepsTeam], [true, 'A']);
+  check('  holes $6, sweep $6', [full.totalKPValue, full.sweepsBonus], [6, 6]);
+  const fin = Game.computeKP(g);
+  check('  and the running card agrees with final settlement',
+    [full.hasSweeps, full.totalKPValue, full.sweepsBonus, full.grandTotal],
+    [fin.hasSweeps, fin.totalKPValue, fin.sweepsBonus, fin.grandTotal]);
+
+  const g2 = mk(['tyler','gary'], ['casey','bunch']);
+  check('casey in the match takes hole 7 -> no sweep through 18', Game.computeKPThroughHole(g2, 17).hasSweeps, false);
 }
 
 console.log(fail ? `\n${fail} FAILURES` : '\nall checks passed');

@@ -174,7 +174,9 @@ async function cacheFirst(request) {
 
 // Auth flows and the auth probe must never be served from cache: a stale page or a
 // cached redirect handler breaks sign-in in ways that are miserable to diagnose.
-const BYPASS_PATHS = ['/auth-probe', '/cloud-test', '/__/auth'];
+// /admin too: every navigation is otherwise stored as the app's offline shell,
+// so opening the admin page would have replaced the app with it.
+const BYPASS_PATHS = ['/auth-probe', '/cloud-test', '/__/auth', '/admin'];
 
 self.addEventListener('fetch', (event) => {
   if (KILLED) return;

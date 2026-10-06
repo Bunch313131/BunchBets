@@ -53,8 +53,12 @@ async function archiveRound(label, { blockEverything = false } = {}) {
       route.request().url().startsWith(ORIGIN) ? route.continue() : route.abort());
   }
 
-  await page.goto(ORIGIN + '/index.html', { waitUntil: 'domcontentloaded' });
-  await page.evaluate((s) => {
+  // Seeded before the app runs, and only on the first load. Loading once,
+  // writing, and reloading raced the blank round the first load saves on a
+  // timer, which sometimes replaced this seed and left nothing to archive.
+  await ctx.addInitScript((s) => {
+    if (sessionStorage.getItem('__bbSeeded')) return;
+    sessionStorage.setItem('__bbSeeded', '1');
     localStorage.setItem('nassauV28_complete', JSON.stringify(s));
     localStorage.setItem('bunchbets-installed', 'true');
     localStorage.removeItem('bunchbets_history');

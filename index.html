@@ -13,10 +13,35 @@
 <head>
 <meta charset="utf-8" />
 <meta name="color-scheme" content="dark" />
-<meta name="theme-color" content="#000000" />
+<!-- The first-paint value only. UI.syncStatusBarColor() replaces it with the
+     active theme's --status-bar as soon as the menu initialises; this is the
+     default theme's (Augusta, light) so the status bar does not flash black
+     above a green header on a cold launch. -->
+<meta name="theme-color" content="#2d6a3f" />
 <style>html,body{background:#000}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<!-- NOT black-translucent. Safari 26 ("Liquid Glass") stopped painting a fixed
+     colour behind the status bar and started SAMPLING the page pixels under it,
+     falling back to a white wash whenever it cannot read a flat colour there —
+     a semi-transparent header, a textured one, or a transparent root. This
+     app's header is all three at once depending on the theme: a repeating
+     gradient over var(--card), which is rgba() on Midnight.
+
+     The result was a white gradient bleeding down from the top, past the
+     cutout, over the header. iOS 27 made it stronger. It is not ours to fix in
+     CSS — Apple has published nothing, and the behaviour is reverse-engineered
+     — so the fix is to stop putting content up there at all. `default` insets
+     the web view below an opaque status bar, and that bar is filled with
+     `theme-color`, which UI.syncStatusBarColor() keeps matching the header.
+
+     `viewport-fit=cover` stays: it still governs the home indicator, the
+     landscape side insets, and the browser (non-installed) case, and every
+     env(safe-area-inset-*) in this file simply resolves to 0 at the top when
+     the status bar is opaque.
+
+     NOTE FOR WHOEVER TESTS THIS: an already-installed home-screen app keeps
+     the old style. The icon has to be deleted and re-added. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&display=swap" rel="stylesheet">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
@@ -34,8 +59,10 @@
   if (m) m.href = 'manifest.beta.webmanifest';
   var a = document.querySelector('link[rel="apple-touch-icon"]');
   if (a) a.href = 'BunchBetsBeta180.png';
-  var t = document.querySelector('meta[name="theme-color"]');
-  if (t) t.content = '#7f1d1d';
+  // Beta used to stain the status bar red to mark the environment. It cannot
+  // any more: the bar is now a solid band butted against the header, and a red
+  // stripe above a green header reads as a rendering fault rather than a label.
+  // The BETA badge in the header says the same thing without the seam.
   document.addEventListener('DOMContentLoaded', function(){
     document.body.classList.add('is-beta');
     var logo = document.querySelector('.header-brand img');
@@ -43,14 +70,36 @@
   });
 })();
 </script>
-<!-- Viewport height fix — must run before body renders to avoid flash -->
+<!-- Viewport height fix — must run before body renders to avoid flash.
+
+     window.innerHeight, NOT screen.height.
+
+     screen.height is the whole physical panel. That was right for exactly as
+     long as the app drew under a translucent status bar and really did occupy
+     the whole panel. 7.20 made the status bar opaque, so iOS now insets the web
+     view below it — and the body went on being forced to the full panel height,
+     ~50px taller than the window it lives in, with overflow:hidden. The header
+     was pushed out of view at the top and the bottom nav off the end: "once you
+     get to gameplay, the black bar is gone from the top and the top header is
+     now cut off."
+
+     innerHeight is the layout viewport, which is exactly the web view. It also
+     does NOT shrink when the keyboard opens (visualViewport.height does, which
+     would collapse the whole app while somebody types a player's name), and in
+     a browser tab it tracks the URL bar the way 100dvh does.
+
+     screen.height survives only as the last-ditch fallback. -->
 <script>
 (function(){
   function setAppHeight(){
-    document.documentElement.style.setProperty('--app-height', screen.height + 'px');
+    var h = window.innerHeight || screen.height;
+    document.documentElement.style.setProperty('--app-height', h + 'px');
   }
   setAppHeight();
   window.addEventListener('resize', setAppHeight);
+  // innerHeight is not always settled while the head is still parsing, and the
+  // status bar inset in particular lands late on a cold launch in standalone.
+  window.addEventListener('load', setAppHeight);
   window.addEventListener('orientationchange', function(){ setTimeout(setAppHeight, 100); });
 })();
 </script>
@@ -75,12 +124,12 @@ if (!window._bbDev) {
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 <style>
 /* Theme 1: Classic (current colors preserved — clean, modern, no frills) */
-:root, :root[data-theme="classic"] { --bg:#0b0e13; --card:#0f1420; --txt:#ecf0f6; --muted:#a3a9b6; --border:#1e2633; --acc:#3b82f6; --success:#16a34a; --danger:#dc2626; --warning:#d97706; --gold:#c9a96e; --radius:14px; --font-display:system-ui,-apple-system,Segoe UI,Roboto,Arial; --header-bg:var(--card); color-scheme: dark; }
-:root[data-theme="classic"].light-mode { --bg:#f5f5f7; --card:#ffffff; --txt:#1d1d1f; --muted:#6e6e73; --border:#d2d2d7; --acc:#3b82f6; --success:#16a34a; --danger:#dc2626; --warning:#d97706; --gold:#a07d3f; color-scheme: light; }
+:root, :root[data-theme="classic"] { --status-bar:#0f1420; --bg:#0b0e13; --card:#0f1420; --txt:#ecf0f6; --muted:#a3a9b6; --border:#1e2633; --acc:#3b82f6; --success:#16a34a; --danger:#dc2626; --warning:#d97706; --gold:#c9a96e; --radius:14px; --font-display:system-ui,-apple-system,Segoe UI,Roboto,Arial; --header-bg:var(--card); color-scheme: dark; }
+:root[data-theme="classic"].light-mode { --status-bar:#ffffff; --bg:#f5f5f7; --card:#ffffff; --txt:#1d1d1f; --muted:#6e6e73; --border:#d2d2d7; --acc:#3b82f6; --success:#16a34a; --danger:#dc2626; --warning:#d97706; --gold:#a07d3f; color-scheme: light; }
 
 /* Theme 2: Augusta — Masters inspired, rich greens, gold accents, serif elegance */
-:root[data-theme="augusta"] { --bg:#0a3d1c; --card:#0f4d26; --txt:#f5f0e1; --muted:#a8c4a0; --border:#1e6e38; --acc:#c8a951; --success:#6fd08c; --danger:#e74c4c; --warning:#daa520; --gold:#c8a951; --radius:6px; --font-display:Georgia,'Times New Roman',serif; --header-bg:linear-gradient(180deg,#0f4d26,#0a3d1c); color-scheme: dark; }
-:root[data-theme="augusta"].light-mode { --bg:#f5f0e1; --card:#fffef8; --txt:#1a2e1d; --muted:#3d5a44; --border:#c5d4b8; --acc:#8b6f2e; --success:#16a34a; --danger:#dc2626; --warning:#b8860b; --gold:#8b6f2e; --header-bg:linear-gradient(180deg,#2d6a3f,#1a5c2e); color-scheme: light; }
+:root[data-theme="augusta"] { --status-bar:#0f4d26; --bg:#0a3d1c; --card:#0f4d26; --txt:#f5f0e1; --muted:#a8c4a0; --border:#1e6e38; --acc:#c8a951; --success:#6fd08c; --danger:#e74c4c; --warning:#daa520; --gold:#c8a951; --radius:6px; --font-display:Georgia,'Times New Roman',serif; --header-bg:linear-gradient(180deg,#0f4d26,#0a3d1c); color-scheme: dark; }
+:root[data-theme="augusta"].light-mode { --status-bar:#2d6a3f; --bg:#f5f0e1; --card:#fffef8; --txt:#1a2e1d; --muted:#3d5a44; --border:#c5d4b8; --acc:#8b6f2e; --success:#16a34a; --danger:#dc2626; --warning:#b8860b; --gold:#8b6f2e; --header-bg:linear-gradient(180deg,#2d6a3f,#1a5c2e); color-scheme: light; }
 /* Augusta structural overrides */
 [data-theme="augusta"] main h2, [data-theme="augusta"] main h3, [data-theme="augusta"] .card h2, [data-theme="augusta"] .card h3 { font-family:Georgia,'Times New Roman',serif; letter-spacing:0.5px; }
 [data-theme="augusta"] .card { border-radius:var(--radius); box-shadow:0 1px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05); border:1px solid var(--border); }
@@ -103,16 +152,15 @@ if (!window._bbDev) {
 [data-theme="augusta"].light-mode .hole-scoring-nav .hole-nav-btn { background:rgba(255,255,255,0.2); color:#fff; }
 [data-theme="augusta"].light-mode .hole-dot.current { color:#fff; }
 [data-theme="augusta"].light-mode .scoring-toggle-btn.active { color:#fff; }
-[data-theme="augusta"] .score-drum { border-radius:6px; background:linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(200,169,81,0.06) 40%, rgba(200,169,81,0.06) 60%, rgba(0,0,0,0.4) 100%); box-shadow:inset 0 2px 6px rgba(0,0,0,0.5), inset 0 -2px 6px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.4); border-color:rgba(200,169,81,0.25); }
-[data-theme="augusta"] .score-drum-frame { border-color:var(--gold); border-radius:4px; box-shadow:0 0 8px rgba(200,169,81,0.3), inset 0 0 6px rgba(200,169,81,0.1); background:rgba(200,169,81,0.04); }
+[data-theme="augusta"] .score-step-btn::before { border-radius:4px; }
 [data-theme="augusta"] .theme-g1 .card { outline-color:rgba(22,163,74,.6); background:linear-gradient(0deg,rgba(22,163,74,.15),rgba(22,163,74,.15)) var(--card); }
 [data-theme="augusta"] .theme-g2 .card { outline-color:rgba(220,38,38,.6); background:linear-gradient(0deg,rgba(220,38,38,.15),rgba(220,38,38,.15)) var(--card); }
 [data-theme="augusta"] .theme-g3 .card { outline-color:rgba(217,119,6,.6); background:linear-gradient(0deg,rgba(217,119,6,.15),rgba(217,119,6,.15)) var(--card); }
 [data-theme="augusta"] .theme-g4 .card { outline-color:rgba(99,102,241,.6); background:linear-gradient(0deg,rgba(99,102,241,.15),rgba(99,102,241,.15)) var(--card); }
 
 /* Theme 3: Midnight — dark luxury, neon accents, glass morphism, futuristic */
-:root[data-theme="midnight"] { --bg:#0a0a0f; --card:rgba(20,20,35,0.85); --txt:#e8e8f0; --muted:#7a7a9a; --border:rgba(100,100,180,0.2); --acc:#7c3aed; --success:#10b981; --danger:#f43f5e; --warning:#f59e0b; --gold:#a78bfa; --radius:20px; --font-display:'SF Pro Display',system-ui,-apple-system,Segoe UI; --header-bg:rgba(10,10,15,0.8); color-scheme: dark; }
-:root[data-theme="midnight"].light-mode { --bg:#f0f0f8; --card:rgba(255,255,255,0.9); --txt:#1a1a2e; --muted:#6a6a8a; --border:rgba(100,100,180,0.15); --acc:#7c3aed; --success:#10b981; --danger:#dc2626; --warning:#d97706; --gold:#7c3aed; --header-bg:rgba(240,240,248,0.8); color-scheme: light; }
+:root[data-theme="midnight"] { --status-bar:#0a0a0f; --bg:#0a0a0f; --card:rgba(20,20,35,0.85); --txt:#e8e8f0; --muted:#7a7a9a; --border:rgba(100,100,180,0.2); --acc:#7c3aed; --success:#10b981; --danger:#f43f5e; --warning:#f59e0b; --gold:#a78bfa; --radius:20px; --font-display:'SF Pro Display',system-ui,-apple-system,Segoe UI; --header-bg:rgba(10,10,15,0.8); color-scheme: dark; }
+:root[data-theme="midnight"].light-mode { --status-bar:#f0f0f8; --bg:#f0f0f8; --card:rgba(255,255,255,0.9); --txt:#1a1a2e; --muted:#6a6a8a; --border:rgba(100,100,180,0.15); --acc:#7c3aed; --success:#10b981; --danger:#dc2626; --warning:#d97706; --gold:#7c3aed; --header-bg:rgba(240,240,248,0.8); color-scheme: light; }
 /* Midnight structural overrides — glassmorphism */
 [data-theme="midnight"] .card { border-radius:var(--radius); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid var(--border); box-shadow:0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05); }
 [data-theme="midnight"] header { background:var(--header-bg); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border-bottom:1px solid var(--border); }
@@ -122,13 +170,12 @@ if (!window._bbDev) {
 [data-theme="midnight"] .bottom-nav { background:var(--header-bg); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border-top:1px solid var(--border); }
 [data-theme="midnight"] .hole-dot.current { background:linear-gradient(135deg,#7c3aed,#a855f7); border-color:#a855f7; box-shadow:0 0 12px rgba(124,58,237,0.5); }
 [data-theme="midnight"] .scoring-toggle-btn.active { background:linear-gradient(135deg,#7c3aed,#a855f7); }
-[data-theme="midnight"] .score-drum { background:linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(124,58,237,0.05) 40%, rgba(124,58,237,0.05) 60%, rgba(0,0,0,0.5) 100%); box-shadow:inset 0 3px 8px rgba(0,0,0,0.6), inset 0 -3px 8px rgba(0,0,0,0.6), 0 0 20px rgba(124,58,237,0.15), 0 2px 4px rgba(0,0,0,0.4); border-color:rgba(124,58,237,0.3); }
-[data-theme="midnight"] .score-drum-frame { border-color:#a855f7; box-shadow:0 0 16px rgba(124,58,237,0.4), inset 0 0 10px rgba(124,58,237,0.15); background:rgba(124,58,237,0.06); }
+[data-theme="midnight"] .score-step-btn::before { box-shadow:0 0 10px rgba(124,58,237,0.3); }
 [data-theme="midnight"] body { background-image:radial-gradient(ellipse at 50% 0%, rgba(124,58,237,0.08) 0%, transparent 60%); }
 
 /* Theme 4: Tour — ESPN/CBS sports broadcast, bold, high-energy */
-:root[data-theme="tour"] { --bg:#0c0c0c; --card:#1a1a1a; --txt:#ffffff; --muted:#999999; --border:#333333; --acc:#ff3b30; --success:#34c759; --danger:#ff3b30; --warning:#ff9500; --gold:#ffcc00; --radius:8px; --font-display:'Helvetica Neue',Helvetica,Arial,sans-serif; --header-bg:#1a1a1a; color-scheme: dark; }
-:root[data-theme="tour"].light-mode { --bg:#f2f2f2; --card:#ffffff; --txt:#000000; --muted:#666666; --border:#dddddd; --acc:#ff3b30; --success:#34c759; --danger:#ff3b30; --warning:#ff9500; --gold:#ff9500; --header-bg:#ffffff; color-scheme: light; }
+:root[data-theme="tour"] { --status-bar:#1a1a1a; --bg:#0c0c0c; --card:#1a1a1a; --txt:#ffffff; --muted:#999999; --border:#333333; --acc:#ff3b30; --success:#34c759; --danger:#ff3b30; --warning:#ff9500; --gold:#ffcc00; --radius:8px; --font-display:'Helvetica Neue',Helvetica,Arial,sans-serif; --header-bg:#1a1a1a; color-scheme: dark; }
+:root[data-theme="tour"].light-mode { --status-bar:#ffffff; --bg:#f2f2f2; --card:#ffffff; --txt:#000000; --muted:#666666; --border:#dddddd; --acc:#ff3b30; --success:#34c759; --danger:#ff3b30; --warning:#ff9500; --gold:#ff9500; --header-bg:#ffffff; color-scheme: light; }
 /* Tour structural overrides — sharp, bold, athletic */
 [data-theme="tour"] h1, [data-theme="tour"] h2, [data-theme="tour"] h3 { font-weight:900; text-transform:uppercase; letter-spacing:1.5px; }
 [data-theme="tour"] .card { border-radius:var(--radius); border-left:4px solid var(--acc); box-shadow:none; }
@@ -141,8 +188,8 @@ if (!window._bbDev) {
 [data-theme="tour"] .bottom-nav-btn.active { color:var(--acc); }
 [data-theme="tour"] .pill { border-radius:4px; font-weight:800; text-transform:uppercase; }
 [data-theme="tour"] .scoring-toggle-btn.active { background:var(--acc); }
-[data-theme="tour"] .score-drum { border-radius:8px; background:linear-gradient(180deg, rgba(0,0,0,0.6) 0%, rgba(255,59,48,0.03) 40%, rgba(255,59,48,0.03) 60%, rgba(0,0,0,0.6) 100%); box-shadow:inset 0 3px 8px rgba(0,0,0,0.7), inset 0 -3px 8px rgba(0,0,0,0.7), 0 2px 4px rgba(0,0,0,0.5); border-color:rgba(255,59,48,0.2); }
-[data-theme="tour"] .score-drum-frame { border-color:var(--acc); border-width:3px; border-radius:6px; box-shadow:0 0 10px rgba(255,59,48,0.3); }
+[data-theme="tour"] .score-step-btn { color:var(--txt); }
+[data-theme="tour"] .score-step-btn::before { border-radius:5px; border-color:var(--border); background:linear-gradient(180deg, color-mix(in srgb, var(--txt) 12%, var(--card)), color-mix(in srgb, var(--txt) 5%, var(--card))); }
 :root.light-mode input[type="text"], :root.light-mode input[type="tel"], :root.light-mode input[type="number"], :root.light-mode select { background:rgba(0,0,0,0.04); }
 :root.light-mode .menu-item:hover { background:rgba(0,0,0,0.05); }
 .theme-switch { position:relative; width:50px; height:26px; display:inline-block; }
@@ -184,6 +231,10 @@ th.sticky, td.sticky { position:sticky; left:0; background:var(--card); z-index:
 .tabs { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 10px; }
 .tabs .btn.active { background:var(--acc); color:#fff; border-color:var(--acc); }
 .scroll { overflow:auto; }
+/* A scrolling card has no padding. The sticky name column sticks to the inner
+   edge of that padding, so with the card's 12px the scores scrolled past it
+   showed through in a strip on its left. Flush, there is no strip. */
+.card.scroll { padding:0; }
 .note { font-size:12px; color:var(--muted); }
 .error { position:fixed; bottom:8px; left:8px; right:8px; background:#fee2e2; color:#991b1b; border:1px solid #fecaca; border-radius:12px; padding:8px 12px; font-size:12px; display:none; z-index:9999; white-space:pre-wrap; }
 .success-toast { position:fixed; top:70px; right:8px; background:var(--success); color:#fff; border-radius:12px; padding:12px 16px; z-index:9999; animation:slideIn 0.3s; box-shadow:0 4px 12px rgba(0,0,0,0.3); }
@@ -311,6 +362,13 @@ body.is-beta header { box-shadow: inset 0 3px 0 #dc2626; }
 .cloud-invite button { margin-top:8px; width:100%; padding:9px; border-radius:8px; border:none; background:var(--acc); color:#fff; font-weight:700; font-size:13px; cursor:pointer; }
 .cloud-backup { margin-top:8px; padding:7px 12px; border-radius:8px; border:1px solid var(--acc); background:none; color:var(--acc); font-weight:700; font-size:12px; cursor:pointer; }
 .wiz-tee { margin-top:14px; padding:12px; border:1px solid var(--border); border-radius:10px; background:var(--card); }
+/* Docked under the course list, NOT inside it. The list scrolls and this does
+   not, so it needs a hard edge of its own — sharing the page background made it
+   read as the last card in the list, i.e. as belonging to whatever course
+   happened to be scrolled to rather than to the one that is selected. */
+.wiz-tee-dock { flex:0 0 auto; padding:0 16px 12px; border-top:1px solid var(--border); background:var(--card); }
+.wiz-tee-dock .wiz-tee { margin-top:12px; }
+.wiz-tee-course { font-size:12px; font-weight:800; letter-spacing:0.04em; text-transform:uppercase; color:var(--muted); margin-bottom:9px; }
 .wiz-tee-row { display:flex; align-items:center; gap:10px; }
 .wiz-tee-label { font-size:13px; font-weight:700; flex:0 0 auto; }
 .wiz-tee-pick { flex:1; min-height:44px; padding:9px 12px; border-radius:8px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:var(--txt); font-size:15px; }
@@ -414,6 +472,103 @@ body.is-beta header { box-shadow: inset 0 3px 0 #dc2626; }
 .wizard-option:hover { border-color:var(--acc); }
 .wizard-option.selected { border-color:var(--acc); background:rgba(59,130,246,0.1); }
 .wizard-option input[type="radio"] { width:18px; height:18px; }
+
+.roster-sec { padding:7px 12px 4px; font-size:10.5px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:var(--muted); background:color-mix(in srgb, var(--txt) 5%, var(--card)); border-bottom:1px solid var(--border); }
+
+/* Sign-in sheet */
+.wz-inline-link { border:none; background:none; padding:0; color:var(--acc); font:inherit; font-weight:700; text-decoration:underline; cursor:pointer; }
+.si-modal .kp-modal-content { max-width:380px; }
+.si-google { display:flex; align-items:center; justify-content:center; gap:10px; width:100%; padding:12px; border-radius:12px; border:1px solid var(--border); background:var(--card); color:var(--txt); font-size:15px; font-weight:700; cursor:pointer; }
+.si-google:disabled { opacity:.5; }
+.si-or { display:flex; align-items:center; gap:10px; margin:14px 0 12px; color:var(--muted); font-size:12px; }
+.si-or::before, .si-or::after { content:''; flex:1; height:1px; background:var(--border); }
+.si-tabs { display:flex; gap:4px; padding:3px; margin-bottom:12px; border-radius:10px; background:color-mix(in srgb, var(--txt) 7%, var(--card)); }
+.si-tab { flex:1; padding:8px; border:none; border-radius:8px; background:transparent; color:var(--muted); font-size:14px; font-weight:700; cursor:pointer; }
+.si-tab.on { background:var(--card); color:var(--txt); box-shadow:0 1px 3px rgba(0,0,0,.15); }
+.si-modal input { width:100%; height:46px; padding:0 12px; margin-bottom:8px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--txt); font-size:16px; box-sizing:border-box; }
+.si-go { width:100%; padding:13px; margin-top:4px; border:none; border-radius:12px; background:var(--acc); color:#fff; font-size:15px; font-weight:700; cursor:pointer; }
+.si-go:disabled { opacity:.6; }
+.si-msg { min-height:18px; margin-top:10px; font-size:13px; line-height:1.4; color:var(--danger); }
+.si-msg.good { color:var(--success); }
+.si-links { display:flex; justify-content:space-between; margin-top:6px; }
+.si-links button { border:none; background:none; padding:6px 0; color:var(--muted); font-size:13px; text-decoration:underline; cursor:pointer; }
+
+/* Groups */
+.wz-groups { margin:-6px 0 16px; }
+.wz-groups-head { display:flex; align-items:center; justify-content:space-between; margin:0 2px 6px; }
+.wz-groups-head .wz-label { margin:0; }
+.wz-groups-manage { border:none; background:none; color:var(--acc); font-size:13px; font-weight:700; cursor:pointer; padding:4px 0; }
+.wz-group-chips { display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; padding-bottom:2px; }
+.wz-group-chips::-webkit-scrollbar { display:none; }
+.wz-group-chip { flex:0 0 auto; padding:8px 14px; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--txt); font-size:13.5px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.wz-group-chip.on { background:var(--acc); border-color:var(--acc); color:#fff; }
+.wz-join-banner { padding:12px; margin-bottom:14px; border-radius:12px; border:1px solid var(--acc); background:color-mix(in srgb, var(--acc) 10%, var(--card)); font-size:14px; line-height:1.4; }
+.wz-join-banner .row2 { display:flex; gap:8px; margin-top:10px; }
+.wz-join-banner button { flex:1; padding:9px; border-radius:10px; font-size:14px; font-weight:700; cursor:pointer; border:1px solid var(--border); background:var(--card); color:var(--txt); }
+.wz-join-banner button.go { background:var(--acc); border-color:var(--acc); color:#fff; }
+.grp-body { padding:12px 16px 24px; }
+.grp-row { display:flex; align-items:center; gap:10px; width:100%; min-height:52px; padding:10px 14px; border:none; border-top:1px solid var(--border); background:transparent; color:var(--txt); font:inherit; text-align:left; cursor:pointer; }
+.grp-row:first-child { border-top:none; }
+.grp-row .nm { flex:1; min-width:0; font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.grp-row .meta { font-size:12px; color:var(--muted); white-space:nowrap; }
+.grp-row .x { flex:0 0 auto; width:30px; height:30px; border-radius:50%; border:1px solid var(--border); background:var(--card); color:var(--muted); font-size:16px; line-height:1; cursor:pointer; }
+.grp-badge { font-size:10.5px; font-weight:800; letter-spacing:.4px; text-transform:uppercase; color:#fff; background:var(--acc); border-radius:999px; padding:3px 8px; }
+.grp-sub { font-size:13px; color:var(--muted); line-height:1.45; margin:2px 2px 12px; }
+.grp-actions { display:flex; gap:8px; margin:0 0 6px; }
+.grp-actions .btn { flex:1; padding:11px 10px; font-size:14px; font-weight:700; border-radius:10px; }
+.grp-input { width:100%; height:44px; padding:0 12px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--txt); font-size:16px; margin-bottom:8px; box-sizing:border-box; }
+.grp-link { display:block; width:100%; margin-top:14px; padding:10px; border:none; background:none; color:var(--muted); font-size:13px; text-decoration:underline; cursor:pointer; }
+.grp-link.danger { color:var(--danger); }
+.grp-new { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.grp-new .grp-input { margin:0; }
+.grp-new .full { grid-column:1 / -1; }
+
+/* New-flow start: home, course, tees & first hole */
+.wz-account { display:flex; align-items:center; gap:12px; padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--card); margin-bottom:18px; }
+.wz-avatar { width:38px; height:38px; border-radius:50%; background:var(--acc); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px; flex:0 0 auto; }
+.wz-account-text { flex:1; min-width:0; }
+.wz-account-name { font-size:15px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wz-account-sub { font-size:12px; color:var(--muted); line-height:1.4; margin-top:2px; }
+.wz-account-btn { flex:0 0 auto; padding:8px 14px; border-radius:999px; border:none; background:var(--acc); color:#fff; font-size:13px; font-weight:700; cursor:pointer; }
+.wz-account-btn:disabled { opacity:.5; cursor:default; }
+.wz-choice { display:flex; align-items:center; gap:14px; width:100%; padding:14px; margin-bottom:10px; border-radius:14px; border:1px solid var(--border); background:var(--card); color:var(--txt); font:inherit; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:transform .1s; }
+.wz-choice:active { transform:scale(.98); }
+.wz-choice::after { content:'\203A'; margin-left:auto; font-size:24px; line-height:1; opacity:.45; }
+.wz-ico { width:44px; height:44px; border-radius:12px; flex:0 0 auto; display:flex; align-items:center; justify-content:center; font-size:22px; background:color-mix(in srgb, var(--acc) 14%, transparent); }
+.wz-choice b { display:block; font-size:16px; }
+.wz-choice .sub { display:block; font-size:12.5px; color:var(--muted); margin-top:2px; line-height:1.35; }
+.wz-choice.primary { background:var(--acc); border-color:var(--acc); color:#fff; }
+.wz-choice.primary .wz-ico { background:rgba(255,255,255,.18); }
+.wz-choice.primary .sub { color:rgba(255,255,255,.85); }
+.wz-link { display:block; width:100%; margin-top:8px; padding:8px; border:none; background:none; color:var(--muted); font-size:13px; text-decoration:underline; cursor:pointer; }
+.wz-search-row { display:flex; gap:8px; }
+.wz-search { flex:1; min-width:0; height:40px; padding:0 12px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--txt); font-size:15px; }
+.wz-chip { flex:0 0 auto; height:40px; padding:0 12px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--txt); font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.wz-chip:disabled { opacity:.5; }
+.wz-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; font-weight:700; margin:16px 2px 6px; }
+.wz-list { border:1px solid var(--border); border-radius:12px; background:var(--card); overflow:hidden; }
+.wz-row { display:flex; align-items:center; gap:10px; width:100%; min-height:48px; padding:10px 14px; border:none; border-top:1px solid var(--border); background:transparent; color:var(--txt); font:inherit; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.wz-row:first-child { border-top:none; }
+.wz-row .nm { flex:1; min-width:0; font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wz-row .meta { font-size:12px; color:var(--muted); white-space:nowrap; }
+.wz-row .tick { width:20px; height:20px; border-radius:50%; border:2px solid var(--border); flex:0 0 auto; display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:800; }
+.wz-row.selected { background:color-mix(in srgb, var(--acc) 10%, transparent); }
+.wz-row.selected .tick { background:var(--acc); border-color:var(--acc); }
+.wz-row.selected .tick::before { content:'\2713'; }
+.wz-row.new .nm { color:var(--acc); }
+.wz-request { display:block; text-align:center; margin:14px 0 4px; font-size:12px; color:var(--muted); text-decoration:none; }
+.wz-tees { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; }
+.wz-tee-btn { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; border:1px solid var(--border); background:var(--card); color:var(--txt); font:inherit; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.wz-tee-btn .dot { width:16px; height:16px; border-radius:50%; flex:0 0 auto; border:1px solid color-mix(in srgb, var(--txt) 30%, transparent); }
+.wz-tee-btn b { display:block; font-size:14.5px; line-height:1.25; overflow-wrap:anywhere; }
+.wz-tee-btn small { display:block; font-size:12px; color:var(--muted); }
+.wz-tee-btn span { min-width:0; }
+.wz-tee-btn.selected { border-color:var(--acc); box-shadow:inset 0 0 0 1px var(--acc); background:color-mix(in srgb, var(--acc) 10%, var(--card)); }
+.wz-caption { margin-top:8px; font-size:12.5px; color:var(--muted); line-height:1.45; }
+.wz-note { padding:12px; border:1px dashed var(--border); border-radius:12px; font-size:13px; color:var(--muted); line-height:1.45; }
+.wz-holes { display:grid; grid-template-columns:repeat(9, minmax(0,1fr)); gap:6px; }
+.wz-hole { aspect-ratio:1; padding:0; border-radius:50%; border:1px solid var(--border); background:var(--card); color:var(--txt); font:inherit; font-size:14px; font-weight:700; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.wz-hole.selected { background:var(--acc); border-color:var(--acc); color:#fff; }
 .wizard-team-zone { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; min-height:100px; text-align:center; }
 .wizard-team-zone h4 { margin:0 0 8px 0; font-size:13px; color:var(--muted); text-align:center; }
 .wizard-player-chip { display:inline-block; background:rgba(59,130,246,0.2); border:1px solid var(--acc); border-radius:20px; padding:6px 12px; margin:4px; font-size:13px; cursor:pointer; }
@@ -527,21 +682,32 @@ body.is-beta header { box-shadow: inset 0 3px 0 #dc2626; }
 .game-status-card { padding:2px 8px; margin-bottom:2px; }
 .game-status-card .card { padding:5px 8px !important; }
 
-/* Score drum picker — 3D wheel effect */
-.score-drum-wrap { display:flex; align-items:center; gap:8px; margin-left:auto; }
-.score-drum { position:relative; width:160px; height:49px; overflow:hidden; border-radius:14px; background:linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(255,255,255,0.03) 40%, rgba(255,255,255,0.03) 60%, rgba(0,0,0,0.3) 100%); box-shadow:inset 0 2px 6px rgba(0,0,0,0.5), inset 0 -2px 6px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.08); }
-.score-drum::before { content:''; position:absolute; inset:0; border-radius:14px; background:linear-gradient(90deg, rgba(0,0,0,0.4) 0%, transparent 20%, transparent 80%, rgba(0,0,0,0.4) 100%); z-index:1; pointer-events:none; }
-.score-drum::after { content:''; position:absolute; top:0; left:0; right:0; height:40%; background:linear-gradient(180deg, rgba(0,0,0,0.15) 0%, transparent 100%); border-radius:14px 14px 0 0; z-index:1; pointer-events:none; }
-.score-drum-track { display:flex; transition:transform 0.2s ease-out; height:100%; align-items:center; }
-.score-drum-num { width:52px; flex-shrink:0; height:41px; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:600; color:var(--muted); opacity:0.5; text-shadow:0 1px 2px rgba(0,0,0,0.3); }
-.score-drum-num.center { font-size:25px; font-weight:800; color:var(--txt); opacity:1; text-shadow:0 1px 0 rgba(255,255,255,0.15), 0 2px 4px rgba(0,0,0,0.3); }
-.score-drum-num.center.eagle, .score-drum-num.center.birdie { color:var(--success); text-shadow:0 0 8px rgba(22,163,74,0.3), 0 1px 0 rgba(255,255,255,0.1); }
-.score-drum-num.center.bogey, .score-drum-num.center.double-bogey { color:var(--danger); text-shadow:0 0 8px rgba(220,38,38,0.3), 0 1px 0 rgba(255,255,255,0.1); }
-.score-drum-frame { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:50px; height:43px; border:2px solid var(--acc); border-radius:12px; pointer-events:none; z-index:4; box-shadow:0 0 12px rgba(59,130,246,0.25), inset 0 0 8px rgba(59,130,246,0.1); background:rgba(59,130,246,0.04); }
-.score-drum-frame.eagle, .score-drum-frame.birdie { border-color:var(--success); box-shadow:0 0 12px rgba(22,163,74,0.3), inset 0 0 8px rgba(22,163,74,0.1); background:rgba(22,163,74,0.04); }
-.score-drum-frame.bogey, .score-drum-frame.double-bogey { border-color:var(--danger); box-shadow:0 0 12px rgba(220,38,38,0.3), inset 0 0 8px rgba(220,38,38,0.1); background:rgba(220,38,38,0.04); }
-.score-drum-touch { position:absolute; inset:0; z-index:5; cursor:grab; }
-.score-drum-touch:active { cursor:grabbing; }
+/* Score stepper. Replaced the swipe drum, which was 160px of mostly-dim
+   neighbouring numbers. The score wears the paper-card marks: circle for a
+   birdie, two for an eagle, a box for a bogey, two for a double or worse. */
+.score-step { display:flex; align-items:center; gap:0; margin-left:auto; flex-shrink:0; }
+/* The button is the full 36x44 tap target; the visible key is a smaller
+   square drawn behind the glyph, so the score is the biggest thing in the row. */
+.score-step-btn { position:relative; isolation:isolate; width:36px; height:44px; padding:0; border:none; background:transparent; color:var(--acc); font-size:18px; font-weight:700; line-height:1; display:flex; align-items:center; justify-content:center; cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+.score-step-btn::before { content:''; position:absolute; top:50%; left:50%; width:28px; height:28px; transform:translate(-50%,-50%); z-index:-1; border-radius:8px; border:1px solid color-mix(in srgb, var(--acc) 40%, var(--border)); background:linear-gradient(180deg, color-mix(in srgb, var(--acc) 20%, var(--card)), color-mix(in srgb, var(--acc) 8%, var(--card))); transition:transform .08s, background .15s; }
+.score-step-btn:active { color:#fff; }
+.score-step-btn:active::before { transform:translate(-50%,-50%) scale(.9); background:var(--acc); }
+.score-step-btn:disabled { opacity:.3; }
+.score-step-val { position:relative; width:46px; height:44px; padding:0; border:none; background:transparent; display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--txt); cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+.score-step-val::before, .score-step-val::after { content:''; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); pointer-events:none; }
+.score-step-val.birdie, .score-step-val.eagle { color:var(--success); }
+.score-step-val.bogey, .score-step-val.double-bogey { color:var(--danger); }
+.score-step-val.birdie::before { width:36px; height:36px; border:2px solid currentColor; border-radius:50%; }
+.score-step-val.eagle::before { width:40px; height:40px; border:2px solid currentColor; border-radius:50%; }
+.score-step-val.eagle::after { width:32px; height:32px; border:2px solid currentColor; border-radius:50%; }
+.score-step-val.bogey::before { width:34px; height:34px; border:2px solid currentColor; border-radius:4px; }
+.score-step-val.double-bogey::before { width:40px; height:40px; border:2px solid currentColor; border-radius:5px; }
+.score-step-val.double-bogey::after { width:32px; height:32px; border:2px solid currentColor; border-radius:3px; }
+/* Not yet entered: par, dimmed, underlined. Tap it to take par. */
+.score-step-val.unscored { color:var(--muted); opacity:.55; font-weight:700; }
+.score-step-val.unscored::before { width:22px; bottom:6px; top:auto; transform:translateX(-50%); border-bottom:2px dashed currentColor; }
+.score-step-val.pop { animation:scorePop .22s ease-out; }
+@keyframes scorePop { 0% { transform:scale(.75); } 60% { transform:scale(1.12); } 100% { transform:scale(1); } }
 /* Scorecard double-rule at Front/Back 9 boundary */
 td:nth-child(11), th:nth-child(11) { border-left:3px double var(--muted); }
 .money { color:var(--gold); font-weight:600; font-family:monospace; }
@@ -720,14 +886,73 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '7.18';
+const APP_VERSION = '7.32';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '7.32': [
+    'Behind the scenes: getting ready to bring group accounts to everyone',
+  ],
+  '7.31': [
+    'Invited to a group by email? Sign in and the invitation is waiting on the Home screen \u2014 tap Join',
+  ],
+  '7.30': [
+    'Table View is now called Scorecard',
+    'Fixed: scores scrolling past showed through to the left of the names on the scorecard and junk tables',
+  ],
+  '7.29': [
+    'Course details and tees can now be kept up to date without an app release \u2014 new courses and corrected ratings show up in the course list by themselves',
+  ],
+  '7.28': [
+    'Behind the scenes: an admin page for managing groups, golfers and accounts. Nothing changes in the app',
+  ],
+  '7.27': [
+    'Fixed: the suggested matches said the wrong side \u201cgives\u201d the strokes. They now name who gets them \u2014 e.g. \u201cAndy Donald gets 3\u201d. The strokes in play were always right',
+    'Plus handicaps show as +3, not -3',
+  ],
+  '7.26': [
+    'No Google account? Sign in with an email and password instead \u2014 Sign in, then New account',
+    'Forgot your password? There\u2019s a reset link on the sign-in screen',
+  ],
+  '7.25': [
+    'Groups: start your own from the golfers already on file \u2014 Groups on the Home screen, then New group, and tick who\u2019s in it',
+    'Invite people with a link. They open it, sign in with Google, and tap Join',
+    'Pick who you\u2019re playing with on the Home screen. That group\u2019s golfers come first when you pick players, and the round counts in its standings',
+    'Standings has a tab for each of your groups',
+  ],
+  '7.24': [
+    'Fixed: the hole screen showed HCP 0 for everyone but one player \u2014 it was showing the strokes from the first match, not each player\u2019s handicap. The bets were always right',
+    'Scoring is \u2212 / + buttons again instead of the swipe wheel, and takes less room. Birdies get a circle and bogeys a box, like a paper card',
+    'Names on the scoring screens are shortened to \u201cT. Bryan\u201d so they stop getting cut off',
+    'Setup starts with a choice: new round, join a live round, or past rounds. The course and the tees are now separate screens, and the starting hole is one tap',
+  ],
+  '7.23': [
+    'The suggested matches in setup are smaller and quieter \u2014 lightly tinted instead of solid green and red, with the two sides next to each other, so all three matches fit on one screen',
+  ],
+  '7.22': [
+    'Fixed: the running match cards paid a KP sweep at the turn when one team had won every par 3 so far \u2014 sweeps are for the whole round. Final settlement was never affected',
+  ],
+  '7.21': [
+    'Fixed: the header was cut off once a round started \u2014 7.20 left the app sized to the whole screen after iOS had already moved it below the status bar',
+    'Your group\u2019s names are now listed alphabetically instead of in whatever order they came back in',
+  ],
+  '7.20': [
+    'Fixed: the white shading bleeding down from the top of the screen \u2014 iOS 26 changed how it fills the status bar, and the app no longer draws into it',
+    'The status bar now matches whichever theme you are on, instead of always being black',
+    '\u26a0\ufe0f Delete the home-screen icon and add it again \u2014 an existing install keeps the old status bar',
+  ],
+  '7.19': [
+    'Fixed: Share results failed outright on any round with KP money \u2014 the sweeps and quads breakdown had been calling a function that was not there since 7.11',
+    'Fixed: switching a game\u2019s type to Skins, Wolf or 9-Point did not save or repaint',
+  ],
   '7.18': [
-    'More groundwork for group accounts \u2014 still nothing new on your screen',
+    'The tee panel now names the course it belongs to, and sits in its own bar below the course list instead of scrolling with it',
+    'Fixed: tapping a different course left the previous course\u2019s name on the tee panel',
+    'Fixed: going Back to the course screen quietly re-selected the top of the list \u2014 pressing Next again would have played the wrong course\u2019s stroke allocation',
   ],
   '7.17': [
-    'Groundwork for group accounts \u2014 nothing changes on your screen yet',
+    'Setting up a round is now one question per screen — sign in, course and tees, players, games, teams, stakes, then a review before anything starts',
+    'The tees moved onto the course screen, where the course is chosen — change them there and the handicaps follow',
+    'Teams arrive already arranged, and the old all-in-one setup is still there under Advanced',
   ],
   '7.16': [
     'The tee note now says what it actually does \u2014 it only claims to set handicaps when it can',
@@ -904,9 +1129,170 @@ const CLOUD_ENABLED = IS_BETA || (() => {
     return localStorage.getItem(CLOUD_OPTIN_KEY) === '1';
   } catch (e) { return false; }
 })();
+
+// The redesigned setup flow travels with accounts: beta always, production only
+// on a device that has opted in, until both launch together. A wizard is the
+// one screen where a surprise costs somebody a round rather than a reload.
+const NEW_WIZARD = CLOUD_ENABLED;
+
+/**
+ * Courses: the built-in list (COURSE_DB, plus El Macero's tees in
+ * BB_DEFAULT_COURSE), overridden and extended by the `courses` collection that
+ * the admin page edits.
+ *
+ * Read with ONE plain request to Firestore's REST endpoint, not the Firebase
+ * SDK: courses are public, the rules let anyone read them, and a launch for
+ * someone who never signs in must not cost the 470KB SDK. The result is kept
+ * on the phone, so a course added in the admin page is there offline from the
+ * next launch on, and the built-in list is always the floor underneath it.
+ *
+ * Beta only, like the rest of the cloud: production has no database yet.
+ *
+ * A database course matches a built-in one by name with "CC", "GC", "Golf
+ * Club" and punctuation ignored — so GHIN's "El Macero CC" is the app's "El
+ * Macero" — and keeps the built-in NAME, because saved presets and rounds in
+ * progress refer to it.
+ */
+const Courses = {
+  CACHE_KEY: 'bb-courses-v1',
+  remote: null,          // [{id, name, par, hcp, lat, lng, tees, hidden}] or null before any load
+
+  key(name) {
+    return String(name || '').toLowerCase().replace(/&/g, 'and')
+      .replace(/\b(golf and country club|country club|golf club|golf course|cc|gc)\b/g, '')
+      .replace(/[^a-z0-9]+/g, ' ').trim();
+  },
+
+  /** Firestore REST's typed JSON, into plain values. */
+  decode(v) {
+    if (!v || typeof v !== 'object') return null;
+    if ('stringValue' in v) return v.stringValue;
+    if ('integerValue' in v) return Number(v.integerValue);
+    if ('doubleValue' in v) return Number(v.doubleValue);
+    if ('booleanValue' in v) return v.booleanValue;
+    if ('nullValue' in v) return null;
+    if ('timestampValue' in v) return v.timestampValue;
+    if ('arrayValue' in v) return (v.arrayValue.values || []).map((x) => Courses.decode(x));
+    if ('mapValue' in v) {
+      const o = {};
+      Object.entries(v.mapValue.fields || {}).forEach(([k, x]) => { o[k] = Courses.decode(x); });
+      return o;
+    }
+    return null;
+  },
+
+  /**
+   * One stored course, made safe to play off. Par and stroke index come from
+   * the course, or else from its first men's tee that carries a full set. A
+   * stroke index that is not exactly 1..18 once each is dropped rather than
+   * trusted — it decides every net bet.
+   */
+  clean(id, raw) {
+    const c = raw || {};
+    const valid18 = (a, ok) => Array.isArray(a) && a.length === 18 && a.every(ok);
+    const isSI = (a) => valid18(a, (n) => Number.isInteger(n) && n >= 1 && n <= 18) && new Set(a).size === 18;
+    const isPar = (a) => valid18(a, (n) => Number.isInteger(n) && n >= 3 && n <= 6);
+    const mens = (c.tees || []).filter((t) => t && t.gender !== 'Female' && t.gender !== 'F');
+    const src = mens.filter((t) => isPar(t.parArr) && isSI(t.hcpArr))[0];
+    const par = isPar(c.par) ? c.par.slice() : (src ? src.parArr.slice() : null);
+    const hcp = isSI(c.hcp) ? c.hcp.slice() : (src ? src.hcpArr.slice() : null);
+    // One tee per round and one rating per tee: the app plays men's ratings.
+    const tees = mens.filter((t) => t.name && Number(t.rating) > 0 && Number(t.slope) > 0).map((t) => ({
+      name: String(t.name), yardage: Number(t.yardage) || null, rating: Number(t.rating), slope: Number(t.slope),
+      par: Number(t.par) || (par ? par.reduce((a, b) => a + b, 0) : null),
+    }));
+    return { id, name: String(c.name || id), par, hcp, tees,
+             lat: Number(c.lat) || null, lng: Number(c.lng) || null, hidden: c.hidden === true };
+  },
+
+  loadCache() {
+    try { const j = JSON.parse(localStorage.getItem(this.CACHE_KEY) || 'null'); if (Array.isArray(j)) this.remote = j; } catch (e) {}
+  },
+
+  url() {
+    return 'https://firestore.googleapis.com/v1/projects/' + FIREBASE_CONFIG.projectId +
+      '/databases/(default)/documents/courses?pageSize=300&key=' + FIREBASE_CONFIG.apiKey;
+  },
+
+  /** Fetch in the background. Never throws; offline simply keeps the cache. */
+  async refresh() {
+    if (!CLOUD_ENABLED) return false;
+    try {
+      const r = await fetch(this.url());
+      if (!r.ok) return false;
+      const j = await r.json();
+      const list = (j.documents || []).map((d) => {
+        const fields = {};
+        Object.entries(d.fields || {}).forEach(([k, v]) => { fields[k] = Courses.decode(v); });
+        return Courses.clean(d.name.split('/').pop(), fields);
+      });
+      this.remote = list;
+      try { localStorage.setItem(this.CACHE_KEY, JSON.stringify(list)); } catch (e) {}
+      return true;
+    } catch (e) { return false; }
+  },
+
+  /**
+   * Every playable course: built-in ones, with a database version laid over
+   * any that has one, then database-only ones. Hidden ones are left out.
+   */
+  list() {
+    const remote = (CLOUD_ENABLED && this.remote) || [];
+    const byKey = {};
+    remote.forEach((c) => { byKey[this.key(c.name)] = c; });
+    const out = [], used = {};
+    COURSE_DB.forEach((b) => {
+      const k = this.key(b.name);
+      const r = byKey[k];
+      used[k] = 1;
+      if (r && r.hidden) return;
+      const deflt = k === this.key(BB_DEFAULT_COURSE.name) ? BB_DEFAULT_COURSE.tees : [];
+      out.push({ name: b.name, par: (r && r.par) || b.par, hcp: (r && r.hcp) || b.hcp,
+                 lat: (r && r.lat) || b.lat, lng: (r && r.lng) || b.lng,
+                 tees: r && r.tees.length ? r.tees : JSON.parse(JSON.stringify(deflt)),
+                 source: r ? 'database' : 'built-in' });
+    });
+    remote.forEach((r) => {
+      const k = this.key(r.name);
+      if (used[k] || r.hidden || !r.par || !r.hcp) return;
+      used[k] = 1;
+      out.push({ name: r.name, par: r.par, hcp: r.hcp, lat: r.lat, lng: r.lng, tees: r.tees, source: 'database' });
+    });
+    return out;
+  },
+
+  /**
+   * By exact name. What CHOOSING a course uses: a phone's own preset called
+   * "Del Paso" must stay that preset, not quietly become the listed "Del Paso
+   * CC", whose par and stroke index may differ.
+   */
+  exact(name) {
+    const n = String(name || '').trim().toLowerCase();
+    return n ? this.list().filter((c) => c.name.toLowerCase() === n)[0] || null : null;
+  },
+
+  /**
+   * By exact name, else by the loose match. For things that belong to the
+   * course whatever it is called — its tees, where it is for the weather.
+   */
+  find(name) {
+    const hit = this.exact(name);
+    if (hit) return hit;
+    const k = this.key(name);
+    return k ? this.list().filter((c) => this.key(c.name) === k)[0] || null : null;
+  },
+};
+Courses.loadCache();
+
+// A marker the browser tests assert on, so a test that accidentally loads a
+// DIFFERENT build — the live site, a cached copy — fails loudly instead of
+// passing against code nobody is changing.
+window.BB_BUILD_MARKER = APP_VERSION;
 const CLOUD_SDK = 'https://www.gstatic.com/firebasejs/9.22.0/';
 const CLOUD_REDIRECT_KEY = 'bb-cloud-redirect';
 const CLOUD_DIAG_KEY = 'bb-cloud-diag';
+const CLOUD_ACTIVE_KEY = 'bb-active-group';     // which group this phone is playing with
+const CLOUD_JOIN_KEY = 'bb-pending-join';       // a share link opened before signing in
 
 /**
  * The app's side of the bridge to js/cloud.js.
@@ -919,7 +1305,7 @@ const CLOUD_DIAG_KEY = 'bb-cloud-diag';
  */
 const Cloud = {
   api: null, user: null, userDoc: null, golfer: null,
-  groups: [], invites: [], pool: [], status: '', busy: false, settling: false,
+  groups: [], pools: {}, invites: [], pool: [], status: '', busy: false, settling: false,
   syncing: false,
   _loading: null,
 
@@ -962,7 +1348,7 @@ const Cloud = {
         self.user = user;
         self.settling = false;
         if (user) self.refreshProfile();
-        else { self.userDoc = null; self.golfer = null; self.groups = []; self.invites = []; self.render(); }
+        else { self.userDoc = null; self.golfer = null; self.groups = []; self.pools = {}; self.pool = []; self.invites = []; self.render(); }
       });
       self.api = api;
       return api;
@@ -1025,6 +1411,7 @@ const Cloud = {
   /** Called once at startup. Never throws. */
   async boot() {
     if (!CLOUD_ENABLED) return;
+    this.captureJoinLink();
     // Sign-in is popup-only now, so there is no redirect to finish. The only
     // reason to pay for the SDK on a cold start is an existing session; anything
     // else waits until the account panel is opened.
@@ -1053,6 +1440,76 @@ const Cloud = {
    * and the button stays disabled until it is ready; by the time it can be
    * tapped, `this.api` is already in hand and the popup opens synchronously.
    */
+  // ------------------------------------------------------ email + password
+  /** Firebase's error codes, in words someone on the first tee can act on. */
+  authMessage(e) {
+    const code = String((e && e.code) || (e && e.message) || '');
+    if (/invalid-credential|wrong-password|user-not-found|invalid-login/.test(code))
+      return 'That email and password don\u2019t match. Try again, or reset your password.';
+    if (/email-already-in-use/.test(code))
+      return 'There\u2019s already an account for that email. Sign in instead \u2014 or, if you used Google before, continue with Google.';
+    if (/weak-password/.test(code)) return 'Use a password of at least 6 characters.';
+    if (/invalid-email|missing-email/.test(code)) return 'That doesn\u2019t look like an email address.';
+    if (/missing-password/.test(code)) return 'Put in a password.';
+    if (/too-many-requests/.test(code)) return 'Too many tries. Wait a minute and try again.';
+    if (/network-request-failed/.test(code)) return 'No connection. Try again when you have signal.';
+    return 'That didn\u2019t work (' + code + ').';
+  },
+
+  /** mode: 'in' | 'up'. Resolves true on success; failures come back as a message. */
+  async emailAuth(mode, email, password, name) {
+    if (!this.api || this.busy) return { ok: false, msg: 'Still connecting \u2014 try again in a second.' };
+    this.busy = true; this.render();
+    try {
+      if (mode === 'up') await this.api.signUpWithEmail(email, password, name);
+      else await this.api.signInWithEmail(email, password);
+      this.diag('email ' + mode + ' ok');
+      this.settling = true;
+      return { ok: true };
+    } catch (e) {
+      this.diag('email ' + mode + ' failed ' + (e.code || e.message));
+      return { ok: false, msg: this.authMessage(e) };
+    } finally {
+      this.busy = false; this.render();
+    }
+  },
+
+  async resetPassword(email) {
+    if (!this.api) return { ok: false, msg: 'Still connecting \u2014 try again in a second.' };
+    if (!String(email || '').trim()) return { ok: false, msg: 'Put in your email first.' };
+    try {
+      await this.api.sendPasswordReset(email);
+      // Said the same way whether or not there is an account, which is what
+      // Firebase's enumeration protection does too.
+      return { ok: true, msg: 'If there\u2019s an account for that email, a reset link is on its way.' };
+    } catch (e) { return { ok: false, msg: this.authMessage(e) }; }
+  },
+
+  /** Signed up with a password and not yet clicked the verify link. */
+  needsVerify() {
+    return !!(this.user && this.user.email && this.user.emailVerified === false);
+  },
+
+  async checkVerified(quiet) {
+    if (!this.api || !this.needsVerify()) return;
+    try {
+      const ok = await this.api.refreshVerified();
+      if (ok) {
+        this.user = this.api.currentUser();
+        if (!quiet) Err.toast('Email verified');
+        await this.refreshProfile();
+      } else if (!quiet) {
+        Err.toast('Not verified yet \u2014 tap the link in the email first');
+      }
+    } catch (e) {}
+    this.render();
+  },
+
+  async resendVerify() {
+    try { await this.api.resendVerification(); Err.toast('Sent \u2014 check your email'); }
+    catch (e) { Err.toast(this.authMessage(e)); }
+  },
+
   signIn() {
     if (this.busy || !this.api) return;
     const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -1097,7 +1554,7 @@ const Cloud = {
   async signOut() {
     try { if (this.api) await this.api.signOut(); } catch (e) {}
     this.user = null; this.userDoc = null; this.golfer = null;
-    this.groups = []; this.invites = []; this.status = '';
+    this.groups = []; this.pools = {}; this.pool = []; this.invites = []; this.status = '';
     this.render();
   },
 
@@ -1115,8 +1572,7 @@ const Cloud = {
       step = 'myGolfer';        this.golfer = await this.api.myGolfer();
       step = 'myGroups';        this.groups = await this.api.myGroups();
       step = 'pendingInvites';  this.invites = await this.api.pendingInvites();
-      step = 'groupPool';       this.pool = this.groups.length
-                                  ? await this.api.groupPool(this.groups[0].id) : [];
+      step = 'groupPool';       await this.loadPools();
       this.status = '';
       this.diag('profile ok invites=' + this.invites.length + ' groups=' + this.groups.length);
     } catch (e) {
@@ -1139,11 +1595,152 @@ const Cloud = {
     try {
       const res = await this.api.acceptInvite(id);
       await this.refreshProfile();
-      Err.toast('Joined ' + ((this.groups[0] && this.groups[0].name) || res.groupId));
+      const joined = this.groups.filter((g) => g.id === res.groupId)[0];
+      Err.toast('Joined ' + ((joined && joined.name) || res.groupId));
     } catch (e) {
       this.status = 'Could not join: ' + (e.code || e.message);
     }
     this.busy = false; this.render();
+  },
+
+  // ------------------------------------------------------------------ groups
+  //
+  // A golfer can be in several groups: the directory (everyone this set of
+  // people plays with) and any number of playing groups built from it. The app
+  // loads every group's golfers, keeps one group "active" for the round being
+  // set up, and files the round there.
+
+  /** Every group's golfers, then the combined list the pickers read. */
+  async loadPools() {
+    const entries = await Promise.all(this.groups.map((g) =>
+      this.api.groupPool(g.id).then((p) => [g.id, p]).catch(() => [g.id, []])));
+    this.pools = {};
+    entries.forEach(([id, p]) => { this.pools[id] = p; });
+    this.rebuildPool();
+  },
+
+  /** One entry per golfer, the active group's first. */
+  rebuildPool() {
+    const active = this.activeGroup();
+    const order = this.groups.slice().sort((a, b) =>
+      (active && a.id === active.id ? -1 : 0) - (active && b.id === active.id ? -1 : 0));
+    const seen = {}, out = [];
+    order.forEach((g) => (this.pools[g.id] || []).forEach((x) => {
+      if (seen[x.id]) return;
+      seen[x.id] = 1;
+      out.push(x);
+    }));
+    this.pool = out;
+  },
+
+  isDirectory(g) { return !!g && g.kind !== 'group'; },
+
+  /**
+   * The group being played with. What this phone last chose, if it is still a
+   * member; otherwise its first playing group; otherwise the directory.
+   */
+  activeGroup() {
+    if (!this.groups.length) return null;
+    let id = null;
+    try { id = localStorage.getItem(CLOUD_ACTIVE_KEY); } catch (e) {}
+    return this.groups.filter((g) => g.id === id)[0]
+      || this.groups.filter((g) => !this.isDirectory(g))[0]
+      || this.groups[0];
+  },
+
+  setActiveGroup(id) {
+    try { localStorage.setItem(CLOUD_ACTIVE_KEY, id); } catch (e) {}
+    this.rebuildPool();
+    this.render();
+  },
+
+  /** What the wizard compares to decide whether cloud state has moved. */
+  sig() {
+    if (typeof CLOUD_ENABLED === 'undefined' || !CLOUD_ENABLED) return '';
+    const a = this.activeGroup();
+    return [!!this.user, this.groups.map((g) => g.id + ':' + g.name).join(','), this.pool.length,
+            this.busy, !!this.api, a ? a.id : '', !!this.pendingJoin(), this.needsVerify(),
+            (this.invites || []).length].join('|');
+  },
+
+  /**
+   * A share link is ?group=<id>&code=<code>&name=<name>. It is kept on the
+   * phone rather than acted on, because the person opening it is usually not
+   * signed in yet, and joining needs an account. The Home screen offers it.
+   */
+  captureJoinLink() {
+    try {
+      const q = new URLSearchParams(location.search);
+      const id = q.get('group'), code = q.get('code');
+      if (!id || !code) return;
+      localStorage.setItem(CLOUD_JOIN_KEY, JSON.stringify({ id, code, name: q.get('name') || '' }));
+      q.delete('group'); q.delete('code'); q.delete('name');
+      const rest = q.toString();
+      history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
+    } catch (e) {}
+  },
+
+  pendingJoin() {
+    try {
+      const j = JSON.parse(localStorage.getItem(CLOUD_JOIN_KEY) || 'null');
+      if (!j || !j.id) return null;
+      // Already in it (joined on another device, or twice): nothing to offer.
+      if (this.groups.some((g) => g.id === j.id)) { localStorage.removeItem(CLOUD_JOIN_KEY); return null; }
+      return j;
+    } catch (e) { return null; }
+  },
+
+  dismissJoin() {
+    try { localStorage.removeItem(CLOUD_JOIN_KEY); } catch (e) {}
+    this.render();
+  },
+
+  async joinPending() {
+    const j = this.pendingJoin();
+    if (!j || this.busy || !this.api || !this.user) return;
+    this.busy = true; this.status = 'Joining\u2026'; this.render();
+    try {
+      await this.api.joinGroup(j.id, j.code);
+      try { localStorage.removeItem(CLOUD_JOIN_KEY); localStorage.setItem(CLOUD_ACTIVE_KEY, j.id); } catch (e) {}
+      this.busy = false;
+      await this.refreshProfile();
+      const g = this.groups.filter((x) => x.id === j.id)[0];
+      Err.toast('You\u2019re in ' + ((g && g.name) || j.name || 'the group'));
+    } catch (e) {
+      // A refused join is almost always an old link: the owner reset the code.
+      try { localStorage.removeItem(CLOUD_JOIN_KEY); } catch (e2) {}
+      this.status = /permission/i.test(e.code || e.message || '')
+        ? 'That invite link no longer works. Ask for a new one.'
+        : 'Could not join: ' + (e.code || e.message);
+      Err.toast(this.status);
+    }
+    this.busy = false; this.render();
+  },
+
+  /** Run a group change, then reload so every screen sees it. */
+  async groupChange(fn) {
+    if (!this.api || !this.user) throw new Error('not signed in');
+    this.busy = true; this.render();
+    try {
+      const out = await fn(this.api);
+      this.busy = false;
+      await this.refreshProfile();
+      return out;
+    } catch (e) {
+      Err.toast(e.message || e.code || 'That did not work');
+      throw e;
+    } finally {
+      this.busy = false; this.render();
+    }
+  },
+
+  /** The link that brings someone into a group. Null if this account cannot make one. */
+  async shareLink(groupId) {
+    const code = await this.api.joinCodeFor(groupId);
+    if (!code) return null;
+    const g = this.groups.filter((x) => x.id === groupId)[0];
+    return location.origin + location.pathname + '?group=' + encodeURIComponent(groupId) +
+      '&code=' + encodeURIComponent(code) + '&name=' + encodeURIComponent((g && g.name) || '');
   },
 
   renderDiag(el, esc) {
@@ -1321,7 +1918,8 @@ const Cloud = {
 
     return {
       id: r.id,
-      groupId: this.groups.length ? this.groups[0].id : null,
+      // The group this phone is playing with, so its standings count the round.
+      groupId: (this.activeGroup() || {}).id || null,
       date: r.date,
       courseName: (r.course && r.course.name) || 'Course',
       courseSnapshot: r.course || null,
@@ -1408,10 +2006,13 @@ const Cloud = {
         '<div class="menu-section-title">Account</div>' +
         '<button class="menu-item primary" id="cloudSignIn"' + (ready && !this.busy && !this.settling ? '' : ' disabled') + '>' +
         label + '</button>' +
+        '<button class="menu-item" id="cloudEmailSignIn"' + (ready && !this.busy && !this.settling ? '' : ' disabled') + '>Sign in with email</button>' +
         '<div class="cloud-note">Optional. Signing in saves your rounds and unlocks group stats \u2014 scoring works exactly the same without it.</div>' +
         note;
       const b = document.getElementById('cloudSignIn');
       if (b) b.onclick = () => Cloud.signIn();
+      const eb = document.getElementById('cloudEmailSignIn');
+      if (eb) eb.onclick = () => { UI.closeMenu(); UI.showSignIn('in'); };
       this.renderDiag(el, esc);
       return;
     }
@@ -1420,12 +2021,13 @@ const Cloud = {
     const linked = this.golfer
       ? esc(this.golfer.name) + (this.golfer.currentIndex ? ' \u00b7 ' + esc(this.golfer.currentIndex) : '')
       : 'No golfer linked yet';
+    const act = this.activeGroup();
     const groupLine = this.groups.length
-      ? this.groups.map((g) => esc(g.name)).join(', ')
+      ? 'Playing with ' + esc(act ? act.name : '') + (this.groups.length > 1 ? ' \u00b7 ' + this.groups.length + ' groups' : '')
       : 'No group yet';
 
     const invites = this.invites.map((inv) =>
-      '<div class="cloud-invite">You have been invited to join <b>' + esc(inv.groupId) + '</b>.' +
+      '<div class="cloud-invite">You have been invited to join <b>' + esc(inv.groupName || inv.groupId) + '</b>.' +
       '<br><span style="color:var(--muted);">Joining also links your scores to the record already on file.</span>' +
       '<button data-invite="' + esc(inv.id) + '"' + (this.busy ? ' disabled' : '') + '>Join</button></div>').join('');
 
@@ -1453,7 +2055,14 @@ const Cloud = {
       '<div class="sub">' + esc(this.user.email || '') + '</div>' +
       '<div class="sub" style="margin-top:6px;">' + linked + '</div>' +
       '<div class="sub">' + groupLine + '</div></div>' +
+      (this.needsVerify()
+        ? '<div class="cloud-note"><b>Verify your email.</b> We sent a link to ' + esc(this.user.email) +
+          '. Until it\u2019s tapped, emailed invitations can\u2019t find you (invite links still work).' +
+          '<br><button class="cloud-backup" id="cloudVerified">I\u2019ve done it</button> ' +
+          '<button class="cloud-backup" id="cloudResend">Send it again</button></div>'
+        : '') +
       invites + backup + unlinked + note +
+      '<button class="menu-item" id="cloudGroups">Groups</button>' +
       '<button class="menu-item" id="cloudSignOut">Sign out</button>';
 
     const bk = document.getElementById('cloudBackup');
@@ -1462,6 +2071,12 @@ const Cloud = {
     if (ln) ln.onclick = () => { UI.closeMenu(); UI.showLinkNames(); };
 
     this.renderDiag(el, esc);
+    const cv = document.getElementById('cloudVerified');
+    if (cv) cv.onclick = () => Cloud.checkVerified(false);
+    const cr = document.getElementById('cloudResend');
+    if (cr) cr.onclick = () => Cloud.resendVerify();
+    const grp = document.getElementById('cloudGroups');
+    if (grp) grp.onclick = () => { UI.closeMenu(); UI.showGroups(); };
     const out = document.getElementById('cloudSignOut');
     if (out) out.onclick = () => Cloud.signOut();
     el.querySelectorAll('[data-invite]').forEach((btn) => {
@@ -2060,29 +2675,6 @@ const History = {
     return labels[type] || type;
   },
 
-  /**
-   * The KP bet as its parts: holes won, then each bonus, per player.
-   *
-   * These used to arrive as one figure tagged "(Sweeps!)" — which says a bonus
-   * happened but not what it was worth, and the bonuses are the larger half. A
-   * sweep matches the hole money and a quad matches holes plus sweep, so a
-   * quadded round pays four times what the par 3s did. Reading that as a single
-   * number means the only way to check a settlement is to re-derive the
-   * multipliers by hand, which is how the 7.4 sweeps bug survived as long as it
-   * did.
-   *
-   * Zero parts are dropped so an ordinary round still shows one KP line.
-   */
-  kpParts(src, sz) {
-    const per = (v) => (v || 0) / (sz || 1);
-    const rows = [];
-    const base = per(src.kpBase != null ? src.kpBase : (src.kpValue != null ? src.kpValue : src.kp));
-    if (Math.abs(base) > 0.005) rows.push({ label: 'KP', amount: base });
-    if (Math.abs(per(src.kpSweeps)) > 0.005) rows.push({ label: 'Sweeps', amount: per(src.kpSweeps) });
-    if (Math.abs(per(src.kpQuads)) > 0.005) rows.push({ label: 'Quads', amount: per(src.kpQuads) });
-    return rows;
-  },
-
   show() {
     const rounds = this.load();
     const overlay = document.createElement('div');
@@ -2398,6 +2990,8 @@ const Game = {
    * when they are.
    */
   teesFor(courseName) {
+    const c = Courses.find(courseName);
+    if (c && c.tees && c.tees.length) return JSON.parse(JSON.stringify(c.tees));
     if (courseName === BB_DEFAULT_COURSE.name) {
       return JSON.parse(JSON.stringify(BB_DEFAULT_COURSE.tees));
     }
@@ -2518,6 +3112,31 @@ const Game = {
       for (let j = i + 1; j < rest.length; j++) out.push(match(pair, [rest[i].id, rest[j].id]));
     }
     return out;
+  },
+
+  /**
+   * A handicap as golfers write it: a plus handicap is "+3", not "-3". The
+   * number is stored negative (it gives strokes back), which is right for the
+   * arithmetic and wrong on a screen.
+   */
+  fmtHcp(h) {
+    const n = Number(h) || 0;
+    return n < 0 ? '+' + (-n) : String(n);
+  },
+
+  /**
+   * Who actually receives the strokes in a team-delta match: the highest
+   * handicap on the side with the higher total, exactly as applyHandicapMode
+   * picks him (first one wins a tie). Null when the sides are level.
+   */
+  teamDeltaReceiver(teamA, teamB, hcpOf) {
+    const tot = (t) => (t || []).reduce((s, pid) => s + (hcpOf(pid) || 0), 0);
+    const a = tot(teamA), b = tot(teamB);
+    if (a === b) return null;
+    const side = a > b ? (teamA || []) : (teamB || []);
+    let pid = side[0], best = hcpOf(side[0]) || 0;
+    side.forEach((x) => { if ((hcpOf(x) || 0) > best) { pid = x; best = hcpOf(x) || 0; } });
+    return { pid, strokes: Math.abs(a - b), side: a > b ? 'A' : 'B' };
   },
 
   applyHandicapMode(g) {
@@ -3040,12 +3659,15 @@ const Game = {
       const gross = g.gross[pid] && g.gross[pid][hole];
       return gross != null;
     }));
+    // A sweep is every par 3 of the ROUND. par3s above is only the ones played
+    // so far, so until the last one is reached nobody has swept anything.
+    const allPar3sReached = this.getPar3Holes().every(h => h <= maxHole);
     const totalKPs = teamAKPs + teamBKPs;
     // A dangling carryStack means the last par 3 — or several — were never won
     // by anybody. If nobody won the final KP then nobody won them all, so there
     // is no sweep, and therefore no quads prompt either.
     const allKPsResolved = carryStack === 0;
-    const hasSweeps = anyKPAwarded && totalKPs > 0 && (teamAKPs === 0 || teamBKPs === 0) && allPar3sScored && allKPsResolved;
+    const hasSweeps = anyKPAwarded && totalKPs > 0 && (teamAKPs === 0 || teamBKPs === 0) && allPar3sScored && allPar3sReached && allKPsResolved;
     const sweepsTeam = hasSweeps ? (teamAKPs > 0 ? 'A' : 'B') : null;
 
     let totalKPValue = 0;
@@ -3969,7 +4591,11 @@ const Wizard = {
       if (splash) {
         splash.classList.add('curtain-up');
         setTimeout(() => {
-          this.step = 'course';
+          this.step = NEW_WIZARD ? 'home' : 'course';
+          // The sign-in button opens a popup, which needs a live tap and cannot
+          // wait on a 470KB download (doc 17), so the SDK has to already be on
+          // its way by the time the curtain finishes.
+          if (NEW_WIZARD) Cloud.warm();
           splash.remove();
           // Reset course content positioning
           const overlay = document.getElementById('wizardOverlay');
@@ -3979,7 +4605,9 @@ const Wizard = {
           }
         }, 1400);
       } else {
-        this.step = 'course'; this.render();
+        this.step = NEW_WIZARD ? 'home' : 'course';
+        if (NEW_WIZARD) Cloud.warm();
+        this.render();
       }
     };
     this._splashTimer = setTimeout(advanceSplash, 8500);
@@ -4040,9 +4668,14 @@ const Wizard = {
    * it.
    */
   proposeTeams(validPlayers) {
-    const first = this.data.games[0];
+    // The first TEAM game, not games[0]. With Skins or Wolf in the round the
+    // team game is not first, and arranging sides on a Skins game leaves the
+    // Nassau with nobody on either side — which is what happened the moment a
+    // test turned Nassau off and back on with Skins already on.
+    const teamGames = this.data.games.filter((g) => g.gameType === 'nassau' || g.gameType === 'vegas');
+    const first = teamGames[0];
     if (!first) return;
-    const assigned = this.data.games.some((g) => (g.teamA || []).length || (g.teamB || []).length);
+    const assigned = teamGames.some((g) => (g.teamA || []).length || (g.teamB || []).length);
     if (assigned) return;
 
     const ids = validPlayers.map((p, i) => ({ id: 'p' + (i + 1), name: p.name, handicap: p.handicap || 0 }));
@@ -4062,7 +4695,9 @@ const Wizard = {
 
     // The second and third matches of a five-man round. Nassau only: the other
     // game types are not played as a set of two-man matches.
-    if (first.gameType === 'nassau' && matches.length > 1 && this.data.games.length === 1) {
+    // Counted against the TEAM games, not every game: a round that also has
+    // Skins in it still wants all three Nassau matches.
+    if (first.gameType === 'nassau' && matches.length > 1 && teamGames.length === 1) {
       matches.slice(1).forEach((m) => {
         const g = this.createGameData();
         g.gameType = 'nassau';
@@ -4288,16 +4923,26 @@ const Wizard = {
     let content;
     switch(this.step) {
       case 'splash': content = this.renderSplash(); break;
-      case 'course': content = this.renderCourse(); break;
+      case 'home': content = this.renderHome(); break;
+      case 'course': content = NEW_WIZARD ? this.renderCoursePick() : this.renderCourse(); break;
+      case 'tee': content = this.renderTee(); break;
       case 'courseSetup': content = this.renderCourseSetup(); break;
       case 'players': content = this.renderPlayers(); break;
+      case 'games': content = this.renderGames(); break;
+      case 'teams': content = this.renderTeams(); break;
+      case 'stakes': content = this.renderStakes(); break;
+      case 'review': content = this.renderReview(); break;
       case 'game': content = this.renderGame(); break;
       default: content = document.createElement('div');
     }
 
-    // During splash, pre-render course step behind it so curtain reveals it
+    // During splash, pre-render the NEXT step behind it so the curtain reveals
+    // it. Hardcoding the course screen here meant the new flow advanced its step
+    // to 'home' and then revealed the course anyway — the first screen never
+    // appeared on a real launch, and a test that set the step directly could not
+    // see it.
     if (this.step === 'splash') {
-      const courseContent = this.renderCourse();
+      const courseContent = NEW_WIZARD ? this.renderHome() : this.renderCourse();
       courseContent.style.position = 'absolute';
       courseContent.style.inset = '0';
       courseContent.style.zIndex = '0';
@@ -4461,11 +5106,11 @@ const Wizard = {
       // Build separate lists: user presets first, then DB courses
       const presetCourses = [];
       const dbCourses = [];
-      const dbNames = new Set(COURSE_DB.map(c => c.name));
+      const COURSES = Courses.list();
 
       // User presets (shown at top)
       Object.keys(State.presets || {}).forEach(name => {
-        const dbMatch = COURSE_DB.find(c => c.name === name);
+        const dbMatch = Courses.find(name);
         presetCourses.push({
           name, par: State.presets[name].par, hcp: State.presets[name].hcp,
           distance: (hasLocation && dbMatch) ? haversineMi(userLat, userLng, dbMatch.lat, dbMatch.lng) : null,
@@ -4475,7 +5120,7 @@ const Wizard = {
 
       // DB courses not already in presets
       const presetNames = new Set(Object.keys(State.presets || {}));
-      COURSE_DB.forEach(c => {
+      COURSES.forEach(c => {
         if (!presetNames.has(c.name)) {
           dbCourses.push({
             name: c.name, par: c.par, hcp: c.hcp,
@@ -4557,11 +5202,30 @@ const Wizard = {
       feedbackLink.textContent = "Don\u2019t see your course? Request it here";
       container.appendChild(feedbackLink);
 
-      // Pre-select first course
-      if (firstCard) {
-        firstCard.classList.add('selected');
-        this.data.selectedCourse = firstCard.dataset.course;
-        this.data.selectedSource = firstCard.dataset.source || null;
+      // Pre-select the course already in play, and only fall back to the first
+      // card when there isn't one.
+      //
+      // This used to select the first card unconditionally, every time the list
+      // was built. Coming Back from the player step therefore threw away the
+      // course you had chosen — silently, since the highlight moved back to the
+      // top of the list as if you had never picked anything — and pressing Next
+      // again committed the first card's par and stroke allocation instead of
+      // the one you were playing. Every net bet of the round then settled on the
+      // wrong holes.
+      const want = this.data.selectedCourse || State.data.course.name;
+      const wanted = want
+        ? [...container.querySelectorAll('.wizard-course-card')]
+            .filter((c) => c.dataset.course === want)[0]
+        : null;
+      const pick = wanted || firstCard;
+      if (pick) {
+        pick.classList.add('selected');
+        this.data.selectedCourse = pick.dataset.course;
+        this.data.selectedSource = pick.dataset.source || null;
+        // Bring it into view: on a list of thirty it is otherwise off-screen,
+        // which is how the tee panel came to look like it belonged to whichever
+        // course happened to be scrolled to.
+        if (wanted) setTimeout(() => { try { pick.scrollIntoView({ block: 'nearest' }); } catch (e) {} }, 0);
       }
 
       // Click handlers
@@ -4591,26 +5255,7 @@ const Wizard = {
           this.render();
           return;
         }
-        if (this.data.selectedCourse) {
-          // Check DB first, then presets
-          const dbCourse = COURSE_DB.find(c => c.name === this.data.selectedCourse);
-          if (dbCourse) {
-            State.data.course.par = [...dbCourse.par];
-            State.data.course.hcp = [...dbCourse.hcp];
-            State.data.course.name = dbCourse.name;
-          } else {
-            const preset = State.presets[this.data.selectedCourse];
-            if (preset) {
-              State.data.course.par = [...preset.par];
-              State.data.course.hcp = [...preset.hcp];
-              State.data.course.name = this.data.selectedCourse;
-            }
-          }
-          // The tees belong to the course. Leaving the previous course's
-          // ratings attached would compute every handicap off the wrong slope,
-          // with nothing on screen to say so.
-          Wizard.setCourseTees(State.data.course.name);
-        }
+        this.commitCourse();
         this.step = 'players';
         this.render();
       };
@@ -4741,7 +5386,7 @@ const Wizard = {
           };
         }
 
-        this.step = 'players';
+        this.step = NEW_WIZARD ? 'tee' : 'players';
         this.render();
       };
     }, 0);
@@ -4762,22 +5407,59 @@ const Wizard = {
   },
 
   /**
-   * The tee row on the players step.
+   * The tee row: which tee, at which course.
    *
-   * It sits here rather than on the course screen because this is where the
-   * numbers it produces are visible — change the tee and you watch the
-   * handicaps move. It belongs on the course screen in the redesign.
+   * IT NAMES THE COURSE, and the caller says which course that is. On the
+   * course screen the answer is the card you just tapped — `selectedCourse` —
+   * and NOT `State.data.course.name`, which still holds the previous round's
+   * course until Next commits the choice. Reading the committed name there put
+   * the wrong course's name on the panel: tap Ancil Hoffman and it answered
+   * "No ratings on file for El Macero", naming the course you had just moved
+   * away from. Tees and ratings are per course, so a panel that shows a slope
+   * without saying whose it is can only be read off the nearest thing on
+   * screen — which, in a list of thirty courses, is whatever you scrolled to.
    */
-  teeStrip() {
+  /**
+   * Make the selected course the round's course: par, stroke index, and its
+   * own tees. Next on the course screen is the only thing that commits it.
+   */
+  commitCourse() {
+    const name = this.data.selectedCourse;
+    if (!name || name === '__new__') return;
+    // The course list first (built-in, with the admin page's edits over it),
+    // then this phone's presets.
+    const dbCourse = Courses.exact(name);
+    if (dbCourse) {
+      State.data.course.par = [...dbCourse.par];
+      State.data.course.hcp = [...dbCourse.hcp];
+      State.data.course.name = dbCourse.name;
+    } else {
+      const preset = State.presets[name];
+      if (preset) {
+        State.data.course.par = [...preset.par];
+        State.data.course.hcp = [...preset.hcp];
+        State.data.course.name = name;
+      }
+    }
+    // The tees belong to the course. Leaving the previous course's ratings
+    // attached would compute every handicap off the wrong slope, with nothing
+    // on screen to say so.
+    Wizard.setCourseTees(State.data.course.name);
+  },
+
+  teeStrip(opts) {
+    const o = opts || {};
+    const name = o.courseName || State.data.course.name;
     const tees = (State.data.course.tees) || [];
     const esc = (t) => String(t == null ? '' : t)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const head = '<div class="wiz-tee-course">' + esc(name) + '</div>';
     if (!tees.length) {
-      return '<div class="wiz-tee"><div class="wiz-tee-msg">No ratings on file for ' +
-        esc(State.data.course.name) + ', so handicaps stay as you type them.</div></div>';
+      return '<div class="wiz-tee">' + head + '<div class="wiz-tee-msg">No ratings on file, ' +
+        'so handicaps stay as you type them.</div></div>';
     }
     const cur = Game.selectedTee(State.data.course);
-    return '<div class="wiz-tee">' +
+    return '<div class="wiz-tee">' + head +
       '<div class="wiz-tee-row"><span class="wiz-tee-label">Tees</span>' +
       '<select id="wizardTee" class="wiz-tee-pick">' +
       tees.map((t) => '<option value="' + esc(t.name) + '"' +
@@ -4820,7 +5502,7 @@ const Wizard = {
    * know something the index does not — would be the same quiet wrongness as
    * every other bug this week.
    */
-  retee() {
+  retee(opts) {
     const tee = Game.selectedTee(State.data.course);
     this.data.players.forEach((p) => {
       // Recompute from the index STORED ON THE PLAYER, not by looking the man up
@@ -4832,7 +5514,7 @@ const Wizard = {
       const ch = Game.courseHandicap(p.index, tee);
       if (ch != null) p.handicap = ch;
     });
-    this.render();
+    if (!opts || opts.repaint !== false) this.render();
   },
 
   /**
@@ -4898,25 +5580,48 @@ const Wizard = {
       return ch == null ? lastPlayedOff(g) : ch;
     };
 
-    const out = [], seen = {};
-    if (typeof CLOUD_ENABLED !== 'undefined' && CLOUD_ENABLED && Cloud.user) {
+    const out = [], others = [], seen = {};
+    const cloudOn = typeof CLOUD_ENABLED !== 'undefined' && CLOUD_ENABLED && Cloud.user;
+    const act = cloudOn ? Cloud.activeGroup() : null;
+    if (cloudOn) {
       Cloud.pool.forEach((g) => {
         const k = norm(g.name);
         if (!k || seen[k]) return;
         seen[k] = 1;
         (g.aliases || []).forEach((a) => { const ak = norm(a); if (ak) seen[ak] = 1; });
         const ch = Game.courseHandicap(g.currentIndex, tee);
-        out.push({ name: g.name, index: g.currentIndex || null,
+        // The group being played with comes first; everyone else you can see
+        // (the directory, your other groups) after it, for the odd fill-in.
+        const mine = !act || (g.poolGroupIds || []).indexOf(act.id) !== -1;
+        (mine ? out : others).push({ name: g.name, index: g.currentIndex || null,
                    handicap: ch == null ? lastPlayedOff(g) : ch, fromTee: ch != null });
       });
     }
+    // Sorted, because Cloud.pool arrives in Firestore's document order — which
+    // is neither the order anybody added them nor any order a human can hold in
+    // their head. With eighteen names it reads as random, and finding a man
+    // means scanning the whole list every time.
+    //
+    // Sorted WITHIN the two blocks, not across them: the group still comes
+    // first and guests still come after. Merging them would bury a group member
+    // among one-off visitors, and the group is who is nearly always playing.
+    const byName = (a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' });
+    out.sort(byName);
+    others.sort(byName);
+
+    const guests = [];
     local.forEach((r) => {
       const k = norm(r.name);
       if (!k || seen[k]) return;
       seen[k] = 1;
-      out.push({ name: r.name, index: null, handicap: r.handicap || 0 });
+      guests.push({ name: r.name, index: null, handicap: r.handicap || 0 });
     });
-    return out;
+    guests.sort(byName);
+    // Section labels only when there is more than one section to tell apart.
+    const parts = [[act ? act.name : 'Your group', out], ['Everyone else', others], ['On this phone', guests]]
+      .filter(([, list]) => list.length);
+    if (parts.length > 1) parts.forEach(([label, list]) => list.forEach((r) => { r.section = label; }));
+    return out.concat(others, guests);
   },
 
   /**
@@ -4945,9 +5650,10 @@ const Wizard = {
         esc(Cloud.user.email || '') + '. You are not in a group yet, so only names from this phone are offered.</div></div>';
     }
     const n = Cloud.pool.length;
+    const act = Cloud.activeGroup();
     return '<div class="wiz-cloud"><div class="wiz-cloud-msg">' +
-      (n ? esc(Cloud.groups[0].name) + ' \u2014 ' + n + ' golfer(s) available, with live indexes. Tap a name box to pick one.'
-         : 'Loading ' + esc(Cloud.groups[0].name) + '\u2026') +
+      (n ? esc(act.name) + ' \u2014 ' + n + ' golfer(s) available, with live indexes. Tap a name box to pick one.'
+         : 'Loading ' + esc(act.name) + '\u2026') +
       '</div></div>';
   },
 
@@ -4957,12 +5663,589 @@ const Wizard = {
    * each time would throw away whatever is half-typed in a name box.
    */
   syncCloud() {
-    if (!this.active || this.step !== 'players') return;
-    const sig = (typeof CLOUD_ENABLED !== 'undefined' && CLOUD_ENABLED)
-      ? [!!Cloud.user, Cloud.groups.length, Cloud.pool.length, Cloud.busy, !!Cloud.api].join('|') : '';
+    if (!this.active || (this.step !== 'players' && this.step !== 'home')) return;
+    const sig = Cloud.sig();
     if (sig === this._cloudSig) return;
     this._cloudSig = sig;
     this.render();
+  },
+
+  // ═══════════════════════════════════════════════════════
+  // THE REDESIGNED FLOW (beta) — see NEW_WIZARD
+  // ═══════════════════════════════════════════════════════
+
+  /** Shared chrome so the seven screens cannot drift apart. */
+  wizStep(n) {
+    const total = 7;   // home isn't counted; it is not part of setting up a round
+    let bars = '';
+    for (let i = 1; i <= total; i++) {
+      bars += '<div style="flex:1;height:3px;border-radius:2px;background:' +
+        (i <= n ? 'var(--acc)' : 'var(--border)') + ';"></div>';
+    }
+    return '<div style="display:flex;gap:6px;padding:4px 16px 0;">' + bars + '</div>';
+  },
+
+  wizHead(title, sub) {
+    const esc = (t) => String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return '<div class="wizard-header"><h2>' + esc(title) + '</h2>' +
+      (sub ? '<p>' + esc(sub) + '</p>' : '') + '</div>';
+  },
+
+  wizFoot(nextLabel, opts) {
+    const o = opts || {};
+    return '<div class="wizard-footer">' +
+      (o.back === false ? '' : '<button class="btn secondary" id="wizBack">Back</button>') +
+      '<button class="btn primary" id="wizNext">' + nextLabel + '</button>' +
+      (o.extra || '') + '</div>';
+  },
+
+  /**
+   * Home: the account, and the three things you open the app to do.
+   *
+   * Sign-in used to be a screen of its own, and Join Live and Old Rounds hung
+   * off the bottom of the course list. Starting, joining and looking back are
+   * different errands, so they are the first choice rather than footnotes to
+   * one of them. Signing in is still offered, never required.
+   */
+  renderHome() {
+    const div = document.createElement('div');
+    div.className = 'wizard-screen';
+    const esc = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    // Warm only when this screen is actually the live step. It is also rendered
+    // BEHIND the splash so the curtain has something to reveal, and warming from
+    // there fetches the auth SDK on every launch — breaking the promise that a
+    // launch costs nothing for someone who never signs in. The splash advance
+    // warms instead, which is ~1.4s before the button can be pressed.
+    if (this.step === 'home') Cloud.warm();
+    this._cloudSig = Cloud.sig();
+
+    let account = '';
+    if (CLOUD_ENABLED && Cloud.user) {
+      const nm = Cloud.user.displayName || Cloud.user.email || 'Signed in';
+      account = '<div class="wz-account"><div class="wz-avatar">' + esc(nm.trim().charAt(0).toUpperCase() || '?') + '</div>' +
+        '<div class="wz-account-text"><div class="wz-account-name">' + esc(nm) + '</div>' +
+        '<div class="wz-account-sub">' + (Cloud.groups.length
+          ? Cloud.pool.length + ' golfer(s), with live indexes'
+          : 'Not in a group yet.') + '</div>' +
+        (Cloud.needsVerify()
+          ? '<div class="wz-account-sub" style="margin-top:4px;">Verify your email: tap the link we sent, then ' +
+            '<button class="wz-inline-link" id="wizVerified">I\u2019ve done it</button></div>'
+          : '') + '</div></div>';
+    } else if (CLOUD_ENABLED) {
+      account = '<div class="wz-account"><div class="wz-account-text"><div class="wz-account-name">Not signed in</div>' +
+        '<div class="wz-account-sub">Your group’s golfers, current GHIN indexes and standings.</div></div>' +
+        '<button class="wz-account-btn" id="wizSignIn"' + (Cloud.api && !Cloud.busy ? '' : ' disabled') + '>' +
+        (Cloud.busy ? 'Waiting…' : Cloud.api ? 'Sign in' : 'Preparing…') + '</button></div>';
+    }
+
+    // A share link opened on this phone, waiting to be accepted.
+    const pj = CLOUD_ENABLED ? Cloud.pendingJoin() : null;
+    let groupsHtml = '';
+    if (pj) {
+      groupsHtml += '<div class="wz-join-banner">You\u2019ve been invited to <b>' + esc(pj.name || 'a group') + '</b>.' +
+        (Cloud.user
+          ? '<div class="row2"><button id="wizJoinLater">Not now</button><button class="go" id="wizJoinGroup"' +
+            (Cloud.busy || !Cloud.api ? ' disabled' : '') + '>' + (Cloud.busy ? 'Joining\u2026' : 'Join') + '</button></div>'
+          : '<div style="margin-top:6px;color:var(--muted);font-size:13px;">Sign in above to join.</div>') +
+        '</div>';
+    }
+    // An emailed invitation (made by the seeding tools) waiting for this
+    // account's address. It used to show only in the menu's account panel, so
+    // someone signing in from Home never saw it. Accepting it also links them
+    // to their golfer record, which a share link cannot do.
+    if (CLOUD_ENABLED && Cloud.user && !pj) {
+      const nice = (inv) => inv.groupName ||
+        String(inv.groupId || 'a group').split(/[-_]/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      (Cloud.invites || []).forEach((inv) => {
+        groupsHtml += '<div class="wz-join-banner">You\u2019ve been invited to <b>' + esc(nice(inv)) + '</b>.' +
+          (inv.golferId ? '<div style="margin-top:4px;color:var(--muted);font-size:13px;">Joining links you to your scores already on file.</div>' : '') +
+          '<div class="row2"><button class="go" data-accept="' + esc(inv.id) + '"' + (Cloud.busy ? ' disabled' : '') + '>' +
+          (Cloud.busy ? 'Joining\u2026' : 'Join') + '</button></div></div>';
+      });
+    }
+    // Which group this round is for. Its golfers come first on the players
+    // screen, and the round counts in its standings.
+    if (CLOUD_ENABLED && Cloud.user) {
+      const act = Cloud.activeGroup();
+      groupsHtml += '<div class="wz-groups"><div class="wz-groups-head"><div class="wz-label">' +
+        (Cloud.groups.length ? 'Playing with' : 'Groups') + '</div>' +
+        '<button class="wz-groups-manage" id="wizGroups">' + (Cloud.groups.length ? 'Groups \u203a' : 'Start a group \u203a') + '</button></div>' +
+        (Cloud.groups.length
+          ? '<div class="wz-group-chips">' + Cloud.groups.map((g) =>
+              '<button class="wz-group-chip' + (act && g.id === act.id ? ' on' : '') + '" data-gid="' + esc(g.id) + '">' +
+              esc(g.name) + '</button>').join('') + '</div>'
+          : '') +
+        '</div>';
+    }
+
+    const choice = (id, cls, ico, title, sub) =>
+      '<button class="wz-choice' + (cls ? ' ' + cls : '') + '" id="' + id + '"><span class="wz-ico">' + ico + '</span>' +
+      '<span><b>' + title + '</b><span class="sub">' + sub + '</span></span></button>';
+    const today = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+
+    div.innerHTML = this.wizHead('Let’s play', today) +
+      '<div class="wizard-content">' + account + groupsHtml +
+      choice('wizNewRound', 'primary', '⛳', 'New round', 'Course, tees, who’s playing and for what') +
+      choice('wizJoin', '', '📡', 'Join a live round', 'Follow a round someone else is scoring') +
+      choice('wizHistory', '', '🗂️', 'Past rounds', 'Results and settlements from earlier rounds') +
+      '<button class="wz-link" id="wizSkip">Advanced setup</button>' +
+      '</div>';
+
+    setTimeout(() => {
+      const si = div.querySelector('#wizSignIn');
+      if (si) si.onclick = () => UI.showSignIn('in');
+      const hv = div.querySelector('#wizVerified');
+      if (hv) hv.onclick = () => Cloud.checkVerified(false);
+      div.querySelector('#wizNewRound').onclick = () => { this.step = 'course'; this.render(); };
+      div.querySelector('#wizJoin').onclick = () => {
+        this.active = false;
+        this.removeOverlay();
+        LiveSync.showJoinModal();
+      };
+      div.querySelector('#wizHistory').onclick = () => History.show();
+      div.querySelector('#wizSkip').onclick = () => this.skip();
+      const gm = div.querySelector('#wizGroups');
+      if (gm) gm.onclick = () => UI.showGroups();
+      div.querySelectorAll('.wz-group-chip').forEach((b) => { b.onclick = () => Cloud.setActiveGroup(b.dataset.gid); });
+      const jg = div.querySelector('#wizJoinGroup');
+      if (jg) jg.onclick = () => Cloud.joinPending();
+      const jl = div.querySelector('#wizJoinLater');
+      if (jl) jl.onclick = () => Cloud.dismissJoin();
+      div.querySelectorAll('[data-accept]').forEach((b) => { b.onclick = () => Cloud.acceptInvite(b.dataset.accept); });
+    }, 0);
+    return div;
+  },
+
+  /**
+   * 1 — the course, and only the course.
+   *
+   * The tees used to share this screen, docked under a scrolling list of thirty
+   * courses, and read as belonging to whichever one was scrolled to. They are
+   * on the next screen now, after Next has committed the course, so the tee
+   * panel can only ever be talking about the course you chose.
+   */
+  renderCoursePick() {
+    const div = document.createElement('div');
+    div.className = 'wizard-screen';
+    const esc = (t) => String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const loc = this._courseLoc || null;
+
+    const presetNames = Object.keys(State.presets || {});
+    const ALL = Courses.list();
+    const mine = presetNames.map((name) => {
+      const db = Courses.find(name);
+      return { name, source: 'preset', par: State.presets[name].par,
+               distance: loc && db ? haversineMi(loc.lat, loc.lng, db.lat, db.lng) : null };
+    });
+    const rest = ALL.filter((c) => !presetNames.includes(c.name)).map((c) => ({
+      name: c.name, source: 'db', par: c.par,
+      distance: loc ? haversineMi(loc.lat, loc.lng, c.lat, c.lng) : null,
+    }));
+    if (loc) rest.sort((a, b) => (a.distance ?? 999) - (b.distance ?? 999));
+    else rest.sort((a, b) => a.name.localeCompare(b.name));
+
+    const row = (c) => {
+      const par = (c.par || []).reduce((a, b) => a + b, 0);
+      const meta = [par ? 'Par ' + par : '', c.distance != null ? c.distance.toFixed(1) + ' mi' : ''].filter(Boolean).join(' · ');
+      return '<button class="wz-row" data-course="' + esc(c.name) + '" data-source="' + c.source + '">' +
+        '<span class="tick"></span><span class="nm">' + esc(c.name) + '</span><span class="meta">' + meta + '</span></button>';
+    };
+    const section = (label, items) => items.length
+      ? '<div class="wz-sec"><div class="wz-label">' + label + '</div><div class="wz-list">' + items.map(row).join('') + '</div></div>' : '';
+
+    div.innerHTML = this.wizStep(1) +
+      this.wizHead('Where are we playing?', 'Pick the course. Tees are next.') +
+      '<div class="wizard-content" id="wizardCourseList">' +
+      '<div class="wz-search-row"><input class="wz-search" id="wizCourseSearch" type="search" placeholder="Search courses" autocomplete="off">' +
+      (!loc && navigator.geolocation ? '<button class="wz-chip" id="wizNearby">📍 Nearby</button>' : '') + '</div>' +
+      section('Your courses', mine) +
+      section(loc ? 'Nearest first' : 'All courses', rest) +
+      '<div class="wz-sec wz-new"><div class="wz-label">Not listed?</div><div class="wz-list">' +
+      '<button class="wz-row new" data-course="__new__"><span class="tick"></span><span class="nm">+ Set up a new course</span></button></div></div>' +
+      '<a class="wz-request" target="_blank" rel="noopener" href="https://docs.google.com/forms/d/e/1FAIpQLSd42m1QbKIdydDACKVW5JHOlTDWbRMbloKPMlkW36_8Pzy_6g/viewform">Or ask for it to be added</a>' +
+      '</div>' + this.wizFoot('Next');
+
+    const rows = () => [...div.querySelectorAll('.wz-row')];
+    const select = (el) => {
+      rows().forEach((r) => r.classList.toggle('selected', r === el));
+      this.data.selectedCourse = el ? el.dataset.course : null;
+      this.data.selectedSource = el ? (el.dataset.source || null) : null;
+    };
+    // Pre-select the course already in play. Coming Back used to re-select the
+    // top of the list, and Next then committed the wrong course's stroke index.
+    const want = this.data.selectedCourse || State.data.course.name;
+    const start = rows().find((r) => r.dataset.course === want) || rows()[0];
+    select(start);
+
+    setTimeout(() => {
+      if (start && want) { try { start.scrollIntoView({ block: 'center' }); } catch (e) {} }
+      rows().forEach((r) => { r.onclick = () => select(r); });
+      const search = div.querySelector('#wizCourseSearch');
+      search.oninput = () => {
+        const q = search.value.trim().toLowerCase();
+        div.querySelectorAll('.wz-sec:not(.wz-new)').forEach((sec) => {
+          let shown = 0;
+          sec.querySelectorAll('.wz-row').forEach((r) => {
+            const hit = !q || r.dataset.course.toLowerCase().includes(q);
+            r.style.display = hit ? '' : 'none';
+            if (hit) shown++;
+          });
+          sec.style.display = shown ? '' : 'none';
+        });
+      };
+      const near = div.querySelector('#wizNearby');
+      if (near) near.onclick = () => {
+        near.textContent = 'Locating…'; near.disabled = true;
+        navigator.geolocation.getCurrentPosition(
+          (pos) => { this._courseLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude }; this.render(); },
+          () => { near.textContent = 'No location'; },
+          { timeout: 8000 });
+      };
+      div.querySelector('#wizBack').onclick = () => { this.step = 'home'; this.render(); };
+      div.querySelector('#wizNext').onclick = () => {
+        if (!this.data.selectedCourse) { Err.toast('Pick a course'); return; }
+        if (this.data.selectedCourse === '__new__') { this.step = 'courseSetup'; this.render(); return; }
+        this.commitCourse();
+        this.step = 'tee';
+        this.render();
+      };
+    }, 0);
+    return div;
+  },
+
+  /** 2 — the tees, and the hole you start on. */
+  renderTee() {
+    const div = document.createElement('div');
+    div.className = 'wizard-screen';
+    const esc = (t) => String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const course = State.data.course;
+    const tees = course.tees || [];
+    const cur = Game.selectedTee(course);
+    const startHole = this.data.startingHole || 0;
+
+    // Tees are mostly named for their markers, so show the marker.
+    const SWATCH = { black: '#111', blue: '#2563eb', white: '#f5f5f5', gold: '#d4a017', yellow: '#facc15',
+      red: '#dc2626', green: '#16a34a', silver: '#c0c0c0', orange: '#f97316', purple: '#7c3aed',
+      copper: '#b87333', bronze: '#a97142', tan: '#d2b48c', teal: '#14b8a6' };
+    // "Blue/White Combo" gets half of each.
+    const swatch = (name) => {
+      const c = String(name || '').toLowerCase().split(/[^a-z]+/).filter((x) => SWATCH[x]).map((x) => SWATCH[x]);
+      if (!c.length) return 'transparent';
+      return c.length === 1 ? c[0] : 'linear-gradient(90deg,' + c[0] + ' 50%,' + c[1] + ' 50%)';
+    };
+
+    const teeHtml = tees.length
+      ? '<div class="wz-tees">' + tees.map((t) =>
+          '<button class="wz-tee-btn' + (cur && t.name === cur.name ? ' selected' : '') + '" data-tee="' + esc(t.name) + '">' +
+          '<i class="dot" style="background:' + swatch(t.name) + ';"></i><span><b>' + esc(t.name) + '</b>' +
+          '<small>' + (t.yardage ? esc(t.yardage) + ' yds' : '') + '</small></span></button>').join('') + '</div>' +
+        (cur ? '<div class="wz-caption">' + esc(cur.yardage) + ' yds · ' + esc(cur.rating) + ' / ' + esc(cur.slope) +
+          (this.canDeriveHandicaps()
+            ? ' — course handicaps come off this tee.'
+            : ' — recorded with the round. Handicaps stay as you type them.') + '</div>' : '')
+      : '<div class="wz-note">No ratings on file for ' + esc(course.name) + ', so handicaps stay as you type them.</div>';
+
+    const holeCaption = (n) => n === 0 ? 'Starting on 1.'
+      : n === 9 ? 'Starting on the back nine.'
+      : 'Shotgun start on ' + (n + 1) + '.';
+    let holes = '';
+    for (let i = 0; i < 18; i++) {
+      holes += '<button class="wz-hole' + (i === startHole ? ' selected' : '') + '" data-hole="' + i + '">' + (i + 1) + '</button>';
+    }
+
+    div.innerHTML = this.wizStep(2) +
+      this.wizHead(course.name || 'Tees', 'Which tees, and where you start.') +
+      '<div class="wizard-content">' +
+      '<div class="wz-label" style="margin-top:4px;">Tees</div>' +
+      '<div id="wizTeeSection">' + teeHtml + '</div>' +
+      '<div class="wz-label">Starting hole</div>' +
+      '<div class="wz-holes">' + holes + '</div>' +
+      '<div class="wz-caption" id="wizHoleCaption">' + holeCaption(startHole) + '</div>' +
+      '</div>' + this.wizFoot('Next');
+
+    setTimeout(() => {
+      div.querySelectorAll('.wz-tee-btn').forEach((b) => {
+        b.onclick = () => {
+          State.data.course.teeName = b.dataset.tee;
+          State.scheduleSave();
+          // Re-derive any handicap that came off the old tee. repaint:false
+          // because this screen redraws itself next.
+          Wizard.retee({ repaint: false });
+          this.render();
+        };
+      });
+      div.querySelectorAll('.wz-hole').forEach((b) => {
+        b.onclick = () => {
+          const n = parseInt(b.dataset.hole, 10) || 0;
+          this.data.startingHole = n;
+          div.querySelectorAll('.wz-hole').forEach((x) => x.classList.toggle('selected', x === b));
+          div.querySelector('#wizHoleCaption').textContent = holeCaption(n);
+        };
+      });
+      div.querySelector('#wizBack').onclick = () => { this.step = 'course'; this.render(); };
+      div.querySelector('#wizNext').onclick = () => {
+        State.data.startingHole = this.data.startingHole || 0;
+        this.step = 'players';
+        this.render();
+      };
+    }, 0);
+    return div;
+  },
+
+  /** 4 — what are we playing. */
+  renderGames() {
+    const div = document.createElement('div');
+    div.className = 'wizard-screen';
+    const TYPES = [
+      ['nassau', 'Nassau', 'Front, back, overall \u00b7 team delta'],
+      ['skins', 'Skins', 'Every man for himself, carries over'],
+      ['vegas', 'Vegas', 'Two-man, scores side by side'],
+      ['wolf', 'Wolf', 'Pick a partner off the tee, or go alone'],
+      ['ninepoint', '9-Point', 'Three-ball, nine points a hole'],
+    ];
+    const on = (t) => this.data.games.some((g) => g.gameType === t);
+    const row = ([t, name, blurb]) =>
+      '<div class="wizard-option' + (on(t) ? ' selected' : '') + '" data-type="' + t + '">' +
+      '<div style="flex:1;min-width:0;"><div style="font-size:16px;font-weight:700;">' + name + '</div>' +
+      '<div class="muted" style="font-size:12px;margin-top:2px;">' + blurb + '</div></div>' +
+      '<div style="width:50px;height:30px;border-radius:999px;flex:0 0 auto;display:flex;align-items:center;' +
+      'padding:0 3px;box-sizing:border-box;background:' + (on(t) ? 'var(--acc)' : 'var(--border)') +
+      ';justify-content:' + (on(t) ? 'flex-end' : 'flex-start') + ';">' +
+      '<div style="width:24px;height:24px;border-radius:50%;background:' + (on(t) ? '#fff' : 'var(--muted)') + ';"></div></div></div>';
+
+    div.innerHTML = this.wizStep(4) +
+      this.wizHead('What are we playing?', 'Nassau is on. Add anything else you fancy.') +
+      '<div class="wizard-content">' + TYPES.map(row).join('') +
+      '<div class="note" style="margin-top:12px;line-height:1.5;">Nothing here is remembered against you \u2014 change it any week.</div>' +
+      '</div>' + this.wizFoot('Next');
+
+    setTimeout(() => {
+      div.querySelectorAll('.wizard-option').forEach((el) => {
+        el.onclick = () => { this.toggleGameType(el.dataset.type); this.render(); };
+      });
+      div.querySelector('#wizBack').onclick = () => { this.step = 'players'; this.render(); };
+      div.querySelector('#wizNext').onclick = () => {
+        if (!this.data.games.length) { Err.toast('Pick at least one game'); return; }
+        this.step = this.hasTeamGame() ? 'teams' : 'stakes';
+        this.render();
+      };
+    }, 0);
+    return div;
+  },
+
+  hasTeamGame() {
+    return this.data.games.some((g) => g.gameType === 'nassau' || g.gameType === 'vegas');
+  },
+
+  /**
+   * Add or remove a game type.
+   *
+   * Removing the LAST team game clears the proposed teams too, so that turning
+   * Nassau off and on again re-proposes from the current players rather than
+   * leaving sides arranged for a lineup that has since changed.
+   */
+  toggleGameType(type) {
+    const has = this.data.games.filter((g) => g.gameType === type);
+    if (has.length) {
+      this.data.games = this.data.games.filter((g) => g.gameType !== type);
+    } else {
+      const g = this.createGameData();
+      g.gameType = type;
+      const ids = this.data.players.filter((p) => String(p.name || '').trim()).map((p, i) => 'p' + (i + 1));
+      // Individual games default to everyone in the round, which is what a
+      // four-ball almost always wants and is one less screen to walk.
+      if (type === 'skins') g.skinsPlayers = ids;
+      if (type === 'wolf') { g.wolfPlayers = ids.slice(0, 5); g.wolfTeeOrder = ids.slice(0, 5); }
+      if (type === 'ninepoint') g.ninePointPlayers = ids.slice(0, 3);
+      this.data.games.push(g);
+    }
+    if (this.hasTeamGame()) this.proposeTeams(this.data.players.filter((p) => String(p.name || '').trim()));
+    this.currentGameIndex = 0;
+  },
+
+  /** 5 — teams. */
+  renderTeams() {
+    const div = document.createElement('div');
+    div.className = 'wizard-screen';
+    const esc = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    const team = this.data.games.filter((g) => g.gameType === 'nassau' || g.gameType === 'vegas');
+    const nameOf = (pid) => {
+      const i = parseInt(String(pid).replace('p', ''), 10) - 1;
+      const p = this.data.players[i];
+      return p ? p.name : pid;
+    };
+    const hcpOf = (pid) => {
+      const i = parseInt(String(pid).replace('p', ''), 10) - 1;
+      const p = this.data.players[i];
+      return p ? (p.handicap || 0) : 0;
+    };
+    // Tinted, not filled: a solid green and red block per side was loud, and at
+    // that size three matches ran off the screen. The sides sit next to each
+    // other so all three fit without scrolling.
+    const side = (ids, label, colour) =>
+      '<div style="min-width:0;align-self:stretch;padding:7px 8px;border-radius:8px;border-left:3px solid ' + colour +
+      ';background:color-mix(in srgb, ' + colour + ' 12%, transparent);">' +
+      '<div style="font-size:10px;color:' + colour + ';text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:2px;">' +
+      label + '</div>' +
+      ids.map((pid) => '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;">' +
+        '<div style="font-size:14px;font-weight:600;line-height:1.25;min-width:0;overflow-wrap:anywhere;">' + esc(nameOf(pid)) + '</div>' +
+        '<div class="muted" style="font-size:12px;font-variant-numeric:tabular-nums;">' + Game.fmtHcp(hcpOf(pid)) + '</div></div>').join('') +
+      '</div>';
+
+    const matches = team.map((g, i) => {
+      const a = (g.teamA || []).reduce((t, pid) => t + hcpOf(pid), 0);
+      const b = (g.teamB || []).reduce((t, pid) => t + hcpOf(pid), 0);
+      // The side with the HIGHER total is the one that gets strokes. This line
+      // used to say that side "gives" them — backwards on every match — though
+      // the strokes themselves were always allocated the right way. Under team
+      // delta they all go to one man, so name him.
+      const r = Game.teamDeltaReceiver(g.teamA, g.teamB, hcpOf);
+      const strokes = !r ? 'no strokes'
+        : g.handicapMode === 'team_delta'
+          ? esc(nameOf(r.pid)) + ' gets ' + r.strokes
+          : esc(nameOf((r.side === 'A' ? g.teamA : g.teamB)[0])) + '\u2019s side gets ' + r.strokes;
+      return '<div class="card" style="margin-bottom:8px;padding:9px 10px;">' +
+        (team.length > 1 ? '<div class="muted" style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:5px;">Match ' + (i + 1) + '</div>' : '') +
+        '<div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:5px;">' +
+        side(g.teamA || [], 'Team A', 'var(--success)') +
+        '<div style="font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.5px;">VS</div>' +
+        side(g.teamB || [], 'Team B', 'var(--danger)') +
+        '</div>' +
+        '<div class="muted" style="font-size:11.5px;margin-top:6px;">' + a + ' v ' + b + ' \u00b7 ' + strokes + '</div>' +
+        '</div>';
+    }).join('');
+
+    div.innerHTML = this.wizStep(5) +
+      this.wizHead(team.length > 1 ? 'Three matches' : 'Teams?',
+        team.length > 1 ? 'The pair plays each of the other three.' : 'Low and high together, the way you always do it.') +
+      '<div class="wizard-content">' + matches +
+      '<button class="wizard-add-btn" id="wizPickTeams">Pick teams myself</button>' +
+      '<div class="note" style="margin-top:12px;line-height:1.5;">Lowest handicap with highest. With four that is the only pairing that balances.</div>' +
+      '</div>' + this.wizFoot('Next');
+
+    setTimeout(() => {
+      div.querySelector('#wizPickTeams').onclick = () => { this.step = 'game'; this.render(); };
+      div.querySelector('#wizBack').onclick = () => { this.step = 'games'; this.render(); };
+      div.querySelector('#wizNext').onclick = () => { this.step = 'stakes'; this.render(); };
+    }, 0);
+    return div;
+  },
+
+  /** 6 — money. */
+  renderStakes() {
+    const div = document.createElement('div');
+    div.className = 'wizard-screen';
+    const g = this.data.games[0] || this.createGameData();
+    const nassau = this.data.games.filter((x) => x.gameType === 'nassau')[0];
+    const money = (id, label, val) =>
+      '<div><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:6px;">' +
+      label + '</div><input type="tel" inputmode="numeric" id="' + id + '" value="' + val +
+      '" style="text-align:center;font-size:19px;font-weight:700;"></div>';
+
+    const nassauCard = nassau ? '<div class="card" style="margin-bottom:10px;">' +
+      '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">Nassau</div>' +
+      '<div class="grid grid-3">' +
+      money('wizFront', 'Front', nassau.stakes.front) +
+      money('wizBack', 'Back', nassau.stakes.back) +
+      money('wizOverall', 'Overall', nassau.stakes.overall) +
+      '</div>' +
+      (this.data.games.filter((x) => x.gameType === 'nassau').length > 1
+        ? '<div class="note" style="margin-top:10px;">Applied to all three matches.</div>' : '') +
+      '</div>' : '';
+
+    const junkCard = '<div class="card">' +
+      '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;">' +
+      '<input type="checkbox" id="wizJunk"' + (g.withJunk ? ' checked' : '') + '>' +
+      '<span style="font-weight:700;font-size:15px;">Junk &amp; KP</span></label>' +
+      '<div id="wizJunkVals" style="margin-top:12px;' + (g.withJunk ? '' : 'display:none;') + '">' +
+      '<div class="grid grid-2">' +
+      money('wizJunkFront', 'Front $/pt', g.junkValue.front) +
+      money('wizJunkBack', 'Back $/pt', g.junkValue.back) +
+      '</div>' +
+      '<div class="note" style="margin-top:10px;line-height:1.5;">KPs need gross par. Sweeps and quads ride on top and show as their own lines.</div>' +
+      '</div></div>';
+
+    div.innerHTML = this.wizStep(6) +
+      this.wizHead('Playing for?', 'Last week\u2019s numbers, already filled in.') +
+      '<div class="wizard-content">' + nassauCard + junkCard + '</div>' +
+      this.wizFoot('Next');
+
+    setTimeout(() => {
+      const num = (id) => { const el = div.querySelector('#' + id); return el ? (parseInt(el.value, 10) || 0) : 0; };
+      const apply = () => {
+        this.data.games.forEach((x) => {
+          if (x.gameType === 'nassau') {
+            x.stakes = { front: num('wizFront'), back: num('wizBack'), overall: num('wizOverall') };
+          }
+          x.withJunk = div.querySelector('#wizJunk').checked;
+          x.junkValue = x.withJunk ? { front: num('wizJunkFront'), back: num('wizJunkBack') } : { front: 0, back: 0 };
+        });
+      };
+      div.querySelector('#wizJunk').onchange = (e) => {
+        div.querySelector('#wizJunkVals').style.display = e.target.checked ? '' : 'none';
+      };
+      div.querySelector('#wizBack').onclick = () => { apply(); this.step = this.hasTeamGame() ? 'teams' : 'games'; this.render(); };
+      div.querySelector('#wizNext').onclick = () => { apply(); this.step = 'review'; this.render(); };
+    }, 0);
+    return div;
+  },
+
+  /** 7 — review. Every line taps back to where it was set. */
+  renderReview() {
+    const div = document.createElement('div');
+    div.className = 'wizard-screen';
+    const esc = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    const players = this.data.players.filter((p) => String(p.name || '').trim());
+    const tee = Game.selectedTee(State.data.course);
+    const nassau = this.data.games.filter((x) => x.gameType === 'nassau')[0];
+    const nameOf = (pid) => {
+      const i = parseInt(String(pid).replace('p', ''), 10) - 1;
+      return players[i] ? players[i].name : pid;
+    };
+
+    const row = (step, title, detail) =>
+      '<div class="wizard-course-card" data-step="' + step + '" style="margin-bottom:8px;">' +
+      '<div class="course-head"><h3>' + title + '</h3>' +
+      '<span class="muted" style="font-size:18px;">\u203A</span></div>' +
+      '<p>' + detail + '</p></div>';
+
+    const teamLine = this.data.games.filter((x) => x.gameType === 'nassau' || x.gameType === 'vegas')
+      .map((x) => (x.teamA || []).map(nameOf).join(' + ') + ' vs ' + (x.teamB || []).map(nameOf).join(' + '))
+      .join('<br>');
+
+    div.innerHTML = this.wizStep(7) +
+      this.wizHead('Ready', 'Tap anything to go back and change it.') +
+      '<div class="wizard-content">' +
+      row('course', esc(State.data.course.name) + (tee ? ' \u00b7 ' + esc(tee.name) : ''),
+        (tee ? esc(tee.rating) + ' / ' + esc(tee.slope) + ' \u00b7 ' : '') +
+        'starting on ' + ((State.data.startingHole || 0) + 1)) +
+      row('players', players.length + ' playing',
+        esc(players.map((p) => p.name.split(' ')[0] + ' ' + Game.fmtHcp(p.handicap)).join(' \u00b7 '))) +
+      // History owns the pretty names for game types; Wizard does not have a
+      // gameLabel of its own, and the guarded call that looked like it did was
+      // quietly falling through to the raw type string.
+      row('games', this.data.games.map((x) => History.gameLabel(x.gameType))
+        .filter((v, i, a) => a.indexOf(v) === i).join(', ') || 'No games',
+        teamLine || 'Individual') +
+      (nassau ? row('stakes', '$' + nassau.stakes.front + ' / $' + nassau.stakes.back + ' / $' + nassau.stakes.overall,
+        (nassau.withJunk ? 'Junk &amp; KP at $' + nassau.junkValue.front + ' a point' : 'No junk')) : '') +
+      '<button class="wizard-add-btn" id="wizAdvanced" style="margin-top:14px;">Advanced setup</button>' +
+      '</div>' +
+      '<div class="wizard-footer"><button class="btn secondary" id="wizBack">Back</button>' +
+      '<button class="btn primary" id="wizPlay" style="background:var(--success);border-color:var(--success);font-weight:700;">Play</button></div>';
+
+    setTimeout(() => {
+      div.querySelectorAll('.wizard-course-card').forEach((el) => {
+        el.onclick = () => { this.step = el.dataset.step; this.render(); };
+      });
+      div.querySelector('#wizAdvanced').onclick = () => { this.step = 'game'; this.render(); };
+      div.querySelector('#wizBack').onclick = () => { this.step = 'stakes'; this.render(); };
+      div.querySelector('#wizPlay').onclick = () => this.finish();
+    }, 0);
+    return div;
   },
 
   renderPlayers() {
@@ -4970,8 +6253,7 @@ const Wizard = {
     // the sign-in popup must be opened by a live tap and cannot wait on a 470KB
     // download, so it has to already be warm when the button is pressed.
     if (typeof CLOUD_ENABLED !== 'undefined' && CLOUD_ENABLED) Cloud.warm();
-    this._cloudSig = (typeof CLOUD_ENABLED !== 'undefined' && CLOUD_ENABLED)
-      ? [!!Cloud.user, Cloud.groups.length, Cloud.pool.length, Cloud.busy, !!Cloud.api].join('|') : '';
+    this._cloudSig = Cloud.sig();
 
     const div = document.createElement('div');
     div.className = 'wizard-screen';
@@ -4998,8 +6280,8 @@ const Wizard = {
         </div>
         <div id="wizardPlayersList">${playersHtml}</div>
         ${this.data.players.length < 5 ? '<button class="wizard-add-btn" id="wizardAddPlayer">+ Add Player</button>' : ''}
-        ${this.teeStrip()}
-        ${this.cloudStrip()}
+        ${NEW_WIZARD ? '' : this.teeStrip()}
+        ${NEW_WIZARD ? '' : this.cloudStrip()}
       </div>
       <div class="wizard-footer">
         <button class="btn secondary" id="wizardPlayersBack">Back</button>
@@ -5022,20 +6304,25 @@ const Wizard = {
           !usedNames.includes(r.name.toLowerCase())
         );
         if (!matches.length) { dropdown.style.display = 'none'; return; }
+        let lastSection = null;
         dropdown.innerHTML = matches.map(r => {
+          const head = r.section && r.section !== lastSection
+            ? '<div class="roster-sec">' + r.section.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</div>' : '';
+          lastSection = r.section || lastSection;
           // Two different numbers, never conflated. The index is what GHIN says
           // about the golfer; HCP is what this phone last played them off. A
           // course handicap is derived from the index and the tee, which the app
           // cannot do yet, so neither number is presented as the other.
           const right = r.index != null
             ? '<span style="color:var(--acc);font-size:12px;">Index ' + r.index + '</span>'
-            : '<span style="color:var(--muted);font-size:12px;">HCP ' + (r.handicap || 0) + '</span>';
-          return '<div class="roster-pick" data-name="' + r.name + '" data-hcp="' +
+            : '<span style="color:var(--muted);font-size:12px;">HCP ' + Game.fmtHcp(r.handicap) + '</span>';
+          const row = '<div class="roster-pick" data-name="' + r.name + '" data-hcp="' +
             (r.handicap == null ? '' : r.handicap) +
             '" data-from-tee="' + (r.fromTee ? '1' : '0') +
             '" data-index="' + (r.index == null ? '' : r.index) +
             '" style="padding:10px 12px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
             '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + r.name + '</span>' + right + '</div>';
+          return head + row;
         }).join('');
         dropdown.style.display = 'block';
         dropdown.querySelectorAll('.roster-pick').forEach(pick => {
@@ -5112,12 +6399,12 @@ const Wizard = {
           return;
         }
         this.proposeTeams(validPlayers);
-        this.step = 'game';
+        this.step = NEW_WIZARD ? 'games' : 'game';
         this.render();
       };
 
       document.getElementById('wizardPlayersBack').onclick = () => {
-        this.step = 'course';
+        this.step = NEW_WIZARD ? 'tee' : 'course';
         this.render();
       };
     }, 0);
@@ -5882,7 +7169,9 @@ const Wizard = {
       };
 
       document.getElementById('wizardGameBack').onclick = () => {
-        this.step = 'players';
+        // Reached from Review (Advanced setup) or from Teams (pick teams
+        // myself) on the new flow, so Back belongs there, not two screens back.
+        this.step = NEW_WIZARD ? 'review' : 'players';
         this.render();
       };
     }, 0);
@@ -5896,6 +7185,78 @@ const UI = {
   playerName(id) {
     const p = State.data.players.find(x => x.id === id);
     return p ? p.name : id;
+  },
+
+  /**
+   * "T. Bryan" for the scoring screens, where full names ran out of room.
+   * Settlement and sharing keep full names.
+   *
+   * If two players would come out the same ("B. Smith" twice) both keep their
+   * full first name, so a score can never land against the wrong man. One-word
+   * names are left alone, and a trailing Jr./Sr./II/III stays with the surname.
+   */
+  shortName(id) {
+    const abbrev = (name) => {
+      const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+      if (parts.length < 2) return parts.join(' ');
+      let last = parts.length - 1;
+      if (/^(jr|sr|ii|iii|iv)\.?$/i.test(parts[last]) && last > 1) last--;
+      return parts[0][0].toUpperCase() + '.\u00a0' + parts.slice(last).join(' ');
+    };
+    const p = State.data.players.find(x => x.id === id);
+    if (!p) return id;
+    const mine = abbrev(p.name);
+    const clash = State.data.players.some(x => x.id !== id && abbrev(x.name) === mine);
+    return clash ? p.name : mine;
+  },
+
+  /** A short tick on a score change: vibration on Android, a click on iOS. */
+  scoreTick() {
+    try { if (navigator.vibrate) navigator.vibrate(12); } catch(e){}
+    try {
+      if (!this._audioCtx) this._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = this._audioCtx;
+      if (ctx.state === 'suspended') ctx.resume();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 1800;
+      gain.gain.value = 0.08;
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.03);
+    } catch(e){}
+  },
+
+  /**
+   * The KP bet as its parts: holes won, then each bonus, per player.
+   *
+   * These used to arrive as one figure tagged "(Sweeps!)" — which says a bonus
+   * happened but not what it was worth, and the bonuses are the larger half. A
+   * sweep matches the hole money and a quad matches holes plus sweep, so a
+   * quadded round pays four times what the par 3s did. Reading that as a single
+   * number means the only way to check a settlement is to re-derive the
+   * multipliers by hand, which is how the 7.4 sweeps bug survived as long as it
+   * did.
+   *
+   * Zero parts are dropped so an ordinary round still shows one KP line.
+   *
+   * IT LIVES ON UI, where all six callers are. It was defined on History in
+   * 7.11 — one object too early in the file — so every call to it threw
+   * "UI.kpParts is not a function" from the moment it shipped: both result
+   * panels, the round detail, the text share and the image share. It survived
+   * four releases because nothing exercised a KP breakdown, and the first
+   * person to meet it was Brian sharing a finished round from the course.
+   */
+  kpParts(src, sz) {
+    const per = (v) => (v || 0) / (sz || 1);
+    const rows = [];
+    const base = per(src.kpBase != null ? src.kpBase : (src.kpValue != null ? src.kpValue : src.kp));
+    if (Math.abs(base) > 0.005) rows.push({ label: 'KP', amount: base });
+    if (Math.abs(per(src.kpSweeps)) > 0.005) rows.push({ label: 'Sweeps', amount: per(src.kpSweeps) });
+    if (Math.abs(per(src.kpQuads)) > 0.005) rows.push({ label: 'Quads', amount: per(src.kpQuads) });
+    return rows;
   },
 
   gameLabel(g) {
@@ -5958,122 +7319,6 @@ const UI = {
     }
     // Header always visible now (contains hamburger menu)
     root.appendChild(view);
-    // Wire up drum picker swipe handlers — real-time finger tracking
-    requestAnimationFrame(() => {
-      if (UI._drumHandlers) {
-        const CELL = 52; // px per number cell
-        const DRUM_W = 160; // drum visible width
-        // Haptic + audio feedback on score change
-        let _audioCtx = null;
-        const haptic = () => {
-          // Android vibration
-          try { if (navigator.vibrate) navigator.vibrate(12); } catch(e){}
-          // Audio click for iOS (no vibrate support) — short tick sound
-          try {
-            if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = _audioCtx.createOscillator();
-            const gain = _audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(_audioCtx.destination);
-            osc.frequency.value = 1800;
-            gain.gain.value = 0.08;
-            gain.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.03);
-            osc.start(_audioCtx.currentTime);
-            osc.stop(_audioCtx.currentTime + 0.03);
-          } catch(e){}
-        };
-
-        UI._drumHandlers.forEach(({ drumId, currentScore, setScore, centerIdx }) => {
-          const el = document.getElementById(drumId);
-          if (!el) return;
-          const touchEl = el.querySelector('.score-drum-touch');
-          const track = el.querySelector('.score-drum-track');
-          if (!touchEl || !track) return;
-          let startX = 0, dragging = false, dx = 0;
-          // Base offset: centers the currentScore cell in the drum window
-          const baseOffset = (DRUM_W / 2) - (centerIdx * CELL) - (CELL / 2);
-
-          const updateTrack = (offset) => {
-            track.style.transition = 'none';
-            track.style.transform = `translateX(${offset}px)`;
-          };
-          const snapTrack = (offset) => {
-            track.style.transition = 'transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94)';
-            track.style.transform = `translateX(${offset}px)`;
-          };
-          const commit = (newScore) => {
-            haptic();
-            setScore(newScore);
-          };
-
-          // Touch events — first touch unlocks AudioContext for iOS
-          touchEl.ontouchstart = (e) => {
-            startX = e.touches[0].clientX;
-            dragging = true; dx = 0;
-            track.style.transition = 'none';
-            // Unlock AudioContext on first user gesture (iOS requirement)
-            if (!_audioCtx) { try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){} }
-            else if (_audioCtx.state === 'suspended') { try { _audioCtx.resume(); } catch(e){} }
-          };
-          touchEl.ontouchmove = (e) => {
-            if (!dragging) return;
-            dx = e.touches[0].clientX - startX;
-            // Clamp to one cell in each valid direction
-            const maxDrag = currentScore > MIN_SCORE ? CELL : 0;
-            const minDrag = currentScore < MAX_SCORE ? -CELL : 0;
-            const clamped = Math.max(minDrag, Math.min(maxDrag, dx));
-            updateTrack(baseOffset + clamped);
-            if (Math.abs(dx) > 5) e.preventDefault();
-          };
-          touchEl.ontouchend = () => {
-            if (!dragging) return;
-            dragging = false;
-            const threshold = CELL * 0.3;
-            if (dx < -threshold && currentScore < MAX_SCORE) {
-              snapTrack(baseOffset - CELL);
-              setTimeout(() => commit(currentScore + 1), 180);
-            } else if (dx > threshold && currentScore > MIN_SCORE) {
-              snapTrack(baseOffset + CELL);
-              setTimeout(() => commit(currentScore - 1), 180);
-            } else {
-              snapTrack(baseOffset);
-            }
-          };
-          touchEl.ontouchcancel = () => { dragging = false; snapTrack(baseOffset); };
-
-          // Mouse events for desktop
-          touchEl.onmousedown = (e) => {
-            startX = e.clientX; dragging = true; dx = 0;
-            track.style.transition = 'none';
-            e.preventDefault();
-          };
-          touchEl.onmousemove = (e) => {
-            if (!dragging) return;
-            dx = e.clientX - startX;
-            const maxDrag = currentScore > MIN_SCORE ? CELL : 0;
-            const minDrag = currentScore < MAX_SCORE ? -CELL : 0;
-            const clamped = Math.max(minDrag, Math.min(maxDrag, dx));
-            updateTrack(baseOffset + clamped);
-          };
-          touchEl.onmouseup = () => {
-            if (!dragging) return;
-            dragging = false;
-            const threshold = CELL * 0.3;
-            if (dx < -threshold && currentScore < MAX_SCORE) {
-              snapTrack(baseOffset - CELL);
-              setTimeout(() => commit(currentScore + 1), 180);
-            } else if (dx > threshold && currentScore > MIN_SCORE) {
-              snapTrack(baseOffset + CELL);
-              setTimeout(() => commit(currentScore - 1), 180);
-            } else {
-              snapTrack(baseOffset);
-            }
-          };
-          touchEl.onmouseleave = () => { if (dragging) { dragging = false; snapTrack(baseOffset); } };
-        });
-        UI._drumHandlers = [];
-      }
-    });
     // Bottom nav bar
     let bottomNav = document.getElementById('bottomNav');
     if (!bottomNav) {
@@ -6161,6 +7406,30 @@ const UI = {
     document.body.style.overflow = '';
   },
 
+  /**
+   * Keep the iOS status bar the same colour as the header underneath it.
+   *
+   * With `apple-mobile-web-app-status-bar-style=default` the installed app sits
+   * BELOW an opaque status bar, and iOS fills that bar with `theme-color`. That
+   * meta tag was a hardcoded #000000 written once at load and never touched
+   * again, which was harmless while the app drew under a translucent bar and is
+   * not any more: black over Augusta's green header is a visible seam across
+   * the top of the screen, and on a light theme it is a black stripe.
+   *
+   * Each theme carries a `--status-bar` of its own rather than this trying to
+   * derive one. The header's real background is a repeating gradient over
+   * var(--card), and var(--card) is rgba() on Midnight — there is no single
+   * computed colour to read, and guessing one from a gradient string is the
+   * kind of cleverness that breaks the next time somebody adds a theme.
+   */
+  syncStatusBarColor() {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) return;
+    const c = getComputedStyle(document.documentElement)
+      .getPropertyValue('--status-bar').trim();
+    if (c) meta.setAttribute('content', c);
+  },
+
   initMenu() {
     document.getElementById('menuToggle').onclick = () => this.openMenu();
     document.getElementById('menuClose').onclick = () => this.closeMenu();
@@ -6169,6 +7438,7 @@ const UI = {
     // Theme color scheme (4 themes)
     const savedColorTheme = localStorage.getItem('bunchbets_theme') || 'augusta';
     document.documentElement.dataset.theme = savedColorTheme;
+    this.syncStatusBarColor();
 
     // Highlight active swatch
     const swatches = document.querySelectorAll('.theme-swatch');
@@ -6191,6 +7461,7 @@ const UI = {
         localStorage.setItem('bunchbets_theme', theme);
         gtag('event', 'theme_selected', { theme });
         updateSwatchHighlight(theme);
+        UI.syncStatusBarColor();
       };
     });
 
@@ -6203,9 +7474,13 @@ const UI = {
       document.documentElement.classList.add('light-mode');
       themeToggle.checked = true;
     }
+    // After the light/dark class is settled, not before: --status-bar differs
+    // between the two, and reading it first gives the wrong half of the theme.
+    this.syncStatusBarColor();
     themeToggle.onchange = () => {
       document.documentElement.classList.toggle('light-mode', themeToggle.checked);
       localStorage.setItem('bunchbets-theme', themeToggle.checked ? 'light' : 'dark');
+      UI.syncStatusBarColor();
     };
   },
 
@@ -6242,7 +7517,7 @@ const UI = {
       onchange:(e) => {
         const val = e.target.value;
         // Check DB first, then presets
-        const dbCourse = COURSE_DB.find(c => c.name === val);
+        const dbCourse = Courses.exact(val);
         if (dbCourse) {
           State.data.course.hcp = [...dbCourse.hcp];
           State.data.course.par = [...dbCourse.par];
@@ -6263,7 +7538,7 @@ const UI = {
     });
     // Add DB courses, then user presets (skip duplicates)
     const addedNames = new Set();
-    COURSE_DB.forEach(c => {
+    Courses.list().forEach(c => {
       presetSel.appendChild(h('option', {value:c.name, selected:c.name===State.data.course.name}, c.name));
       addedNames.add(c.name);
     });
@@ -6384,7 +7659,7 @@ const UI = {
         h('div',{class:'row',style:'margin-top:6px;flex-wrap:wrap;gap:8px;'},[
           h('label',{class:'nowrap'},[
             h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='nassau',
-              onchange:()=>{g.gameType='nassau';Game.sanitizeGame(g);State.scheduleSave();State.scheduleRender();}}),
+              onchange:()=>{g.gameType='nassau';Game.sanitize(g);State.scheduleSave();State.scheduleRender();}}),
             ' Nassau'
           ]),
           h('label',{class:'nowrap'},[
@@ -6400,17 +7675,17 @@ const UI = {
           ]),
           h('label',{class:'nowrap'},[
             h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='skins',
-              onchange:()=>{g.gameType='skins';g.withJunk=false;Game.sanitizeGame(g);State.scheduleSave();State.scheduleRender();}}),
+              onchange:()=>{g.gameType='skins';g.withJunk=false;Game.sanitize(g);State.scheduleSave();State.scheduleRender();}}),
             ' Skins'
           ]),
           h('label',{class:'nowrap'},[
             h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='wolf',
-              onchange:()=>{g.gameType='wolf';g.withJunk=false;Game.sanitizeGame(g);State.scheduleSave();State.scheduleRender();}}),
+              onchange:()=>{g.gameType='wolf';g.withJunk=false;Game.sanitize(g);State.scheduleSave();State.scheduleRender();}}),
             ' Wolf'
           ]),
           h('label',{class:'nowrap'},[
             h('input',{type:'radio',name:`type_${g.id}`,checked:g.gameType==='ninepoint',
-              onchange:()=>{g.gameType='ninepoint';g.withJunk=false;Game.sanitizeGame(g);State.scheduleSave();State.scheduleRender();}}),
+              onchange:()=>{g.gameType='ninepoint';g.withJunk=false;Game.sanitize(g);State.scheduleSave();State.scheduleRender();}}),
             ' 9-Point'
           ])
         ])
@@ -6770,7 +8045,7 @@ const UI = {
     const rosterRows = roster.map((entry, i) =>
       h('div',{style:'display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);'},[
         h('span',{style:'flex:1;font-size:14px;'},entry.name),
-        h('span',{class:'muted',style:'font-size:12px;width:50px;text-align:center;'},`HCP ${entry.handicap || 0}`),
+        h('span',{class:'muted',style:'font-size:12px;width:50px;text-align:center;'},`HCP ${Game.fmtHcp(entry.handicap)}`),
         h('button',{style:'background:none;border:none;color:var(--danger);font-size:16px;cursor:pointer;padding:4px 8px;',
           onclick:() => {
             roster.splice(i, 1);
@@ -6910,24 +8185,6 @@ const UI = {
         if (s > 0) strokeDots.push(h('span',{class:`dot g${gi+1}`}));
       });
 
-      const adjustScore = (delta) => {
-        // Re-entering scores clears the "intentionally cleared" flag
-        if (State.data._clearedHoles) delete State.data._clearedHoles[hole];
-        // Mark hole as user-scored so bet computations include it
-        if (!State.data._scoredHoles) State.data._scoredHoles = {};
-        State.data._scoredHoles[hole] = true;
-        let current = gross;
-        if (current == null) current = par;
-        else current += delta;
-        current = Math.max(MIN_SCORE, Math.min(MAX_SCORE, current));
-        // Set score in ALL games that include this player
-        State.data.games.forEach(gm => {
-          if (gm.gross[p.id]) gm.gross[p.id][hole] = current;
-        });
-        State.scheduleSave();
-        State.scheduleRender();
-      };
-
       const setScore = (value) => {
         if (State.data._clearedHoles) delete State.data._clearedHoles[hole];
         // Mark hole as user-scored so bet computations include it
@@ -6937,6 +8194,8 @@ const UI = {
         State.data.games.forEach(gm => {
           if (gm.gross[p.id]) gm.gross[p.id][hole] = clamped;
         });
+        UI.scoreTick();
+        UI._scorePop = `${p.id}-${hole}`;
         State.scheduleSave();
         State.scheduleRender();
       };
@@ -6963,57 +8222,19 @@ const UI = {
         ]);
       }
 
-      // Drum picker — 5 numbers loaded (2 off-screen), 3 visible, center is selected
-      const currentScore = gross != null ? gross : par;
-      const drumNums = [];
-      for (let n = currentScore - 2; n <= currentScore + 2; n++) {
-        if (n >= MIN_SCORE && n <= MAX_SCORE) drumNums.push(n);
-      }
-      const centerIdx = drumNums.indexOf(currentScore);
-      const centerDiff = currentScore - par;
-      let frameClass = 'score-drum-frame';
-      if (centerDiff <= -2) frameClass += ' eagle';
-      else if (centerDiff === -1) frameClass += ' birdie';
-      else if (centerDiff === 1) frameClass += ' bogey';
-      else if (centerDiff >= 2) frameClass += ' double-bogey';
-
-      // Position track so currentScore is centered in the visible window
-      const CELL = 52;
-      const drumCenter = 80; // half of 160px drum width
-      const trackOffset = drumCenter - (centerIdx * CELL) - (CELL / 2);
-      const drumTrack = h('div',{class:'score-drum-track',style:`transform:translateX(${trackOffset}px);`},
-        drumNums.map((n, i) => {
-          const diff = n - par;
-          let cls = 'score-drum-num';
-          if (i === centerIdx) {
-            cls += ' center';
-            if (diff <= -2) cls += ' eagle';
-            else if (diff === -1) cls += ' birdie';
-            else if (diff === 1) cls += ' bogey';
-            else if (diff >= 2) cls += ' double-bogey';
-          }
-          return h('div',{class:cls},String(n));
-        })
-      );
-
-      // Touch overlay for swipe handling
-      const touchOverlay = h('div',{class:'score-drum-touch'});
-      // Wire up swipe after DOM insertion
-      const drumId = `drum-${p.id}-${hole}`;
-      const drum = h('div',{class:'score-drum',id:drumId},[
-        drumTrack,
-        h('div',{class:frameClass}),
-        touchOverlay
-      ]);
-
-      const scoreDrum = h('div',{class:'score-drum-wrap'},[
-        drum,
+      // Score stepper. Holes arrive pre-filled at par but do not count until
+      // somebody touches one (_scoredHoles), so until then every number shows
+      // dimmed: tap it to take the par, or step from par with - / +.
+      const shown = gross != null ? gross : par;
+      const unscored = gross == null || !State.data._scoredHoles[hole];
+      let valCls = 'score-step-val ' + (unscored ? 'unscored' : scoreClass(gross));
+      if (UI._scorePop === `${p.id}-${hole}`) { valCls += ' pop'; UI._scorePop = null; }
+      const scoreDrum = h('div',{class:'score-step'},[
+        h('button',{class:'score-step-btn','aria-label':'One less',disabled:shown<=MIN_SCORE,onclick:()=>setScore(shown-1)},'\u2212'),
+        h('button',{class:valCls,'aria-label':unscored ? `Take ${shown}` : `Score ${shown}`,onclick:()=>{ if (unscored) setScore(shown); }},String(shown)),
+        h('button',{class:'score-step-btn','aria-label':'One more',disabled:shown>=MAX_SCORE,onclick:()=>setScore(shown+1)},'+'),
         junkInline
       ].filter(Boolean));
-
-      // Store swipe handler data for post-render wiring
-      if (!UI._drumHandlers) UI._drumHandlers = [];
-      UI._drumHandlers.push({ drumId, pid: p.id, currentScore, par, hole, setScore, centerIdx });
 
       // Cumulative to-par label (all scored holes)
       let cumDiff = 0, hasAnyScore = false;
@@ -7027,9 +8248,13 @@ const UI = {
 
       return h('div',{class:'hole-player-row'},[
         h('div',{class:'hole-player-info'},[
-          h('div',{class:'hole-player-name'},p.name),
+          h('div',{class:'hole-player-name'},UI.shortName(p.id)),
           h('div',{style:'display:flex;gap:6px;align-items:center;'},[
-            h('span',{class:'hole-player-hcp'},`HCP ${g.strokesCount[p.id]||0}`),
+            // The player's handicap, not strokesCount. strokesCount is what one
+            // game gives him after its handicap mode, and under team_delta that
+            // is 0 for everyone but the high man on the higher side — so this
+            // read 0 for all but one player. The dots beside it show the strokes.
+            h('span',{class:'hole-player-hcp'},`HCP ${Game.fmtHcp(p.handicap)}`),
             strokeDots.length ? h('span',{class:'hole-stroke-dots'},strokeDots) : null,
             vsParLabel
           ].filter(Boolean))
@@ -7045,7 +8270,7 @@ const UI = {
       const hasKP = ranking.length > 0;
       const kpNames = ranking.map(pid => {
         const p = allPlayers.find(pl => pl.id === pid);
-        return p ? p.name : '?';
+        return p ? UI.shortName(p.id) : '?';
       });
 
       kpSection = h('div',{style:'padding:8px 12px;'},[
@@ -7114,8 +8339,8 @@ const UI = {
 
         // Line 1: Game type + team names + total + thru indicator (bold)
         const typeLabel = isNassau ? 'Nassau' : 'Vegas';
-        const aN = (game.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
-        const bN = (game.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
+        const aN = (game.teamA||[]).map(pid => UI.shortName(pid)).join(' & ');
+        const bN = (game.teamB||[]).map(pid => UI.shortName(pid)).join(' & ');
         const totStr = perPlayer !== 0 ? (perPlayer > 0 ? '+' : '') + Utils.fmt(perPlayer) + '/ea' : 'Even';
         lines.push(h('div',{style:'display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:12px;'},[
           h('span',{},[h('b',{},typeLabel), `: ${aN} vs ${bN}`]),
@@ -7165,7 +8390,7 @@ const UI = {
 
         // Each player: name, skins, take
         const playerLines = players.map(pid => {
-          const name = UI.playerName(pid);
+          const name = UI.shortName(pid);
           const skins = mode === 'gross' ? result.grossSkins[pid] :
                         mode === 'net' ? result.netSkins[pid] :
                         (result.grossSkins[pid] + result.netSkins[pid]);
@@ -7207,7 +8432,7 @@ const UI = {
         const playerLines = players.map(pid => {
           const val = (res.playerNet[pid] || 0) + (junkNet[pid] || 0);
           return h('span',{style:'font-size:11px;' + (val > 0 ? 'color:var(--success);' : val < 0 ? 'color:var(--danger);' : '')},
-            `${UI.playerName(pid)}: ${val > 0 ? '+' : ''}${Utils.fmt(val)}`);
+            `${UI.shortName(pid)}: ${val > 0 ? '+' : ''}${Utils.fmt(val)}`);
         });
         return h('div',{class:`${theme} game-status-card`,style:'margin-bottom:4px;'},[
           h('div',{class:'card',style:'padding:6px 10px;'},[
@@ -7232,7 +8457,7 @@ const UI = {
         const playerLines = players.map(pid => {
           const val = (res.playerNet[pid] || 0) + (junkNet[pid] || 0);
           return h('span',{style:'font-size:11px;' + (val > 0 ? 'color:var(--success);' : val < 0 ? 'color:var(--danger);' : '')},
-            `${UI.playerName(pid)}: ${val > 0 ? '+' : ''}${Utils.fmt(val)}`);
+            `${UI.shortName(pid)}: ${val > 0 ? '+' : ''}${Utils.fmt(val)}`);
         });
         return h('div',{class:`${theme} game-status-card`,style:'margin-bottom:4px;'},[
           h('div',{class:'card',style:'padding:6px 10px;'},[
@@ -7260,9 +8485,9 @@ const UI = {
       ]);
     }).filter(Boolean);
 
-    // Column headers — centered above drum and junk controls
+    // Column headers — centered above the score and junk controls
     const colHeaderItems = [
-      h('div',{class:'hole-col-hdr score',style:'width:160px;text-align:center;'},'Score')
+      h('div',{class:'hole-col-hdr score',style:'width:118px;text-align:center;'},'Score')
     ];
     if (g.withJunk) {
       colHeaderItems.push(h('div',{class:'hole-col-hdr junk',style:'width:69px;text-align:center;margin-left:8px;margin-right:2px;'},'Junk'));
@@ -7298,7 +8523,7 @@ const UI = {
       const wolfResult = Game.computeWolfResult(game);
       const detail = wolfResult.holeDetails[hole] || {};
       const wolfPid = detail.wolf || wolfPlayers[hole % wolfPlayers.length];
-      const wolfName = UI.playerName(wolfPid) || '?';
+      const wolfName = UI.shortName(wolfPid) || '?';
       const currentSel = game.wolfSelections[hole] || '';
       const otherPlayers = wolfPlayers.filter(p => p !== wolfPid);
       const setSel = (val) => { game.wolfSelections[hole] = val; State.scheduleSave(); State.scheduleRender(); };
@@ -7307,7 +8532,7 @@ const UI = {
         h('div',{class:'hole-press-btns'},[
           h('button',{class:`hole-press-btn${currentSel===''?' active':''}`,onclick:()=>setSel('')},'?'),
           ...otherPlayers.map(pid => {
-            const name = UI.playerName(pid) || '?';
+            const name = UI.shortName(pid) || '?';
             const abbr = name.length <= 4 ? name : name.slice(0,3);
             return h('button',{class:`hole-press-btn${currentSel===pid?' active':''}`,onclick:()=>setSel(pid)},abbr);
           }),
@@ -7349,10 +8574,10 @@ const UI = {
       clearBtn
     ].filter(Boolean));
 
-    // Toggle bar for switching between hole view and table view
+    // Toggle bar for switching between hole view and the scorecard
     const toggleBar = h('div',{class:'scoring-toggle'},[
       h('button',{class:'scoring-toggle-btn active',onclick:()=>{}},'Hole View'),
-      h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.scoringView='table';State.scheduleRender();}},'Table View'),
+      h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.scoringView='table';State.scheduleRender();}},'Scorecard'),
       h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.scoringView='junk';State.data.tab='scores';State.scheduleRender();}},'Junk')
     ]);
 
@@ -7751,7 +8976,7 @@ const UI = {
     const rows = State.data.players.map((p, ri) => {
       // Ensure gross array exists for this player
       if (!g.gross[p.id]) g.gross[p.id] = Utils.make18(null);
-      const cells = [h('td',{class:'sticky'},p.name)];
+      const cells = [h('td',{class:'sticky'},UI.shortName(p.id))];
       for (let hole = 0; hole < 18; hole++) {
         const tabIdx = (hole * State.data.players.length) + ri + 1;
         const score = g.gross[p.id][hole];
@@ -7885,14 +9110,14 @@ const UI = {
           // Check if all prior holes have selections made - if so, wolf is determined
           const allPriorSelected = Array.from({length: hole}, (_, h) => game.wolfSelections[h]).every(s => s);
           if (allPriorSelected && detail.wolf) {
-            const name = UI.playerName(detail.wolf) || '?';
+            const name = UI.shortName(detail.wolf) || '?';
             displayName = name.length <= 3 ? name : name.slice(0,2);
           } else {
             displayName = 'TBD';
           }
         } else {
           const wolfPid = detail.wolf || wolfPlayers[hole % wolfPlayers.length];
-          const name = UI.playerName(wolfPid) || '?';
+          const name = UI.shortName(wolfPid) || '?';
           displayName = name.length <= 3 ? name : name.slice(0,2);
         }
         wolfNameCells.push(h('td',{style:'font-size:11px;text-align:center;' + (isCatchUp ? 'color:#ca8a04;' : '')},displayName));
@@ -7912,7 +9137,7 @@ const UI = {
         const options = [
           h('option',{value:'',selected:currentSel===''},'?'),
           ...otherPlayers.map(pid => {
-            const name = UI.playerName(pid) || '?';
+            const name = UI.shortName(pid) || '?';
             const abbr = name.length <= 3 ? name : name.slice(0,2);
             return h('option',{value:pid,selected:currentSel===pid},abbr);
           }),
@@ -8004,7 +9229,7 @@ const UI = {
         const totalJunkMoney = Game.computeJunkLadder(game, players).totalJunkMoney;
 
         const playerLines = players.map(pid => {
-          const name = UI.playerName(pid);
+          const name = UI.shortName(pid);
           const skins = mode === 'gross' ? result.grossSkins[pid] :
                         mode === 'net' ? result.netSkins[pid] :
                         (result.grossSkins[pid] + result.netSkins[pid]);
@@ -8039,7 +9264,7 @@ const UI = {
 
         // Build player net $ standings (Wolf + junk pay-up-the-ladder)
         const playerAmts = players.map(pid => {
-          const name = UI.playerName(pid);
+          const name = UI.shortName(pid);
           const abbr = name.length <= 3 ? name : name.slice(0,2);
           const wolfAmt = result.playerNet[pid] || 0;
           const junkAmt = junkNet[pid] || 0;
@@ -8060,7 +9285,7 @@ const UI = {
         const totalJunkMoney9 = __jl.totalJunkMoney;
 
         const playerAmts = players.map(pid => {
-          const name = UI.playerName(pid);
+          const name = UI.shortName(pid);
           const abbr = name.length <= 3 ? name : name.slice(0,2);
           const nineAmt = result.playerNet[pid] || 0;
           const junkAmt = junkNet[pid] || 0;
@@ -8091,8 +9316,8 @@ const UI = {
 
         const perPlayer = isNassau ? result.teamTotals.total / sz : result.totalValue / sz;
         const typeLabel = isNassau ? 'Nassau' : 'Vegas';
-        const aN = (game.teamA||[]).map(pid => UI.playerName(pid)).join(' & ');
-        const bN = (game.teamB||[]).map(pid => UI.playerName(pid)).join(' & ');
+        const aN = (game.teamA||[]).map(pid => UI.shortName(pid)).join(' & ');
+        const bN = (game.teamB||[]).map(pid => UI.shortName(pid)).join(' & ');
         const totStr = perPlayer !== 0 ? (perPlayer > 0 ? '+' : '') + Utils.fmt(perPlayer) + '/ea' : 'Even';
 
         const buildNineLine = (label, betsStr, junkPts, kpNet, dollarPP) => {
@@ -8155,7 +9380,7 @@ const UI = {
 
     const toggleBar = h('div',{class:'scoring-toggle'},[
       h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.scoringView='hole';State.scheduleRender();}},'Hole View'),
-      h('button',{class:'scoring-toggle-btn active',onclick:()=>{}},'Table View'),
+      h('button',{class:'scoring-toggle-btn active',onclick:()=>{}},'Scorecard'),
       h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.scoringView='junk';State.data.tab='scores';State.scheduleRender();}},'Junk')
     ]);
 
@@ -8237,7 +9462,7 @@ const UI = {
       for (let i = 0; i < 18; i++) head.push(h('th',{id:`junk_col_${gi}_${i}`},String(i+1)));
 
       const rows = pids.map((pid,ri) => {
-        const cells = [h('td',{class:'sticky'},UI.playerName(pid))];
+        const cells = [h('td',{class:'sticky'},UI.shortName(pid))];
         for (let hole = 0; hole < 18; hole++) {
           cells.push(h('td',{},[createInput(pid, hole, ri)]));
         }
@@ -8269,7 +9494,7 @@ const UI = {
 
     const toggleBar = h('div',{class:'scoring-toggle'},[
       h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.scoringView='hole';State.data.tab='scores';State.scheduleRender();}},'Hole View'),
-      h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.scoringView='table';State.data.tab='scores';State.scheduleRender();}},'Table View'),
+      h('button',{class:'scoring-toggle-btn',onclick:()=>{State.data.scoringView='table';State.data.tab='scores';State.scheduleRender();}},'Scorecard'),
       h('button',{class:'scoring-toggle-btn active',onclick:()=>{}},'Junk')
     ]);
 
@@ -10465,6 +11690,299 @@ const UI = {
    * about people who never played each other (doc 08 \u00a73). Scoring is just golf
    * and carries no such restriction.
    */
+  /**
+   * Groups: the directory everyone picks from, and the playing groups built
+   * from it. One overlay, four views — the list, a group, adding golfers to it,
+   * and starting a new one. Every change goes through Cloud.groupChange, which
+   * reloads the profile so the Home screen and the pickers follow.
+   */
+  /**
+   * Sign in: Google, or an email and password. The Google button is a direct
+   * tap handler because the popup has to open inside the tap — see
+   * Cloud.signIn. Email sign-in happens entirely in the app, which is why it
+   * is a password and not an emailed link (see js/cloud.js).
+   */
+  showSignIn(mode) {
+    const esc = (t) => String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const old = document.getElementById('signInSheet');
+    if (old) old.remove();
+    Cloud.warm();
+    let tab = mode === 'up' ? 'up' : 'in';
+    const wrap = document.createElement('div');
+    wrap.className = 'kp-modal si-modal';
+    wrap.id = 'signInSheet';
+    document.body.appendChild(wrap);
+    const close = () => wrap.remove();
+    wrap.onclick = (e) => { if (e.target === wrap) close(); };
+
+    const draw = (keep) => {
+      const v = keep || {};
+      wrap.innerHTML = '<div class="kp-modal-content">' +
+        '<h3>Sign in</h3><div class="subtitle">Your group\u2019s golfers, current GHIN indexes and standings. Scoring works without it.</div>' +
+        '<button class="si-google" id="siGoogle"' + (Cloud.api && !Cloud.busy ? '' : ' disabled') + '>' +
+        (Cloud.api ? 'Continue with Google' : 'Preparing\u2026') + '</button>' +
+        '<div class="si-or">or with email</div>' +
+        '<div class="si-tabs"><button class="si-tab' + (tab === 'in' ? ' on' : '') + '" id="siTabIn">Sign in</button>' +
+        '<button class="si-tab' + (tab === 'up' ? ' on' : '') + '" id="siTabUp">New account</button></div>' +
+        (tab === 'up' ? '<input id="siName" placeholder="Your name" autocomplete="name" value="' + esc(v.name) + '">' : '') +
+        '<input id="siEmail" type="email" placeholder="Email" autocomplete="email" autocapitalize="off" value="' + esc(v.email) + '">' +
+        '<input id="siPass" type="password" placeholder="' + (tab === 'up' ? 'Choose a password (6+ characters)' : 'Password') + '" ' +
+        'autocomplete="' + (tab === 'up' ? 'new-password' : 'current-password') + '">' +
+        '<button class="si-go" id="siGo">' + (tab === 'up' ? 'Create account' : 'Sign in') + '</button>' +
+        '<div class="si-msg" id="siMsg"></div>' +
+        '<div class="si-links">' + (tab === 'in' ? '<button id="siForgot">Forgot password?</button>' : '<span></span>') +
+        '<button id="siClose">Not now</button></div></div>';
+
+      const val = (id) => { const el = wrap.querySelector('#' + id); return el ? el.value : ''; };
+      const say = (t, good) => { const m = wrap.querySelector('#siMsg'); m.textContent = t || ''; m.classList.toggle('good', !!good); };
+      const keepNow = () => ({ name: val('siName'), email: val('siEmail') });
+      wrap.querySelector('#siGoogle').onclick = () => { close(); Cloud.signIn(); };
+      wrap.querySelector('#siTabIn').onclick = () => { tab = 'in'; draw(keepNow()); };
+      wrap.querySelector('#siTabUp').onclick = () => { tab = 'up'; draw(keepNow()); };
+      wrap.querySelector('#siClose').onclick = close;
+      const go = wrap.querySelector('#siGo');
+      const submit = async () => {
+        if (tab === 'up' && !val('siName').trim()) { say('Put in your name, as the group knows you.'); return; }
+        go.disabled = true; go.textContent = tab === 'up' ? 'Creating\u2026' : 'Signing in\u2026'; say('');
+        const r = await Cloud.emailAuth(tab, val('siEmail'), val('siPass'), val('siName'));
+        if (r.ok) {
+          close();
+          Err.toast(tab === 'up' ? 'Account made \u2014 check your email to verify it' : 'Signed in');
+          return;
+        }
+        go.disabled = false; go.textContent = tab === 'up' ? 'Create account' : 'Sign in';
+        say(r.msg);
+      };
+      go.onclick = submit;
+      wrap.querySelector('#siPass').onkeydown = (e) => { if (e.key === 'Enter') submit(); };
+      const fg = wrap.querySelector('#siForgot');
+      if (fg) fg.onclick = async () => { const r = await Cloud.resetPassword(val('siEmail')); say(r.msg, r.ok); };
+    };
+    draw();
+    // The SDK may still be arriving; enable the buttons when it does.
+    if (!Cloud.api) {
+      const t = setInterval(() => {
+        if (!document.getElementById('signInSheet')) { clearInterval(t); return; }
+        if (Cloud.api) { clearInterval(t); const g = wrap.querySelector('#siGoogle'); if (g) { g.disabled = false; g.textContent = 'Continue with Google'; } }
+      }, 300);
+    }
+  },
+
+  showGroups(opts) {
+    const esc = (t) => String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const old = document.getElementById('groupsOverlay');
+    if (old) old.remove();
+    const overlay = document.createElement('div');
+    overlay.className = 'history-overlay';
+    overlay.id = 'groupsOverlay';
+    document.body.appendChild(overlay);
+
+    let view = opts && opts.groupId ? { name: 'group', id: opts.groupId } : { name: 'list' };
+    const picked = {};                 // golfer ids ticked on the add / new views
+    const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'en', { sensitivity: 'base' });
+    const groupOf = (id) => Cloud.groups.filter((g) => g.id === id)[0];
+    const go = (v) => { view = v; Object.keys(picked).forEach((k) => delete picked[k]); draw(); };
+
+    const frame = (title, back, body) => {
+      overlay.innerHTML =
+        '<div class="history-header"><button class="history-back" id="grpBack">&larr; ' + back + '</button>' +
+        '<h2>' + esc(title) + '</h2><div style="width:60px;"></div></div>' +
+        '<div class="history-list"><div class="grp-body">' + body + '</div></div>';
+      overlay.querySelector('#grpBack').onclick = () => {
+        if (view.name === 'list') overlay.remove();
+        else if (view.name === 'add') go({ name: 'group', id: view.id });
+        else go({ name: 'list' });
+      };
+    };
+
+    /** A searchable tick-list of golfers. */
+    const checklist = (golfers) =>
+      '<input class="grp-input" id="grpSearch" type="search" placeholder="Search" autocomplete="off">' +
+      (golfers.length
+        ? '<div class="wz-list" id="grpPick">' + golfers.slice().sort(byName).map((g) =>
+            '<button class="wz-row" data-id="' + esc(g.id) + '" data-nm="' + esc(String(g.name).toLowerCase()) + '">' +
+            '<span class="tick"></span><span class="nm">' + esc(g.name) + '</span>' +
+            '<span class="meta">' + (g.currentIndex ? esc(g.currentIndex) : '') + '</span></button>').join('') + '</div>'
+        : '<div class="grp-sub">Nobody else to add.</div>');
+    const wireChecklist = (onChange) => {
+      overlay.querySelectorAll('#grpPick .wz-row').forEach((r) => {
+        r.onclick = () => {
+          if (picked[r.dataset.id]) delete picked[r.dataset.id]; else picked[r.dataset.id] = 1;
+          r.classList.toggle('selected', !!picked[r.dataset.id]);
+          onChange();
+        };
+      });
+      const q = overlay.querySelector('#grpSearch');
+      if (q) q.oninput = () => {
+        const t = q.value.trim().toLowerCase();
+        overlay.querySelectorAll('#grpPick .wz-row').forEach((r) => {
+          r.style.display = !t || r.dataset.nm.indexOf(t) !== -1 ? '' : 'none';
+        });
+      };
+    };
+
+    const draw = () => {
+      if (!CLOUD_ENABLED || !Cloud.user) {
+        frame('Groups', 'Back', '<div class="history-empty">Sign in to see your groups and start new ones.</div>');
+        return;
+      }
+
+      if (view.name === 'list') {
+        const act = Cloud.activeGroup();
+        const rows = Cloud.groups.map((g) => {
+          const n = (Cloud.pools[g.id] || []).length;
+          const meta = (Cloud.isDirectory(g) ? 'Everyone · ' : '') + n + ' golfer' + (n === 1 ? '' : 's') +
+            ' · ' + (g.memberUids || []).length + ' in it';
+          return '<button class="grp-row" data-gid="' + esc(g.id) + '"><span class="nm">' + esc(g.name) + '</span>' +
+            (act && act.id === g.id ? '<span class="grp-badge">Playing</span>' : '<span class="meta">' + meta + '</span>') + '</button>';
+        }).join('');
+        frame('Groups', 'Back',
+          '<div class="grp-sub">A group is who you settle with. Each has its own standings. Build one from ' +
+          'the golfers you already have, then send the others the invite link.</div>' +
+          (rows ? '<div class="wz-list">' + rows + '</div>' : '<div class="grp-sub"><b>You are not in a group yet.</b></div>') +
+          '<button class="btn primary" id="grpNew" style="width:100%;margin-top:14px;padding:12px;font-weight:700;">+ New group</button>');
+        overlay.querySelectorAll('.grp-row').forEach((b) => { b.onclick = () => go({ name: 'group', id: b.dataset.gid }); });
+        overlay.querySelector('#grpNew').onclick = () => go({ name: 'new' });
+        return;
+      }
+
+      if (view.name === 'new') {
+        frame('New group', 'Groups',
+          '<input class="grp-input" id="grpName" placeholder="Name, e.g. Wednesday game" autocomplete="off" maxlength="40">' +
+          '<div class="wz-label">Who’s in it</div>' + checklist(Cloud.pool) +
+          '<button class="btn primary" id="grpCreate" style="width:100%;margin-top:14px;padding:12px;font-weight:700;" disabled>Start group</button>' +
+          '<div class="grp-sub" style="margin-top:10px;">You can add people who aren’t listed on the next screen.</div>');
+        const name = overlay.querySelector('#grpName');
+        const btn = overlay.querySelector('#grpCreate');
+        const sync = () => {
+          const n = Object.keys(picked).length;
+          btn.disabled = !name.value.trim() || Cloud.busy;
+          btn.textContent = 'Start group' + (n ? ' with ' + n : '');
+        };
+        name.oninput = sync;
+        wireChecklist(sync);
+        btn.onclick = async () => {
+          btn.disabled = true; btn.textContent = 'Starting…';
+          try {
+            const id = await Cloud.groupChange((api) => api.createGroup(name.value, Object.keys(picked)));
+            Cloud.setActiveGroup(id);
+            go({ name: 'group', id });
+          } catch (e) { sync(); }
+        };
+        return;
+      }
+
+      const g = groupOf(view.id);
+      if (!g) { go({ name: 'list' }); return; }
+      const dir = Cloud.isDirectory(g);
+      const mine = g.ownerUid === (Cloud.user && Cloud.user.uid);
+      const pool = (Cloud.pools[g.id] || []).slice().sort(byName);
+
+      if (view.name === 'add') {
+        const inIt = {};
+        pool.forEach((x) => { inIt[x.id] = 1; });
+        const dirs = Cloud.groups.filter((x) => Cloud.isDirectory(x) && x.id !== g.id);
+        frame('Add golfers', 'Back',
+          '<div class="wz-label" style="margin-top:0;">Already on file</div>' +
+          checklist(Cloud.pool.filter((x) => !inIt[x.id])) +
+          '<button class="btn primary" id="grpAdd" style="width:100%;margin-top:12px;padding:12px;font-weight:700;" disabled>Add</button>' +
+          '<div class="wz-label">Someone new</div>' +
+          '<div class="grp-new"><input class="grp-input full" id="grpNewName" placeholder="Full name" autocomplete="off">' +
+          '<input class="grp-input" id="grpNewGhin" placeholder="GHIN # (optional)" inputmode="numeric">' +
+          '<input class="grp-input" id="grpNewIdx" placeholder="Index (optional)" inputmode="decimal"></div>' +
+          '<button class="btn" id="grpCreateGolfer" style="width:100%;margin-top:8px;padding:11px;font-weight:700;">Add new golfer</button>' +
+          (dirs.length ? '<div class="grp-sub" style="margin-top:10px;">New golfers also go into ' +
+            dirs.map((d) => esc(d.name)).join(', ') + ', so everyone can pick them.</div>' : ''));
+        const add = overlay.querySelector('#grpAdd');
+        const sync = () => {
+          const n = Object.keys(picked).length;
+          add.disabled = !n || Cloud.busy;
+          add.textContent = n ? 'Add ' + n : 'Add';
+        };
+        wireChecklist(sync);
+        add.onclick = async () => {
+          add.disabled = true; add.textContent = 'Adding…';
+          try {
+            await Cloud.groupChange((api) => api.addToGroup(g.id, Object.keys(picked)));
+            go({ name: 'group', id: g.id });
+          } catch (e) { sync(); }
+        };
+        overlay.querySelector('#grpCreateGolfer').onclick = async () => {
+          const nm = overlay.querySelector('#grpNewName').value.trim();
+          if (!nm) { Err.toast('Put in a name'); return; }
+          const ghin = overlay.querySelector('#grpNewGhin').value.trim();
+          const idx = overlay.querySelector('#grpNewIdx').value.trim();
+          try {
+            await Cloud.groupChange((api) => api.createGolfer({ name: nm, ghinNumber: ghin || null, currentIndex: idx || null },
+              [g.id].concat(dirs.map((d) => d.id))));
+            Err.toast(nm + ' added');
+            go({ name: 'group', id: g.id });
+          } catch (e) {}
+        };
+        return;
+      }
+
+      // view: one group
+      const act = Cloud.activeGroup();
+      const rows = pool.map((x) =>
+        '<div class="grp-row" style="cursor:default;"><span class="nm">' + esc(x.name) + '</span>' +
+        '<span class="meta">' + (x.currentIndex ? esc(x.currentIndex) : '') + '</span>' +
+        (dir ? '' : '<button class="x" data-rm="' + esc(x.id) + '" aria-label="Take ' + esc(x.name) + ' out">×</button>') +
+        '</div>').join('');
+      frame(g.name, 'Groups',
+        '<div class="grp-sub">' + (dir ? 'Everyone you play with. Groups are built from this list.<br>' : '') +
+        pool.length + ' golfer' + (pool.length === 1 ? '' : 's') + ' · ' + (g.memberUids || []).length +
+        ' with the app' + (mine ? ' · you run it' : '') +
+        (act && act.id === g.id ? '<br><b>You’re playing with this group.</b>' : '') + '</div>' +
+        '<div class="grp-actions">' +
+        (act && act.id === g.id ? '' : '<button class="btn" id="grpPlay">Play with this group</button>') +
+        '<button class="btn primary" id="grpInvite">Invite people</button></div>' +
+        '<div class="wz-label">Golfers</div>' +
+        (rows ? '<div class="wz-list">' + rows + '</div>' : '<div class="grp-sub">Nobody yet.</div>') +
+        '<button class="btn" id="grpAddBtn" style="width:100%;margin-top:10px;padding:11px;font-weight:700;">+ Add golfers</button>' +
+        (mine ? '<button class="grp-link" id="grpReset">Stop old invite links working</button>'
+              : '<button class="grp-link danger" id="grpLeave">Leave this group</button>'));
+
+      const play = overlay.querySelector('#grpPlay');
+      if (play) play.onclick = () => { Cloud.setActiveGroup(g.id); draw(); };
+      overlay.querySelector('#grpAddBtn').onclick = () => go({ name: 'add', id: g.id });
+      overlay.querySelector('#grpInvite').onclick = async () => {
+        let url = null;
+        try { url = await Cloud.shareLink(g.id); } catch (e) {}
+        if (!url) {
+          Err.toast(dir ? 'Only whoever runs ' + g.name + ' can invite people to it' : 'Could not make a link');
+          return;
+        }
+        const text = 'Join ' + g.name + ' on Bunch Bets: open this, sign in with Google, and you’re in.';
+        try {
+          if (navigator.share) { await navigator.share({ title: g.name, text, url }); return; }
+        } catch (e) { if (e && e.name === 'AbortError') return; }
+        try { await navigator.clipboard.writeText(url); Err.toast('Invite link copied'); }
+        catch (e) { window.prompt('Copy this link and send it:', url); }
+      };
+      overlay.querySelectorAll('[data-rm]').forEach((b) => {
+        b.onclick = async () => {
+          const who = pool.filter((x) => x.id === b.dataset.rm)[0];
+          if (!confirm('Take ' + (who ? who.name : 'them') + ' out of ' + g.name + '? Their past rounds stay.')) return;
+          try { await Cloud.groupChange((api) => api.removeFromGroup(g.id, b.dataset.rm)); draw(); } catch (e) {}
+        };
+      });
+      const reset = overlay.querySelector('#grpReset');
+      if (reset) reset.onclick = async () => {
+        if (!confirm('Every invite link sent so far will stop working. People already in stay in.')) return;
+        try { await Cloud.groupChange((api) => api.resetJoinCode(g.id)); Err.toast('Old links no longer work'); } catch (e) {}
+      };
+      const leave = overlay.querySelector('#grpLeave');
+      if (leave) leave.onclick = async () => {
+        if (!confirm('Leave ' + g.name + '? You can rejoin with an invite link.')) return;
+        try { await Cloud.groupChange((api) => api.leaveGroup(g.id)); go({ name: 'list' }); } catch (e) {}
+      };
+    };
+    draw();
+  },
+
   async showStandings() {
     const esc = (t) => String(t == null ? '' : t)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -10487,7 +12005,20 @@ const UI = {
     if (!Cloud.api)      { msg('Still connecting\u2026 give it a second and try again.'); return; }
     if (!Cloud.groups.length) { msg('You are not in a group yet.<br><br>A group is what makes money add up \u2014 it is the set of people who actually settle with each other.'); return; }
 
-    const group = Cloud.groups[0];
+    const group = Cloud.activeGroup();
+    // Each group is its own table. Switching here also switches the group this
+    // phone plays with, which is nearly always what someone checking it wants.
+    if (Cloud.groups.length > 1) {
+      const bar = document.createElement('div');
+      bar.className = 'wz-group-chips';
+      bar.style.cssText = 'padding:10px 12px 0;flex-shrink:0;';
+      bar.innerHTML = Cloud.groups.map((g) => '<button class="wz-group-chip' + (g.id === group.id ? ' on' : '') +
+        '" data-gid="' + esc(g.id) + '">' + esc(g.name) + '</button>').join('');
+      body.parentNode.insertBefore(bar, body);
+      bar.querySelectorAll('.wz-group-chip').forEach((b) => {
+        b.onclick = () => { Cloud.setActiveGroup(b.dataset.gid); overlay.remove(); UI.showStandings(); };
+      });
+    }
     msg('Loading ' + esc(group.name) + '\u2026');
 
     let rounds = [];
@@ -10736,6 +12267,11 @@ State.data.games = State.data.games.map(Game.sanitize);
 
 document.getElementById('historyMenuBtn').onclick = () => { UI.closeMenu(); History.show(); };
 document.getElementById('comboMenuBtn').onclick = () => { UI.closeMenu(); UI.showComboCalc(State.data, null); };
+// Coming back from Mail or Safari after tapping the verify link.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && typeof Cloud !== 'undefined' && Cloud.needsVerify()) Cloud.checkVerified(true);
+});
+
 document.getElementById('standingsMenuBtn').onclick = () => { UI.closeMenu(); UI.showStandings(); };
 
 // Accounts opt-in from INSIDE the app, for production. ?cloud=1 alone is not
@@ -10770,7 +12306,7 @@ document.getElementById('standingsMenuBtn').onclick = () => { UI.closeMenu(); UI
 // alternative is stubbing Firestore at the network layer, which would mean a
 // leaderboard test that mostly tests Firestore — slower, and it would pass or
 // fail for reasons that have nothing to do with the arithmetic on screen.
-if (window._bbDev) window._bb = { Cloud, UI, State, History, Game, Wizard };
+if (window._bbDev) window._bb = { Cloud, UI, State, History, Game, Wizard, NEW_WIZARD, Courses };
 
 /**
  * Tapping a number field clears it, showing the old value ghosted behind, so
@@ -10933,6 +12469,13 @@ let joiningViaUrl = false;
 UI.render();
 UI.initMenu();
 Cloud.boot();   // never throws; resolves to a no-op when signed out or offline
+// Course edits from the admin page. Background, never blocks; the cache and the
+// built-in list cover offline. A course screen already open is redrawn so a
+// first-ever launch picks them up without a restart.
+Courses.refresh().then((changed) => {
+  if (changed && typeof Wizard !== 'undefined' && Wizard.active && Wizard.step === 'course' &&
+      !(document.getElementById('wizCourseSearch') || {}).value) Wizard.render();
+});
 
 // === WHAT'S NEW / VERSION CHECK ===
 
@@ -10968,7 +12511,11 @@ function showWhatsNew() {
   // Older version — collect all notes the user hasn't seen
   const allNotes = [];
   Object.keys(RELEASE_NOTES).sort(cmpVersion).forEach(v => {
-    if (cmpVersion(v, storedVersion) > 0) allNotes.push(...RELEASE_NOTES[v]);
+    if (cmpVersion(v, storedVersion) <= 0) return;
+    // Notes after 7.16 describe beta features. A production device that has not
+    // opted in has none of them, so it hears only about the current version.
+    if (!CLOUD_ENABLED && cmpVersion(v, '7.16') > 0 && v !== APP_VERSION) return;
+    allNotes.push(...RELEASE_NOTES[v]);
   });
   if (!allNotes.length) {
     localStorage.setItem(VERSION_KEY, APP_VERSION);
@@ -11127,12 +12674,7 @@ window.addEventListener('appinstalled', () => {
     // Match course name to COURSE_DB — fuzzy: "El Macero" matches "El Macero CC"
     const courseName = State.data && State.data.course && State.data.course.name;
     let dbCourse = null;
-    if (courseName && typeof COURSE_DB !== 'undefined') {
-      const lower = courseName.toLowerCase();
-      dbCourse = COURSE_DB.find(c => c.name.toLowerCase() === lower)
-        || COURSE_DB.find(c => c.name.toLowerCase().startsWith(lower))
-        || COURSE_DB.find(c => lower.startsWith(c.name.toLowerCase().replace(/ cc$| gc$| golf club$/,'')));
-    }
+    if (courseName && typeof Courses !== 'undefined') dbCourse = Courses.find(courseName);
     if (dbCourse && dbCourse.lat && dbCourse.lng) {
       fetchWeather(dbCourse.lat, dbCourse.lng);
     } else {

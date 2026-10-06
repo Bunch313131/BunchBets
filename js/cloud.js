@@ -61,6 +61,21 @@ function clean(obj) {
 
 const golferIdForGhin = (ghin) => `ghin:${String(ghin).replace(/\D/g, '')}`;
 
+/** An unguessable code for a group's share link. Knowing it is the grant. */
+function randomCode(len = 12) {
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  const buf = new Uint32Array(len);
+  crypto.getRandomValues(buf);
+  return Array.from(buf, (n) => chars[n % chars.length]).join('');
+}
+
+/**
+ * A group from before groups had a kind is the DIRECTORY: everyone this set of
+ * people plays with. Playing groups — the Wednesday game, the Saturday money
+ * game — are built from it and carry kind 'group'.
+ */
+const isDirectory = (group) => (group && group.kind) !== 'group';
+
 /**
  * A handicap index from GHIN is a STRING and is not always a number: "NH" means
  * no established handicap, and plus handicaps arrive as "+2.8". Both appear in
@@ -78,6 +93,7 @@ function parseIndex(value) {
 BB.cloud = {
   golferIdForGhin,
   parseIndex,
+  isDirectory,
 
   /** @param {object} config Firebase web config. @param {object} [opts] {emulator:{authUrl,firestoreHost,firestorePort}} */
   init(config, opts = {}) {
@@ -144,6 +160,63 @@ BB.cloud = {
     return res;
   },
 
+  // --------------------------------------------------------- email + password
+  //
+  // Not everyone has a Google account. Email-LINK sign-in was ruled out: on an
+  // iPhone the emailed link opens in Safari, which has its own storage, so the
+  // person ends up signed in to Safari and still signed out of the home-screen
+  // app. A password is typed into the app itself, so the session lands where
+  // it is used. The two emails Firebase sends — verify, and reset — only
+  // change state on the server, so it does not matter where they are opened.
+
+  /** New account: create it, name it, and send the verify-your-email mail. */
+  async signUpWithEmail(email, password, name) {
+    assertReady();
+    const cred = await state.auth.createUserWithEmailAndPassword(String(email || '').trim(), password);
+    const nm = String(name || '').trim();
+    if (nm) {
+      await cred.user.updateProfile({ displayName: nm });
+      // onAuthStateChanged has usually made the user doc already, before the
+      // name was set, so put the name there too.
+      try {
+        await BB.cloud.ensureUserDoc();
+        await state.db.doc(`users/${cred.user.uid}`).update({ displayName: nm });
+      } catch (e) { /* offline: the name is on the auth profile regardless */ }
+    }
+    try { await cred.user.sendEmailVerification(); } catch (e) { /* can be resent */ }
+    return cred.user;
+  },
+
+  async signInWithEmail(email, password) {
+    assertReady();
+    return (await state.auth.signInWithEmailAndPassword(String(email || '').trim(), password)).user;
+  },
+
+  async sendPasswordReset(email) {
+    assertReady();
+    await state.auth.sendPasswordResetEmail(String(email || '').trim());
+  },
+
+  async resendVerification() {
+    const user = requireUser();
+    await user.sendEmailVerification();
+  },
+
+  /**
+   * Has the address been verified since? The verify link is usually opened in
+   * Mail or Safari, not here, so the app has to ask. A fresh ID token is what
+   * carries email_verified to the security rules — reload() alone is not enough.
+   */
+  async refreshVerified() {
+    const user = requireUser();
+    await user.reload();
+    if (state.auth.currentUser && state.auth.currentUser.emailVerified) {
+      await state.auth.currentUser.getIdToken(true);
+    }
+    state.user = state.auth.currentUser;
+    return !!(state.user && state.user.emailVerified);
+  },
+
   signOut() { assertReady(); return state.auth.signOut(); },
 
   // ------------------------------------------------------------- bootstrap
@@ -179,7 +252,10 @@ BB.cloud = {
    */
   async pendingInvites() {
     const user = requireUser();
-    if (!user.email) return [];
+    // The rules only match invitations against a VERIFIED address. Asking with
+    // an unverified one is refused, which would fail the whole profile load
+    // for anyone who signed up with a password and has not clicked the link.
+    if (!user.email || !user.emailVerified) return [];
     const qs = await state.db.collection('invites')
       .where('email', '==', user.email.toLowerCase())
       .where('status', '==', 'pending')
@@ -205,7 +281,10 @@ BB.cloud = {
     const batch = state.db.batch();
     const arrayUnion = firebase.firestore.FieldValue.arrayUnion;
 
-    batch.update(state.db.doc(`groups/${invite.groupId}`), { memberUids: arrayUnion(user.uid) });
+    // joinInvite is the proof the rules ask for: without it, appending yourself
+    // to a group is refused (anyone could otherwise join by knowing the id).
+    batch.update(state.db.doc(`groups/${invite.groupId}`),
+      { memberUids: arrayUnion(user.uid), joinInvite: inviteId });
     batch.update(state.db.doc(`users/${user.uid}`), clean({
       groupIds: arrayUnion(invite.groupId),
       myGolferId: invite.golferId || undefined,
@@ -257,6 +336,142 @@ BB.cloud = {
     await state.db.doc(`golfers/${golferId}`).update({
       aliases: firebase.firestore.FieldValue.arrayUnion(name),
     });
+  },
+
+  // ---------------------------------------------------------------- groups
+  /**
+   * Start a playing group: you own it, you are its only member, and it has a
+   * join code for the share link. Golfers are added after it exists, because
+   * the rules check membership of the group a golfer is being put into.
+   */
+  async createGroup(name, golferIds = []) {
+    const user = requireUser();
+    const clean_ = String(name || '').trim();
+    if (!clean_) throw new Error('a group needs a name');
+    const ref = state.db.collection('groups').doc();
+    await ref.set({
+      name: clean_,
+      kind: 'group',
+      ownerUid: user.uid,
+      memberUids: [user.uid],
+      joinCode: randomCode(),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await state.db.doc(`users/${user.uid}`).update({
+      groupIds: firebase.firestore.FieldValue.arrayUnion(ref.id),
+    });
+    await BB.cloud.addToGroup(ref.id, golferIds);
+    return ref.id;
+  },
+
+  /**
+   * Put golfers in a group. One write per golfer: the rules allow a golfer to
+   * gain exactly one group per write, and a batch would fail as a whole on
+   * the first one that is refused.
+   */
+  async addToGroup(groupId, golferIds = []) {
+    requireUser();
+    const arrayUnion = firebase.firestore.FieldValue.arrayUnion;
+    let added = 0;
+    for (const id of golferIds) {
+      await state.db.doc(`golfers/${id}`).update({ poolGroupIds: arrayUnion(groupId) });
+      added++;
+    }
+    return added;
+  },
+
+  /** Take a golfer out of a playing group. The directory refuses this. */
+  async removeFromGroup(groupId, golferId) {
+    requireUser();
+    await state.db.doc(`golfers/${golferId}`).update({
+      poolGroupIds: firebase.firestore.FieldValue.arrayRemove(groupId),
+    });
+  },
+
+  /**
+   * Someone nobody has entered yet. With a GHIN number the record is keyed by
+   * it, so the index refresh finds him; without one he is a guest. Either way
+   * he goes into the groups given, which must all be the caller's.
+   */
+  async createGolfer({ name, ghinNumber = null, currentIndex = null }, groupIds) {
+    requireUser();
+    const nm = String(name || '').trim();
+    if (!nm) throw new Error('a golfer needs a name');
+    const ghin = ghinNumber ? String(ghinNumber).replace(/\D/g, '') : '';
+    const id = ghin ? golferIdForGhin(ghin) : `guest:${randomCode(10)}`;
+    try {
+      await state.db.doc(`golfers/${id}`).set(clean({
+        name: nm,
+        ghinNumber: ghin || null,
+        currentIndex: currentIndex == null || currentIndex === '' ? null : String(currentIndex),
+        claimedByUid: null,
+        discoverable: false,
+        poolGroupIds: groupIds,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      }));
+    } catch (e) {
+      // A GHIN already on file belongs to a record this account cannot see, so
+      // the write lands as an update to it and is refused.
+      if (ghin && /permission/i.test(e.code || e.message)) {
+        throw new Error('GHIN ' + ghin + ' is already on file with another group');
+      }
+      throw e;
+    }
+    return id;
+  },
+
+  /**
+   * Join from a share link. The group is unreadable until you are in it, so
+   * this cannot look anything up first — the code is presented, and the rules
+   * decide. Recorded on the user doc in the same batch.
+   */
+  async joinGroup(groupId, code) {
+    const user = requireUser();
+    const arrayUnion = firebase.firestore.FieldValue.arrayUnion;
+    const batch = state.db.batch();
+    batch.update(state.db.doc(`groups/${groupId}`),
+      { memberUids: arrayUnion(user.uid), joinProof: String(code || '') });
+    batch.update(state.db.doc(`users/${user.uid}`), { groupIds: arrayUnion(groupId) });
+    await batch.commit();
+    const snap = await state.db.doc(`groups/${groupId}`).get();
+    return { id: snap.id, ...snap.data() };
+  },
+
+  /**
+   * The join code for a share link. A group made before share links has none;
+   * its owner gets one made on first ask, and nobody else can make one.
+   */
+  async joinCodeFor(groupId) {
+    const user = requireUser();
+    const ref = state.db.doc(`groups/${groupId}`);
+    const g = (await ref.get()).data() || {};
+    if (g.joinCode) return g.joinCode;
+    if (g.ownerUid !== user.uid) return null;
+    const code = randomCode();
+    await ref.update({ joinCode: code });
+    return code;
+  },
+
+  /** Owner only: a new code, so every link sent out before stops working. */
+  async resetJoinCode(groupId) {
+    requireUser();
+    const code = randomCode();
+    await state.db.doc(`groups/${groupId}`).update({ joinCode: code });
+    return code;
+  },
+
+  async renameGroup(groupId, name) {
+    requireUser();
+    const nm = String(name || '').trim();
+    if (!nm) throw new Error('a group needs a name');
+    await state.db.doc(`groups/${groupId}`).update({ name: nm });
+  },
+
+  async leaveGroup(groupId) {
+    const user = requireUser();
+    const arrayRemove = firebase.firestore.FieldValue.arrayRemove;
+    await state.db.doc(`groups/${groupId}`).update({ memberUids: arrayRemove(user.uid) });
+    await state.db.doc(`users/${user.uid}`).update({ groupIds: arrayRemove(groupId) });
   },
 
   async myGroups() {

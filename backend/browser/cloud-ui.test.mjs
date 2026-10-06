@@ -145,6 +145,11 @@ console.log('\nPRODUCTION (bunchbets.com — must be completely dark)\n');
       db: (document.body.innerHTML.match(/bunchbets-default-rtdb/) || []).length,
     };
   });
+  // Same guard as wizard-flow: prove the page under test is THIS build. A
+  // routing mistake that let the request reach the real bunchbets.com would
+  // make every assertion below pass for reasons unrelated to the code.
+  check('the page under test is this build, not the live site',
+    await page.evaluate(() => typeof window.BB_BUILD_MARKER), 'string');
   check('account panel hidden on production', prod.hidden, true);
   check('and never rendered', prod.empty, true);
   check('no auth SDK fetched', prod.authSdk, false);

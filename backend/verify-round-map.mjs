@@ -30,7 +30,12 @@ globalThis.APP_VERSION = '0.0-test';
 // The shipped methods call Cloud.norm() by name, so the object under test has
 // to BE the global Cloud. History is stubbed per-test for unlinkedNames().
 const make = (pool, groups, history) => {
-  const o = eval('({' + ['golferIdFor', 'norm', 'unlinkedNames', 'suggestFor', 'buildRound', 'linkNames']
+  // buildRound files the round under the group being played with, so the
+  // active-group lookup comes along. No localStorage in node: it falls back to
+  // the first playing group, then the first group, which is what these expect.
+  globalThis.localStorage = globalThis.localStorage || { getItem: () => null };
+  const o = eval('({' + ['golferIdFor', 'norm', 'unlinkedNames', 'suggestFor', 'buildRound', 'linkNames',
+                         'activeGroup', 'isDirectory']
     .map(grab).join(',\n') + '})');
   o.pool = pool; o.groups = groups;
   globalThis.Cloud = o;

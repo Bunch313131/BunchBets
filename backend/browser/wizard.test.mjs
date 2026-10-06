@@ -71,8 +71,15 @@ async function boot({ seed = PLAYED, cloud = null } = {}) {
   await page.route('**://**', (route) =>
     route.request().url().startsWith(ORIGIN) ? route.continue() : route.abort());
 
-  await page.goto(ORIGIN + '/index.html', { waitUntil: 'domcontentloaded' });
-  await page.evaluate((s) => {
+  // Seed storage BEFORE the app's first script runs, and only on the first
+  // load. This used to load the page once, write the seed, and reload — but that
+  // first load starts a blank round and saves it on a timer, and when the timer
+  // fired between the write and the reload it replaced the seed with P1..P5 at
+  // hole 1. The round these tests are about was then simply not there, at
+  // random, depending on how long the app took to start.
+  await ctx.addInitScript((s) => {
+    if (sessionStorage.getItem('__bbSeeded')) return;
+    sessionStorage.setItem('__bbSeeded', '1');
     localStorage.setItem('nassauV28_complete', JSON.stringify(s));
     localStorage.setItem('bunchbets-installed', 'true');
     localStorage.setItem('bunchbets_roster', JSON.stringify([
@@ -89,6 +96,45 @@ async function boot({ seed = PLAYED, cloud = null } = {}) {
   if (cloud) await page.evaluate((c) => Object.assign(window._bb.Cloud, c), cloud);
   return { page, ctx, errs };
 }
+
+/**
+ * Show the wizard step that currently carries the tee picker.
+ *
+ * It sat on the player step and moved to the course step in the redesign — the
+ * numbers it produces are visible on one, but the tee is part of choosing where
+ * you are playing, not who with. Which screen it lives on is not what any of
+ * these assertions is about, and pinning it made them die with a thirty-second
+ * timeout waiting for a strip that had simply moved one screen back.
+ */
+async function showTeeStep(page) {
+  const step = await page.evaluate(() => {
+    const s = window._bb.NEW_WIZARD ? 'tee' : 'players';
+    window._bb.Wizard.active = true; window._bb.Wizard.step = s; window._bb.Wizard.render();
+    return s;
+  });
+  await page.waitForTimeout(300);
+  return step;
+}
+
+// The new flow picks tees from tiles on their own screen; the old one from a
+// <select> on the player step. These read and pick either way.
+const teeCount = (page) => page.evaluate(() => window._bb.NEW_WIZARD
+  ? document.querySelectorAll('.wz-tee-btn').length
+  : document.querySelectorAll('#wizardTee option').length);
+const teeOffered = (page) => page.evaluate(() => window._bb.NEW_WIZARD
+  ? document.querySelectorAll('.wz-tee-btn').length > 0 ? 1 : 0
+  : document.querySelectorAll('#wizardTee').length);
+const teeValue = (page) => page.evaluate(() => {
+  if (!window._bb.NEW_WIZARD) return (document.getElementById('wizardTee') || {}).value;
+  const b = document.querySelector('.wz-tee-btn.selected');
+  return b ? b.dataset.tee : null;
+});
+const pickTee = async (page, name) => {
+  if (await page.evaluate(() => window._bb.NEW_WIZARD)) await page.click(`.wz-tee-btn[data-tee="${name}"]`);
+  else await page.selectOption('#wizardTee', name);
+};
+const teePanel = async (page) => page.textContent(
+  (await page.evaluate(() => window._bb.NEW_WIZARD)) ? '#wizTeeSection' : '.wiz-tee');
 
 // --------------------------------------------------------------------------
 console.log('\na new game is a new round — every per-round tracker goes with it\n');
@@ -234,8 +280,10 @@ console.log('\ncarrying a saved round forward\n');
   const bad = [7,15,9,1,11,3,17,13,5,4,2,10,8,12,14,18,6,16];
   const ctx2 = await browser.newContext({ viewport: { width: 420, height: 900 }, serviceWorkers: 'block' });
   const p2 = await ctx2.newPage();
-  await p2.goto(ORIGIN + '/index.html', { waitUntil: 'domcontentloaded' });
-  await p2.evaluate(([seed, badHcp]) => {
+  // Seeded before the app runs, for the reason given in boot().
+  await ctx2.addInitScript(([seed, badHcp]) => {
+    if (sessionStorage.getItem('__bbSeeded')) return;
+    sessionStorage.setItem('__bbSeeded', '1');
     localStorage.setItem('bunchbets-installed', 'true');
     localStorage.setItem('nassauV28_complete', JSON.stringify({ ...seed, presets: {
       'El Macero': { hcp: badHcp, par: seed.course.par },
@@ -259,10 +307,14 @@ console.log('\ncarrying a saved round forward\n');
 
 console.log('\nthe picker offers the group, and never invents a course handicap\n');
 {
+  // DELIBERATELY OUT OF ORDER. Firestore hands the pool back in its own document
+  // order, and this list used to be built straight out of it — which reads as
+  // random on a phone and means scanning eighteen names to find one. A fixture
+  // listed alphabetically would pass whether or not anything sorted it.
   const POOL = [
-    { id: 'ghin:1506580', name: 'Brian Bunch', currentIndex: '7.0', aliases: ['Bunch'] },
-    { id: 'ghin:1586673', name: 'Gary Nunes', currentIndex: '10.4', aliases: ['Gary'] },
     { id: 'ghin:326845', name: 'Tyler Bryan', currentIndex: '+0.3', aliases: ['Tyler'] },
+    { id: 'ghin:1586673', name: 'Gary Nunes', currentIndex: '10.4', aliases: ['Gary'] },
+    { id: 'ghin:1506580', name: 'Brian Bunch', currentIndex: '7.0', aliases: ['Bunch'] },
   ];
   const { page, ctx, errs } = await boot({
     cloud: { user: { uid: 'u', email: 'b@x.com' }, groups: [{ id: 'nunes', name: 'Nunes' }], pool: POOL },
@@ -276,10 +328,17 @@ console.log('\nthe picker offers the group, and never invents a course handicap\
   ])));
 
   const r = await page.evaluate(() => window._bb.Wizard.pickerRoster());
-  check('the group comes first', r.slice(0, 3).map((x) => x.name),
+  check('the group comes first, in alphabetical order', r.slice(0, 3).map((x) => x.name),
     ['Brian Bunch', 'Gary Nunes', 'Tyler Bryan']);
+  check('  which is NOT the order the pool arrived in',
+    r.slice(0, 3).map((x) => x.name).join('|') !== 'Tyler Bryan|Gary Nunes|Brian Bunch', true);
   check('  each with a live index', r.slice(0, 3).map((x) => x.index), ['7.0', '10.4', '+0.3']);
   check('a guest from this phone is still offered', r.map((x) => x.name).includes('Visiting Steve'), true);
+  // Guests sort among themselves and stay AFTER the group. Merging the two
+  // would bury a group member among one-off visitors, and the group is who is
+  // nearly always playing.
+  check('  and lands after the group, not merged into it',
+    r.map((x) => x.name).indexOf('Visiting Steve') >= 3, true);
   check('  and is not duplicated by the pool', r.filter((x) => x.name === 'Brian Bunch').length, 1);
 
   // The rule that keeps the money right: an index is not a course handicap.
@@ -310,12 +369,21 @@ console.log('\nthe picker offers the group, and never invents a course handicap\
     unrated.find((x) => x.name === 'Tyler Bryan').handicap, 0);
   await page.evaluate(() => { window._bb.State.data.course = JSON.parse(JSON.stringify(window._bb.State.presets)) && window._bb.State.data.course; });
 
-  await page.evaluate(() => { window._bb.Wizard.active = true; window._bb.Wizard.step = 'players'; window._bb.Wizard.render(); });
+  // Whose group is on offer has to be visible on the screen that offers it. In
+  // the redesigned flow that screen is `home`, not `players` — sign-in moved
+  // out of the player step onto the first screen. Asked of `players` there, this
+  // waits thirty seconds for a `.wiz-cloud` that is no longer rendered and dies
+  // with a timeout, which reads like a broken test rather than a moved screen.
+  const NEW = await page.evaluate(() => !!window._bb.NEW_WIZARD);
+  await page.evaluate((step) => {
+    window._bb.Wizard.active = true; window._bb.Wizard.step = step; window._bb.Wizard.render();
+  }, NEW ? 'home' : 'players');
   await page.waitForTimeout(300);
-  const strip = await page.textContent('.wiz-cloud');
+  const strip = await page.textContent(NEW ? '.wizard-screen' : '.wiz-cloud');
   check('the step says whose group it is', /Nunes/.test(strip), true);
   check('  and how many are available', /3 golfer\(s\)/.test(strip), true);
-  check('no sign-in button while signed in', await page.locator('#wizardSignIn').count(), 0);
+  check('no sign-in button while signed in',
+    await page.locator(NEW ? '#wizSignIn' : '#wizardSignIn').count(), 0);
 
   check('no page errors', errs, []);
   await ctx.close();
@@ -401,22 +469,25 @@ console.log('\nthe tee is pickable, and it moves the numbers\n');
       { name: 'Timothy Mar', handicap: 21, hcpFromTee: true, index: '18.7' },
       { name: 'Visiting Steve', handicap: 20 },        // no index, typed by hand
     ];
-    window._bb.Wizard.active = true;
-    window._bb.Wizard.step = 'players';
-    window._bb.Wizard.render();
   });
-  await page.waitForTimeout(300);
 
-  check('the tee is on screen', await page.locator('#wizardTee').count(), 1);
-  check('  showing all eight', await page.locator('#wizardTee option').count(), 8);
-  check('  set to White', await page.inputValue('#wizardTee'), 'White');
+  // The tee picker moved from the player step to the course step in the
+  // redesign, so ask for whichever screen currently carries it. What is being
+  // tested is that picking a tee moves the numbers — not which screen it is
+  // picked on, and pinning the screen made this die with a timeout the moment
+  // the strip moved.
+  await showTeeStep(page);
+
+  check('the tee is on screen', await teeOffered(page), 1);
+  check('  showing all eight', await teeCount(page), 8);
+  check('  set to White', await teeValue(page), 'White');
   check('  with its rating and slope stated',
-    /6499 yds \u00b7 72 \/ 129/.test(await page.textContent('.wiz-tee')), true);
+    /6499 yds \u00b7 72 \/ 129/.test(await teePanel(page)), true);
   check('  and it promises the conversion, because it can do it',
-    /course handicaps come off this tee/.test(await page.textContent('.wiz-tee')), true);
+    /course handicaps come off this tee/.test(await teePanel(page)), true);
 
   // Blue is 137 against White's 129, so every derived handicap goes up.
-  await page.selectOption('#wizardTee', 'Blue');
+  await pickTee(page, 'Blue');
   await page.waitForTimeout(250);
   const moved = await page.evaluate(() => window._bb.Wizard.data.players.map((p) => p.handicap));
   check('moving to Blue re-derives the handicaps it filled', moved.slice(0, 2), [8, 23]);
@@ -429,13 +500,21 @@ console.log('\nthe tee is pickable, and it moves the numbers\n');
   // recompute would have written proves nothing, and the first version of this
   // used 19, which is exactly what Gold derives.
   await page.evaluate(() => {
-    const el = document.querySelectorAll('.wizard-player-row input[data-field="handicap"]')[1];
-    el.focus(); el.value = '15'; el.dispatchEvent(new Event('input', { bubbles: true })); el.blur();
+    window._bb.Wizard.step = 'players'; window._bb.Wizard.render();
   });
+  await page.waitForTimeout(300);
+  const typed = await page.evaluate(() => {
+    const el = document.querySelectorAll('.wizard-player-row input[data-field="handicap"]')[1];
+    if (!el) return false;
+    el.focus(); el.value = '15'; el.dispatchEvent(new Event('input', { bubbles: true })); el.blur();
+    return true;
+  });
+  check('the handicap box was there to type in', typed, true);
   await page.waitForTimeout(120);
   check('typing over a handicap releases it from the tee',
     await page.evaluate(() => window._bb.Wizard.data.players[1].hcpFromTee), false);
-  await page.selectOption('#wizardTee', 'Gold');
+  await showTeeStep(page);
+  await pickTee(page, 'Gold');
   await page.waitForTimeout(250);
   const held = await page.evaluate(() => window._bb.Wizard.data.players.map((p) => p.handicap));
   check('  so changing tees again does NOT revert it', held[1], 15);
@@ -448,12 +527,63 @@ console.log('\nthe tee is pickable, and it moves the numbers\n');
   // out. Re-deriving from it would mean changing tees in that window silently
   // did nothing, so the index rides on the player instead.
   await page.evaluate(() => { window._bb.Cloud.user = null; window._bb.Cloud.pool = []; });
-  await page.selectOption('#wizardTee', 'Aggie');
+  await showTeeStep(page);
+  await pickTee(page, 'Aggie');
   await page.waitForTimeout(250);
   check('re-deriving does not need the pool', await page.evaluate(() => window._bb.Wizard.data.players[0].handicap), 9);
 
   check('no page errors', errs, []);
   await ctx.close();
+}
+
+console.log('\nthe tee screen can only be talking about the course you picked\n');
+{
+  // Brian, on the first real look at the old course screen: "it looks like the
+  // tees are part of the scrollable part and is confusing. We are selecting
+  // Elmo white here but it looks like Ancil Hoffman."
+  //
+  // The tees now come on their own screen, AFTER Next has committed the course,
+  // so there is no uncommitted selection for them to disagree with. What is
+  // left to pin: the tee screen names the committed course, and coming Back
+  // keeps the course you chose rather than re-selecting the top of the list —
+  // which moves money, since the first card's stroke index is not yours.
+  const { page, ctx, errs } = await boot();
+  const NEW = await page.evaluate(() => !!window._bb.NEW_WIZARD);
+  if (!NEW) { console.log('  (old flow — tees are on the player step)'); await ctx.close(); }
+  else {
+    await page.evaluate(() => {
+      window._bb.Wizard.active = true; window._bb.Wizard.step = 'course'; window._bb.Wizard.render();
+    });
+    await page.waitForTimeout(300);
+    check('the course screen has no tees on it', await page.locator('.wz-tee-btn').count(), 0);
+    check('  and starts on the course in play',
+      await page.evaluate(() => (document.querySelector('.wz-row.selected') || {}).dataset?.course), 'El Macero');
+
+    await page.fill('#wizCourseSearch', 'paso');
+    await page.waitForTimeout(100);
+    const visible = await page.evaluate(() => [...document.querySelectorAll('.wz-row')]
+      .filter((r) => r.offsetParent !== null && r.dataset.course !== '__new__').map((r) => r.dataset.course));
+    check('search narrows the list', visible.every((n) => /paso/i.test(n)) && visible.includes('Del Paso'), true);
+
+    await page.click('.wz-row[data-course="Del Paso"]');
+    check('  tapping a course does not commit it',
+      await page.evaluate(() => window._bb.State.data.course.name), 'El Macero');
+    await page.click('#wizNext');
+    await page.waitForTimeout(300);
+    check('Next commits the course you picked',
+      await page.evaluate(() => window._bb.State.data.course.name), 'Del Paso');
+    check('  and the tee screen is headed with it', (await page.textContent('.wizard-header h2')).trim(), 'Del Paso');
+
+    await page.click('#wizBack');
+    await page.waitForTimeout(300);
+    check('coming Back keeps it selected, not the first card',
+      await page.evaluate(() => window._bb.Wizard.data.selectedCourse), 'Del Paso');
+    check('  the highlight agrees',
+      await page.evaluate(() => (document.querySelector('.wz-row.selected') || {}).dataset?.course), 'Del Paso');
+
+    check('no page errors', errs, []);
+    await ctx.close();
+  }
 }
 
 console.log('\na course with no ratings switches the conversion off\n');
@@ -474,11 +604,12 @@ console.log('\na course with no ratings switches the conversion off\n');
   });
   await page.waitForTimeout(400);
   const picked = await page.evaluate(() => {
-    const cards = [...document.querySelectorAll('.wizard-course-card')];
+    const NEW = window._bb.NEW_WIZARD;
+    const cards = [...document.querySelectorAll(NEW ? '.wz-row' : '.wizard-course-card')];
     const del = cards.find((c) => c.dataset.course === 'Del Paso');
     if (!del) return null;
     del.click();
-    document.getElementById('wizardCourseNext').click();
+    document.getElementById(NEW ? 'wizNext' : 'wizardCourseNext').click();
     return true;
   });
   check('Del Paso was selectable in the course list', picked, true);
@@ -494,10 +625,12 @@ console.log('\na course with no ratings switches the conversion off\n');
   check('so no handicap is derived', after.gary.handicap === undefined, true);
   check('  and it is not marked as coming from a tee', !!after.gary.fromTee, false);
 
-  await page.evaluate(() => { window._bb.Wizard.active = true; window._bb.Wizard.step = 'players'; window._bb.Wizard.render(); });
-  await page.waitForTimeout(250);
-  check('the screen says why', /No ratings on file for Del Paso/.test(await page.textContent('.wiz-tee')), true);
-  check('  and offers no tee to pick', await page.locator('#wizardTee').count(), 0);
+  await showTeeStep(page);
+  const unratedPanel = (await page.evaluate(() => document.querySelector('.wizard-screen').textContent)).replace(/\s+/g, ' ');
+  check('the screen names the course it is talking about', /Del Paso/.test(unratedPanel), true);
+  check('  and says why there is nothing to pick',
+    /No ratings on file.*so handicaps stay as you type them/.test(unratedPanel), true);
+  check('  and offers no tee to pick', await teeOffered(page), 0);
   await ctx.close();
 }
 
@@ -507,10 +640,9 @@ console.log('\nthe tee caption only promises what the build can do\n');
   // The tee still records the round's tee, but nothing can be derived from it,
   // and saying otherwise is the cheap version of a number being quietly wrong.
   const { page, ctx } = await boot();
-  await page.evaluate(() => { window._bb.Wizard.active = true; window._bb.Wizard.step = 'players'; window._bb.Wizard.render(); });
-  await page.waitForTimeout(300);
-  const txt = await page.textContent('.wiz-tee');
-  check('the tee is still offered', await page.locator('#wizardTee').count(), 1);
+  await showTeeStep(page);
+  const txt = await teePanel(page);
+  check('the tee is still offered', await teeOffered(page), 1);
   check('  and still states the tee itself', /6499 yds/.test(txt), true);
   check('it does NOT claim handicaps come off it', /course handicaps come off this tee/.test(txt), false);
   check('  it says what actually happens', /Handicaps stay as you type them/.test(txt), true);
@@ -524,7 +656,7 @@ console.log('\nthe tee caption only promises what the build can do\n');
   });
   await page.waitForTimeout(250);
   check('a pool with no usable index does not promise it either',
-    /course handicaps come off this tee/.test(await page.textContent('.wiz-tee')), false);
+    /course handicaps come off this tee/.test(await teePanel(page)), false);
   check('  and "NH" is not a usable index',
     await page.evaluate(() => window._bb.Game.parseIndex('NH')), null);
 
@@ -534,20 +666,36 @@ console.log('\nthe tee caption only promises what the build can do\n');
   });
   await page.waitForTimeout(250);
   check('one real index is enough to make the promise true',
-    /course handicaps come off this tee/.test(await page.textContent('.wiz-tee')), true);
+    /course handicaps come off this tee/.test(await teePanel(page)), true);
   await ctx.close();
 }
 
 console.log('\nsigned out, the step still works — sign-in is offered, not required\n');
 {
   const { page, ctx, errs } = await boot();
-  await page.evaluate(() => { window._bb.Wizard.active = true; window._bb.Wizard.step = 'players'; window._bb.Wizard.render(); });
+  // Sign-in is on the home screen in the redesign; it was a strip on the player
+  // step before. Either way it is in the way of starting a round rather than
+  // three taps away in the pancake menu, and either way it is skippable.
+  const NEW = await page.evaluate(() => !!window._bb.NEW_WIZARD);
+  await page.evaluate((s) => {
+    window._bb.Wizard.active = true; window._bb.Wizard.step = s; window._bb.Wizard.render();
+  }, NEW ? 'home' : 'players');
   await page.waitForTimeout(300);
 
   check('the prompt is here, not three taps away in the menu',
-    await page.locator('#wizardSignIn').count(), 1);
+    await page.locator(NEW ? '#wizSignIn' : '#wizardSignIn').count(), 1);
   check('  and says what signing in buys',
-    /current GHIN indexes/.test(await page.textContent('.wiz-cloud')), true);
+    /current GHIN indexes/.test(await page.textContent(NEW ? '.wizard-screen' : '.wiz-cloud')), true);
+  if (NEW) {
+    check('  and can be walked past without an account',
+      await page.locator('#wizNewRound').isEnabled(), true);
+    await page.click('#wizNewRound');
+    await page.waitForTimeout(250);
+    check('    which lands on the course step',
+      await page.evaluate(() => window._bb.Wizard.step), 'course');
+    await page.evaluate(() => { window._bb.Wizard.step = 'players'; window._bb.Wizard.render(); });
+    await page.waitForTimeout(300);
+  }
 
   const r = await page.evaluate(() => window._bb.Wizard.pickerRoster().map((x) => x.name));
   check('this phone’s own names still work signed out', r, ['Brian Bunch', 'Visiting Steve']);
