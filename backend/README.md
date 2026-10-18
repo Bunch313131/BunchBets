@@ -69,7 +69,7 @@ phone, and lays it over the built-in `COURSE_DB`: matched by name with
 index is not 1..18 once each is dropped, missing par/hcp fall back to its first
 men's tee, and only men's tees are offered. Choosing a course matches its name
 exactly, so a phone's own preset is never swapped for a similarly named course.
-Beta only, like the rest of the cloud.
+Beta and production each read their own project's courses.
 
 The admin page's Courses tab reads the built-in list out of `index.html` itself,
 edits holes and tees (refusing a bad stroke index), adds courses, and hides

@@ -163,6 +163,35 @@ console.log('\nPRODUCTION (bunchbets.com — accounts on, no BETA branding)\n');
   await page.close();
 }
 
+// www.bunchbets.com is production too. Before 8.3 only the bare host counted,
+// so www ran with the BETA badge against the test project, while admin.html
+// already treated both hosts as production.
+console.log('\nWWW (www.bunchbets.com — production, not beta)\n');
+{
+  const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, serviceWorkers: 'block' });
+  const page = await ctx.newPage();
+  const errs = []; page.on('pageerror', (e) => errs.push(e.message));
+  await page.route('**://**', (r) => r.request().url().startsWith('https://www.bunchbets.com') ? r.continue() : r.abort());
+  await page.route('https://www.bunchbets.com/**', async (route) => {
+    const url = new URL(route.request().url());
+    const upstream = await fetch(ORIGIN + url.pathname + url.search).catch(() => null);
+    if (!upstream) return route.abort();
+    route.fulfill({ status: upstream.status, body: Buffer.from(await upstream.arrayBuffer()),
+      headers: { 'content-type': upstream.headers.get('content-type') || 'text/html' } });
+  });
+  await page.goto('https://www.bunchbets.com/index.html', { waitUntil: 'load' });
+  await page.waitForTimeout(600);
+  check('the page under test is this build, not the live site',
+    await page.evaluate(() => typeof window.BB_BUILD_MARKER), 'string');
+  const w = await page.evaluate(() => ({ beta: window._bbBeta, title: document.title,
+    manifest: document.querySelector('link[rel="manifest"]').getAttribute('href') }));
+  check('www is production', w.beta, false);
+  check('  with the production title', w.title, 'Bunch Bets');
+  check('  and the production manifest', w.manifest, 'manifest.webmanifest');
+  check('no page errors', errs, []);
+  await ctx.close();
+}
+
 // The module itself is covered by cloud_load_test.mjs, which serves the Firebase
 // SDK through route interception. Loading it from gstatic here does not work:
 // Chromium in this container has no route to the internet.

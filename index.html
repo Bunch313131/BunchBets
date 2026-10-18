@@ -47,12 +47,12 @@
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="BunchBets180.png">
 <link rel="manifest" href="manifest.webmanifest">
-<title>Bunch Bets V7.3</title>
+<title>Bunch Bets</title>
 <!-- Environment switch — anything that is not the production host is BETA.
      Runs before render so the manifest/icon are correct at install time. -->
 <script>
 (function(){
-  window._bbBeta = location.hostname !== 'bunchbets.com';
+  window._bbBeta = location.hostname !== 'bunchbets.com' && location.hostname !== 'www.bunchbets.com';
   if (!window._bbBeta) return;
   document.title = 'Bunch Bets BETA';
   var m = document.querySelector('link[rel="manifest"]');
@@ -886,7 +886,7 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '8.2';
+const APP_VERSION = '8.3';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
   '8.2': [
@@ -1086,8 +1086,9 @@ function haversineMi(lat1,lon1,lat2,lon2){
 }
 
 // === ENVIRONMENT ===
-// Production is bunchbets.com (GitHub Pages). Everything else — the Cloudflare
-// beta origin, localhost, branch previews — is treated as BETA.
+// Production is bunchbets.com or www.bunchbets.com (GitHub Pages), the same two
+// hosts admin.html counts. Everything else — the Cloudflare beta origin,
+// localhost, branch previews — is treated as BETA.
 const IS_BETA = !!window._bbBeta;
 
 // === FIREBASE CONFIG ===
@@ -1146,7 +1147,7 @@ const NEW_WIZARD = CLOUD_ENABLED;
  * on the phone, so a course added in the admin page is there offline from the
  * next launch on, and the built-in list is always the floor underneath it.
  *
- * Beta only, like the rest of the cloud: production has no database yet.
+ * Read on beta and production alike, each from its own project.
  *
  * A database course matches a built-in one by name with "CC", "GC", "Golf
  * Club" and punctuation ignored — so GHIN's "El Macero CC" is the app's "El
@@ -5765,7 +5766,7 @@ const Wizard = {
   },
 
   // ═══════════════════════════════════════════════════════
-  // THE REDESIGNED FLOW (beta) — see NEW_WIZARD
+  // THE REDESIGNED FLOW — see NEW_WIZARD
   // ═══════════════════════════════════════════════════════
 
   /** Shared chrome so the seven screens cannot drift apart. */
@@ -12093,7 +12094,6 @@ const UI = {
     const body = overlay.querySelector('#standBody');
     const msg = (t) => { body.innerHTML = '<div class="history-empty">' + t + '</div>'; };
 
-    if (!CLOUD_ENABLED) { msg('Standings are part of the beta.'); return; }
     if (!Cloud.user)     { msg('Sign in to see your group standings.<br><br>Menu \u2192 Account \u2192 Sign in with Google.'); return; }
     Cloud.warm();
     if (!Cloud.api)      { msg('Still connecting\u2026 give it a second and try again.'); return; }
