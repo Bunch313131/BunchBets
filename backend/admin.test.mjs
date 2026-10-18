@@ -22,6 +22,8 @@ process.env.FIREBASE_AUTH_EMULATOR_HOST ||= '127.0.0.1:9099';
 const URL = 'http://127.0.0.1:8099/admin.html?sdk=/vendor&emulator=1';
 
 let browser, auth, db, page;
+// What the next prompt() is answered with; confirm() and alert() just accept.
+let promptAnswer = '';
 
 async function seed() {
   const set = (p, d) => db.doc(p).set(d);
@@ -49,7 +51,7 @@ async function signIn(uid, claims) {
   if (claims) await auth.setCustomUserClaims(uid, claims);
   const token = await auth.createCustomToken(uid);
   page = await browser.newPage();
-  page.on('dialog', (d) => d.accept());
+  page.on('dialog', (d) => (d.type() === 'prompt' ? d.accept(promptAnswer) : d.accept()));
   await page.goto(URL, { waitUntil: 'load' });
   await page.waitForFunction(() => typeof window.__adminSignIn === 'function', { timeout: 15000 });
   await page.evaluate((t) => window.__adminSignIn(t), token);
@@ -176,6 +178,67 @@ describe('groups', () => {
     assert.deepStrictEqual((await db.doc('golfers/ghin:1').get()).data().poolGroupIds, ['dir']);
     assert.deepStrictEqual((await db.doc('users/uid_mike').get()).data().groupIds, ['dir']);
     assert.strictEqual((await db.doc('invites/inv1').get()).exists, false);
+  });
+
+  test('renaming a group renames its invitations too', async () => {
+    // Shown before the reader is in the group, so the name has to be on the
+    // invitation; renaming the directory used to leave them saying the old one.
+    await db.doc('invites/inv_ren').set({ groupId: 'dir', email: 'lee@x.com', invitedByUid: 'uid_brian', status: 'pending' });
+    await page.click('#rf'); await settle();
+    await open('groups', 'dir');
+    await page.fill('#gName', 'ELMO');
+    await page.click('#gNameSave'); await settle();
+    assert.strictEqual((await db.doc('groups/dir').get()).data().name, 'ELMO');
+    assert.strictEqual((await db.doc('invites/inv_ren').get()).data().groupName, 'ELMO');
+  });
+
+  test('the directory is not deleted, or merged away, by a click', async () => {
+    // Its own golfer: an earlier test deletes ghin:3.
+    await db.doc('golfers/ghin:4').set({ name: 'Kenneth Bernard', ghinNumber: '4', poolGroupIds: ['dir'], claimedByUid: null });
+    await db.doc('groups/tmp').set({ name: 'Tmp', kind: 'group', ownerUid: 'uid_brian', memberUids: ['uid_brian'], joinCode: 'z' });
+    await page.click('#rf'); await settle();
+    await open('groups', 'dir');
+    promptAnswer = 'Elmo';                              // close, but not its name
+    await page.click('#gDel'); await settle();
+    assert.match(await page.textContent('#toast'), /directory/);
+    assert.strictEqual((await db.doc('groups/dir').get()).exists, true);
+    await open('groups', 'dir');
+    await page.selectOption('#gInto', 'tmp');
+    await page.click('#gMerge'); await settle();
+    assert.match(await page.textContent('#toast'), /directory/);
+    assert.strictEqual((await db.doc('groups/dir').get()).exists, true);
+    assert.deepStrictEqual((await db.doc('golfers/ghin:4').get()).data().poolGroupIds, ['dir'], 'nobody was moved');
+    promptAnswer = '';
+    await db.doc('groups/tmp').delete();
+    await page.click('#rf'); await settle();
+  });
+
+  test('a new playing group can be made here, in the app\'s own shape', async () => {
+    await page.click('.tab[data-tab="groups"]');
+    await page.click('#gNew');
+    await page.fill('#ngName', 'Nunes');
+    await page.selectOption('#ngOwner', 'uid_brian');
+    await page.check('#ngGolf input[value="ghin:2"]');
+    await page.check('#ngGolf input[value="ghin:4"]');
+    await page.click('#ngCreate'); await settle();
+    const made = (await db.collection('groups').where('name', '==', 'Nunes').get()).docs;
+    assert.strictEqual(made.length, 1);
+    const id = made[0].id, g = made[0].data();
+    assert.deepStrictEqual([g.kind, g.ownerUid, g.memberUids], ['group', 'uid_brian', ['uid_brian']]);
+    assert.match(g.joinCode, /^[a-z2-9]{12}$/, 'its invite link works');
+    assert.ok((await db.doc('users/uid_brian').get()).data().groupIds.includes(id), 'the owner has it');
+    assert.ok((await db.doc('golfers/ghin:2').get()).data().poolGroupIds.includes(id));
+    assert.ok((await db.doc('golfers/ghin:4').get()).data().poolGroupIds.includes(id));
+    assert.ok(!(await db.doc('golfers/ghin:1').get()).data().poolGroupIds.includes(id));
+    assert.strictEqual(await page.textContent('#detail h2'), 'Nunes', 'and it is open, ready to edit');
+
+    // Its golfers can then be changed from the group itself.
+    await page.uncheck('#gGolf input[value="ghin:4"]');
+    await page.check('#gGolf input[value="ghin:1"]');
+    await page.click('#gGolfSave'); await settle();
+    assert.ok((await db.doc('golfers/ghin:1').get()).data().poolGroupIds.includes(id));
+    assert.ok(!(await db.doc('golfers/ghin:4').get()).data().poolGroupIds.includes(id));
+    assert.deepStrictEqual((await db.doc('golfers/ghin:4').get()).data().poolGroupIds, ['dir'], 'still in the directory');
   });
 });
 

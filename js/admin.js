@@ -16,7 +16,7 @@
  *   users/{uid}    displayName, email, groupIds, myGolferId
  *   rounds/{id}    groupId, date, courseName, golferIds, results{golferId:…},
  *                  createdByUid
- *   invites/{id}   groupId, email, golferId, invitedByUid, status
+ *   invites/{id}   groupId, groupName, email, golferId, invitedByUid, status
  */
 
 let db = null;
@@ -65,10 +65,63 @@ export async function loadAll() {
 
 // -------------------------------------------------------------------- groups
 
+/**
+ * Rename a group, and every invitation to it. An invitation is shown before
+ * its reader is in the group, when the rules will not let them read the group
+ * itself — so it carries the name. Without this, renaming the directory left
+ * its invitations still saying the old name (taken from the group's id).
+ */
 export async function renameGroup(groupId, name) {
   const nm = String(name || '').trim();
   if (!nm) throw new Error('a group needs a name');
-  await doc(`groups/${groupId}`).update({ name: nm });
+  const w = writer();
+  w.update(doc(`groups/${groupId}`), { name: nm });
+  for (const i of await where('invites', 'groupId', '==', groupId)) w.update(doc(`invites/${i.id}`), { groupName: nm });
+  await w.commit();
+}
+
+function randomCode(len = 12) {
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  const buf = new Uint32Array(len);
+  crypto.getRandomValues(buf);
+  return Array.from(buf, (n) => chars[n % chars.length]).join('');
+}
+
+/**
+ * A new playing group, in exactly the shape the app's own "Start a group"
+ * writes: kind 'group', the owner as its only member, and a join code so its
+ * invite link works. The owner gets it in their own list, and the chosen
+ * golfers are put in it. Returns the new group's id.
+ */
+export async function createGroup({ name, ownerUid, golferIds = [] }) {
+  const nm = String(name || '').trim();
+  if (!nm) throw new Error('a group needs a name');
+  if (!ownerUid) throw new Error('a group needs an owner');
+  const ref = db.collection('groups').doc();
+  const w = writer();
+  w.set(ref, { name: nm, kind: 'group', ownerUid, memberUids: [ownerUid], joinCode: randomCode(),
+               createdAt: FV.serverTimestamp() });
+  if ((await doc(`users/${ownerUid}`).get()).exists) w.update(doc(`users/${ownerUid}`), { groupIds: FV.arrayUnion(ref.id) });
+  uniq(golferIds).forEach((id) => w.update(doc(`golfers/${id}`), { poolGroupIds: FV.arrayUnion(ref.id) }));
+  await w.commit();
+  return ref.id;
+}
+
+/**
+ * Make a group's golfers exactly `golferIds`: add the missing, take out the
+ * rest. Only golfers whose membership actually changes are written.
+ */
+export async function setGroupGolfers(groupId, golferIds) {
+  const want = new Set(uniq(golferIds));
+  const w = writer();
+  let added = 0, removed = 0;
+  for (const g of await all('golfers')) {
+    const has = (g.poolGroupIds || []).includes(groupId);
+    if (want.has(g.id) && !has) { w.update(doc(`golfers/${g.id}`), { poolGroupIds: FV.arrayUnion(groupId) }); added++; }
+    if (!want.has(g.id) && has) { w.update(doc(`golfers/${g.id}`), { poolGroupIds: FV.arrayRemove(groupId) }); removed++; }
+  }
+  await w.commit();
+  return { added, removed };
 }
 
 /** Hand the group to one of its members. */
@@ -101,7 +154,15 @@ export async function setKind(groupId, kind) {
  * creator's own rounds (groupId null), so nobody's history vanishes. Its
  * pending invitations are deleted.
  */
-export async function deleteGroup(groupId) {
+export async function deleteGroup(groupId, { confirmName } = {}) {
+  // The directory is everyone's golfers and every waiting invitation. Deleting
+  // it by accident (it happened) strands all of them, so it takes its name
+  // typed back, not just a click.
+  const grp = (await doc(`groups/${groupId}`).get()).data();
+  if (!grp) throw new Error('no such group');
+  if (isDirectory(grp) && String(confirmName || '').trim() !== grp.name) {
+    throw new Error('that is the directory — type its name exactly to delete it');
+  }
   const w = writer();
   for (const g of await where('golfers', 'poolGroupIds', 'array-contains', groupId)) {
     w.update(doc(`golfers/${g.id}`), { poolGroupIds: FV.arrayRemove(groupId) });
@@ -124,11 +185,15 @@ export async function deleteGroup(groupId) {
  * then `fromId` is deleted. The surviving group keeps its own name, owner and
  * join code.
  */
-export async function mergeGroups(fromId, intoId) {
+export async function mergeGroups(fromId, intoId, { confirmName } = {}) {
   if (fromId === intoId) throw new Error('pick two different groups');
   const from = (await doc(`groups/${fromId}`).get()).data();
   const into = (await doc(`groups/${intoId}`).get()).data();
   if (!from || !into) throw new Error('no such group');
+  // Merging the directory away deletes it, so it takes the same typed name.
+  if (isDirectory(from) && String(confirmName || '').trim() !== from.name) {
+    throw new Error('that is the directory — type its name exactly to merge it away');
+  }
   const w = writer();
   for (const g of await where('golfers', 'poolGroupIds', 'array-contains', fromId)) {
     w.update(doc(`golfers/${g.id}`), { poolGroupIds: uniq((g.poolGroupIds || []).map((x) => x === fromId ? intoId : x)) });
@@ -139,7 +204,7 @@ export async function mergeGroups(fromId, intoId) {
   const rounds = await where('rounds', 'groupId', '==', fromId);
   rounds.forEach((r) => w.update(doc(`rounds/${r.id}`), { groupId: intoId }));
   for (const i of await where('invites', 'groupId', '==', fromId)) {
-    w.update(doc(`invites/${i.id}`), { groupId: intoId });
+    w.update(doc(`invites/${i.id}`), { groupId: intoId, groupName: into.name });
   }
   w.update(doc(`groups/${intoId}`), { memberUids: uniq([...(into.memberUids || []), ...(from.memberUids || [])]) });
   w.delete(doc(`groups/${fromId}`));

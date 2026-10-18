@@ -277,10 +277,12 @@ function listGroups() {
     { h: 'Members', num: 1, v: (g) => (g.memberUids || []).length },
     { h: 'Golfers', num: 1, v: (g) => D.golfers.filter((x) => (x.poolGroupIds || []).includes(g.id)).length },
     { h: 'Rounds', num: 1, v: (g) => D.rounds.filter((r) => r.groupId === g.id).length },
-  ], rows);
-  const g = byId(D.groups)[sel];
+  ], rows, '<button class="btn primary" id="gNew">New group</button>');
+  $('#gNew').onclick = () => { sel = NEW_GROUP; render(); };
   const P = $('#detail');
-  if (!g) { P.innerHTML = '<div class="empty">Pick a group.</div>'; return; }
+  if (sel === NEW_GROUP) return newGroupForm(P);
+  const g = byId(D.groups)[sel];
+  if (!g) { P.innerHTML = '<div class="empty">Pick a group, or make a new one.</div>'; return; }
   const golfers = D.golfers.filter((x) => (x.poolGroupIds || []).includes(g.id)).sort((a, b) => a.name.localeCompare(b.name));
   const nonMembers = D.users.filter((u) => !(g.memberUids || []).includes(u.id));
   P.innerHTML =
@@ -298,24 +300,77 @@ function listGroups() {
     (nonMembers.length ? '<div class="field" style="margin-top:8px;"><select id="gAdd">' + nonMembers.map((u) =>
       '<option value="' + esc(u.id) + '">' + esc(u.displayName || u.email || u.id) + '</option>').join('') +
       '</select><button class="btn" id="gAddBtn">Add member</button></div>' : '') +
-    '<div class="sec">Golfers (' + golfers.length + ')</div><div class="note">' + (golfers.map((x) => esc(x.name)).join(', ') || 'None') +
-      '</div><p class="note">Edit who is in it from the Golfers tab.</p>' +
+    '<div class="sec">Golfers (' + golfers.length + ')</div>' + golferChecklist('gGolf', golfers.map((x) => x.id)) +
+    '<button class="btn primary" id="gGolfSave" style="margin-top:8px;">Save golfers</button>' +
     '<div class="danger-zone"><div class="sec" style="margin-top:0;">Merge into another group</div>' +
     '<div class="field"><select id="gInto">' + D.groups.filter((x) => x.id !== g.id).map((x) =>
       '<option value="' + esc(x.id) + '">' + esc(x.name) + '</option>').join('') + '</select><button class="btn danger" id="gMerge">Merge</button></div>' +
     '<p class="note">Moves this group’s golfers, members, rounds and invitations into the other one, then deletes this one.</p>' +
     '<button class="btn danger" id="gDel" style="margin-top:10px;">Delete group</button>' +
-    '<p class="note">Golfers are kept. Its rounds become their scorer’s own rounds. Its invitations are deleted.</p></div>';
+    '<p class="note">Golfers are kept. Its rounds become their scorer’s own rounds. Its invitations are deleted.' +
+      (ops.isDirectory(g) ? ' <b>This is the directory</b> — everyone’s golfers and every waiting invitation. Deleting or merging it away asks you to type its name.' : '') +
+      '</p></div>';
   $('#gNameSave').onclick = () => act('Renamed', () => ops.renameGroup(g.id, $('#gName').value));
   $('#gKindSave').onclick = () => act('Saved', () => ops.setKind(g.id, $('#gKind').value));
   $('#gOwnerSave').onclick = () => act('Owner changed', () => ops.setOwner(g.id, $('#gOwner').value));
   $$('[data-rm]', P).forEach((b) => { b.onclick = () => act('Removed', () => ops.removeMember(g.id, b.dataset.rm), 'Remove ' + userName(b.dataset.rm) + ' from ' + g.name + '?'); });
   const ab = $('#gAddBtn'); if (ab) ab.onclick = () => act('Added', () => ops.addMember(g.id, $('#gAdd').value));
+  $('#gGolfSave').onclick = () => act('Golfers saved', () => ops.setGroupGolfers(g.id, checked('gGolf')));
+  // The directory needs its name typed back; a playing group a plain confirm.
+  const typed = (verb) => {
+    if (!ops.isDirectory(g)) return '';
+    const t = prompt(g.name + ' is the directory. ' + verb + ' it strands every golfer and invitation in it.\n\nType ' + g.name + ' to go ahead.');
+    return t == null ? null : t;
+  };
   const gm = $('#gMerge');
-  if (gm) gm.onclick = () => { const into = $('#gInto').value; act('Merged', () => ops.mergeGroups(g.id, into).then((r) => { sel = into; return r; }),
-    'Merge ' + g.name + ' into ' + groupName(into) + '? ' + g.name + ' will be deleted.'); };
-  $('#gDel').onclick = () => act('Deleted', () => ops.deleteGroup(g.id).then((r) => { sel = null; return r; }),
-    'Delete ' + g.name + '? This cannot be undone.');
+  if (gm) gm.onclick = () => {
+    const into = $('#gInto').value, name = typed('Merging it away');
+    if (name === null) return;
+    act('Merged', () => ops.mergeGroups(g.id, into, { confirmName: name }).then((r) => { sel = into; return r; }),
+      ops.isDirectory(g) ? null : 'Merge ' + g.name + ' into ' + groupName(into) + '? ' + g.name + ' will be deleted.');
+  };
+  $('#gDel').onclick = () => {
+    const name = typed('Deleting');
+    if (name === null) return;
+    act('Deleted', () => ops.deleteGroup(g.id, { confirmName: name }).then((r) => { sel = null; return r; }),
+      ops.isDirectory(g) ? null : 'Delete ' + g.name + '? This cannot be undone.');
+  };
+}
+
+const NEW_GROUP = '__new_group__';
+
+/** Every golfer as a ticked/unticked row, last name order, with a filter. */
+function golferChecklist(id, ticked) {
+  const on = new Set(ticked || []);
+  const list = D.golfers.slice().sort((a, b) =>
+    (norm(a.name).split(' ').pop() + norm(a.name)).localeCompare(norm(b.name).split(' ').pop() + norm(b.name)));
+  return '<input type="search" class="chk-filter" data-for="' + id + '" placeholder="Filter golfers" style="width:100%;height:32px;margin-bottom:6px;">' +
+    '<div class="items" id="' + id + '" style="max-height:340px;overflow:auto;">' + list.map((x) =>
+      '<label class="item" data-nm="' + esc(norm(x.name)) + '"><input type="checkbox" value="' + esc(x.id) + '"' + (on.has(x.id) ? ' checked' : '') + '>' +
+      '<span class="grow">' + esc(x.name) + '</span><span class="muted">' + esc(x.currentIndex || '') + '</span></label>').join('') + '</div>';
+}
+const checked = (id) => $$('#' + id + ' input[type=checkbox]:checked').map((c) => c.value);
+document.addEventListener('input', (e) => {
+  const f = e.target.closest && e.target.closest('.chk-filter');
+  if (!f) return;
+  const v = norm(f.value);
+  $$('#' + f.dataset.for + ' .item').forEach((row) => { row.style.display = !v || row.dataset.nm.includes(v) ? '' : 'none'; });
+});
+
+function newGroupForm(P) {
+  const me = auth.currentUser;
+  P.innerHTML = '<h2>New group</h2><div class="sub">A playing group, like one made in the app with Start a group.</div>' +
+    '<div class="sec">Name</div><div class="field"><input id="ngName" placeholder="e.g. Nunes"></div>' +
+    '<div class="sec">Owner</div><div class="field"><select id="ngOwner">' + D.users.slice()
+      .sort((a, b) => String(a.displayName || a.email).localeCompare(String(b.displayName || b.email))).map((u) =>
+      '<option value="' + esc(u.id) + '"' + (u.id === me.uid ? ' selected' : '') + '>' + esc(u.displayName || u.email || u.id) + '</option>').join('') +
+      '</select></div><p class="note">The owner is its first member. Others join with its invite link, or add them under Members afterwards.</p>' +
+    '<div class="sec">Golfers</div>' + golferChecklist('ngGolf', []) +
+    '<div class="field" style="margin-top:10px;"><button class="btn primary" id="ngCreate">Create group</button><button class="btn" id="ngCancel">Cancel</button></div>';
+  $('#ngCancel').onclick = () => { sel = null; render(); };
+  $('#ngCreate').onclick = () => act('Group created', () => ops.createGroup({
+    name: $('#ngName').value, ownerUid: $('#ngOwner').value, golferIds: checked('ngGolf'),
+  }).then((id) => { sel = id; }));
 }
 
 // --------------------------------------------------------------- golfers
