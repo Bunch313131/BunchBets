@@ -104,8 +104,10 @@ console.log('BETA (localhost is treated as beta)\n');
   await page.close();
 }
 
-// ------------------------------------------------------- PRODUCTION stays dark
-console.log('\nPRODUCTION (bunchbets.com — must be completely dark)\n');
+// ------------------------------------------- PRODUCTION has accounts (8.2+)
+// Until 8.2 production was dark here. Accounts are now on for everyone; what
+// must still differ is only the environment: no BETA branding.
+console.log('\nPRODUCTION (bunchbets.com — accounts on, no BETA branding)\n');
 {
   // Service workers BLOCKED. The worker precaches gstatic and serves it
   // cache-first, and a service worker's fetch is not covered by page.route — so
@@ -141,8 +143,9 @@ console.log('\nPRODUCTION (bunchbets.com — must be completely dark)\n');
     return {
       hidden: el ? el.style.display === 'none' : null,
       empty: el ? el.innerHTML.trim() === '' : null,
-      authSdk: !!document.querySelector('script[src*="firebase-auth-compat"]'),
-      db: (document.body.innerHTML.match(/bunchbets-default-rtdb/) || []).length,
+      button: (document.getElementById('cloudSignIn') || {}).textContent || '',
+      title: document.title,
+      betaBody: document.body.classList.contains('is-beta'),
     };
   });
   // Same guard as wizard-flow: prove the page under test is THIS build. A
@@ -150,9 +153,11 @@ console.log('\nPRODUCTION (bunchbets.com — must be completely dark)\n');
   // make every assertion below pass for reasons unrelated to the code.
   check('the page under test is this build, not the live site',
     await page.evaluate(() => typeof window.BB_BUILD_MARKER), 'string');
-  check('account panel hidden on production', prod.hidden, true);
-  check('and never rendered', prod.empty, true);
-  check('no auth SDK fetched', prod.authSdk, false);
+  check('account panel shown on production', prod.hidden, false);
+  check('  and rendered', prod.empty, false);
+  check('  offering Google sign-in', /Sign in with Google|Preparing sign-in/.test(prod.button), true);
+  check('no BETA title', /BETA/.test(prod.title), false);
+  check('no BETA styling', prod.betaBody, false);
   await page.screenshot({ path: '/home/claude/cloud-prod.png' });
   check('no page errors', errs, []);
   await page.close();

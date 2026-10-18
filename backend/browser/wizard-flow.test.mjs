@@ -308,7 +308,8 @@ console.log('\nturning a game on and off\n');
 }
 
 // --------------------------------------------------------------------------
-console.log('\nproduction keeps the wizard its users know\n');
+// Until 8.2 production kept the old wizard. It now gets the new setup.
+console.log('\nproduction gets the new setup too\n');
 {
   const { page, ctx, errs } = await open('https://bunchbets.com');
   // Driven click by click rather than inside one page.evaluate: the wizard
@@ -328,9 +329,12 @@ console.log('\nproduction keeps the wizard its users know\n');
   check('the page under test is this build, not the live site',
     await page.evaluate(() => typeof window.BB_BUILD_MARKER), 'string');
   const prod = await heading(page);
-  check('the splash goes straight to the course, not to sign-in', prod, 'Select Course');
-  check('  and there is no new-flow footer', await page.locator('#wizNext').count(), 0);
-  check('  nor a tee row on the course screen', await page.locator('#wizardCourseTee #wizardTee').count(), 0);
+  check('the splash goes to Home', prod, 'Let\u2019s play');
+  check('  offering new round, join and past rounds',
+    await page.evaluate(() => ['#wizNewRound', '#wizJoin', '#wizHistory'].map((q) => !!document.querySelector(q))),
+    [true, true, true]);
+  await page.evaluate(() => document.querySelector('#wizNewRound').click()); await page.waitForTimeout(600);
+  check('  and New round goes to the course', await heading(page), 'Where are we playing?');
   check('no page errors', errs, []);
   await ctx.close();
 }
