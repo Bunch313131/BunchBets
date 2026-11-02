@@ -61,6 +61,9 @@ await page.evaluate(() => {
 });
 
 const rowHeads = () => page.evaluate(() => [...document.querySelectorAll('.nassau-press-row')].map((r) => r.innerText.replace(/\s+/g, ' ')));
+// The status card a press row sits in: its title names the match in full.
+const cardTitles = () => page.evaluate(() => [...document.querySelectorAll('.nassau-press-row')].map((r) =>
+  r.closest('.game-status-card').innerText.split('\n')[0].replace(/\s+/g, ' ')));
 const holeButtons = async (pos) => {
   await page.evaluate((p) => {
     const S = window._bb.State;
@@ -82,8 +85,9 @@ check('nobody on the first hole of a nine', await holeButtons(0), []);
 const teamA = await page.evaluate(() => ['p1', 'p2'].map((p) => window._bb.UI.shortName(p)).join(' & '));
 check('on hole 4, only team A (down 6), offered to press',
   await holeButtons(3), [{ team: 'A', text: 'Press', on: false }]);
-check('  the row says which match, who is down and by how much',
-  (await rowHeads())[0].startsWith(`Match 1: ${teamA} 6 down on the front`), true);
+check('  inside that match\'s status card, saying who is down and by how much',
+  (await rowHeads())[0].startsWith(`${teamA} 6 down on the front`), true);
+check('  the card names the match in full', /Nassau: .+ vs .+/.test((await cardTitles())[0]), true);
 check('team B cannot press while ahead', await page.evaluate(() =>
   window._bb.Game.toggleManualPress(window._bb.State.data.games[0], 3, 'B')), false);
 
@@ -161,9 +165,12 @@ await page.evaluate(() => {
 });
 await holeButtons(2);
 const heads = await rowHeads();
+const titles = await cardTitles();
 check('one press row per match', heads.length, 3);
-check('  each naming a different match', new Set(heads.map((t) => t.split(':')[0])).size, 3);
-check('  with both sides in full, all different', new Set(heads.map((t) => t.split(' vs ')[1])).size, 3);
+check('  each in a different match\'s card', new Set(titles).size, 3);
+check('  whose titles name different opponents', new Set(titles.map((t) => t.split(' vs ')[1])).size, 3);
+check('the press sits in the match status card, not a separate block',
+  await page.evaluate(() => [...document.querySelectorAll('.nassau-press-row')].every((r) => !!r.closest('.game-status-card'))), true);
 await page.evaluate(() => document.querySelector('.nassau-press-row[data-game="1"] .nassau-press').click());
 await page.waitForTimeout(250);
 check('pressing in match 2 presses match 2 only', await page.evaluate(() =>

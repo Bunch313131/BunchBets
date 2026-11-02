@@ -296,7 +296,6 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .press-label { font-weight:600; font-size:12px; }
 .hole-press-section { padding:6px 12px 2px; }
 .hole-press-row { display:flex; align-items:center; justify-content:space-between; padding:6px 10px; border-radius:8px; margin-bottom:4px; }
-.nassau-press-row { gap:10px; }
 .hole-press-row.theme-g1 { background:rgba(22,163,74,0.15); }
 .hole-press-row.theme-g2 { background:rgba(220,38,38,0.15); }
 .hole-press-row.theme-g3 { background:rgba(217,119,6,0.15); }
@@ -8456,6 +8455,33 @@ const UI = {
     }
     const thruLabel = lastScoredThru >= 0 ? `Thru ${lastScoredThru + 1}` : '';
 
+    // Nassau manual press, inside that match's status card so the match is
+    // already named (colour, both sides, running bets) and the cards stay in
+    // view. Offered only to the team down on this nine (before this hole); the
+    // press counts from this hole to the end of the nine at the nine's stake.
+    // A press already on this hole shows lit and taps off.
+    const nassauPressControl = (game, idx) => {
+      const down = Game.pressableBy(game, hole);
+      const on = (game.manualPresses || []).filter(mp => mp.start === hole).map(mp => mp.by);
+      const teams = [...new Set([...on, ...(down ? [down] : [])])];
+      if (!teams.length) return null;
+      const names = (t) => (t === 'A' ? game.teamA : game.teamB).map(pid => UI.shortName(pid)).join(' & ');
+      const nine = hole < 9 ? 'front' : 'back';
+      const cum = Game.nineStanding(game, hole);
+      const text = down
+        ? `${names(down)} ${Math.abs(cum)} down on the ${nine} \u00b7 press $${game.stakes[nine]||0} from this hole`
+        : `Pressed from this hole \u00b7 $${game.stakes[nine]||0} to the end of the ${nine}`;
+      return h('div',{class:'nassau-press-row','data-game':idx,
+        style:'display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;padding-top:6px;border-top:1px solid var(--border);'},[
+        h('span',{style:'font-size:11px;color:var(--muted);min-width:0;'},text),
+        h('div',{class:'hole-press-btns',style:'flex-shrink:0;'},teams.map(t =>
+          h('button',{class:`hole-press-btn nassau-press${on.includes(t)?' active':''}`,'data-team':t,
+            'aria-label':`${on.includes(t) ? 'Take back the press by' : 'Press for'} ${names(t)} in match ${idx + 1}`,
+            onclick:()=>{ Game.toggleManualPress(game, hole, t); State.scheduleSave(); State.scheduleRender(); }},
+            teams.length > 1 ? `${on.includes(t) ? '\u2713 ' : ''}${names(t)}` : (on.includes(t) ? 'Pressed \u2713' : 'Press'))))
+      ]);
+    };
+
     // Game status summary cards
     const statusCards = State.data.games.map((game, idx) => {
       const theme = `theme-g${(idx%6)+1}`;
@@ -8469,7 +8495,8 @@ const UI = {
         const junk = game.withJunk ? Game.computeJunkThroughHole(game, hole) : null;
         const kpResult = game.withJunk ? Game.computeKPThroughHole(game, hole) : null;
         const fmtPts = (pts) => pts > 0 ? `+${pts}` : pts === 0 ? 'E' : String(pts);
-        const fmtSeg = (s) => s.winners.join('/');
+        // A manual press is marked *, as in the results' hole-by-hole view.
+        const fmtSeg = (s) => s.winners.map((w, i) => w + (s.lines[i] && s.lines[i].manual ? '*' : '')).join('/');
         const hasBack9Score = hole >= 9;
         const allHolesScored = hole >= 17 && [...(game.teamA||[]), ...(game.teamB||[])].every(pid => {
           const scores = game.gross[pid];
@@ -8521,6 +8548,8 @@ const UI = {
           lines.push(buildNineLine('Front', fmtSeg(result.segments.front), junk ? junk.frontNetPts : 0, frontKP, result.segments.front.payA));
           if (hasBack9Score) lines.push(buildNineLine('Back', fmtSeg(result.segments.back), junk ? junk.backNetPts : 0, backKP, result.segments.back.payA));
           lines.push(buildNineLine('Overall', fmtSeg(result.segments.overall), 0, 0, result.segments.overall.payA));
+          const press = nassauPressControl(game, idx);
+          if (press) lines.push(press);
         } else {
           const frontPP = result.frontPoints * (game.pointValue.front || 0);
           const backPP = result.backPoints * (game.pointValue.back || 0);
@@ -8718,41 +8747,6 @@ const UI = {
       ]);
     })) : null;
 
-    // Nassau manual press. Offered only to the team down on this nine (before
-    // this hole); the press includes this hole and runs to the end of the nine
-    // at the nine's stake. A press already on this hole shows lit and taps off.
-    const nassauGames = State.data.games.filter(gm => gm.gameType === 'nassau');
-    const nassauPressRows = nassauGames.map(game => {
-      const actualIdx = State.data.games.indexOf(game);
-      const theme = `theme-g${(actualIdx%6)+1}`;
-      const down = Game.pressableBy(game, hole);
-      const on = (game.manualPresses || []).filter(mp => mp.start === hole).map(mp => mp.by);
-      const teams = [...new Set([...on, ...(down ? [down] : [])])];
-      if (!teams.length) return null;
-      // Say WHICH match in full. With several matches the short game labels
-      // can be identical ("T/TI vs B/K" twice), and the same team is often down
-      // in all of them, so neither tells the rows apart.
-      const names = (t) => (t === 'A' ? game.teamA : game.teamB).map(pid => UI.shortName(pid)).join(' & ');
-      const nine = hole < 9 ? 'front' : 'back';
-      const cum = Game.nineStanding(game, hole);
-      const matchNo = actualIdx + 1;
-      const head = down
-        ? `Match ${matchNo}: ${names(down)} ${Math.abs(cum)} down on the ${nine}`
-        : `Match ${matchNo}: ${on.map(names).join(', ')} pressed`;
-      return h('div',{class:`hole-press-row nassau-press-row ${theme}`,'data-game':actualIdx},[
-        h('div',{class:'hole-press-label',style:'min-width:0;'},[
-          h('div',{},head),
-          h('div',{style:'font-weight:400;font-size:11px;opacity:.75;margin-top:2px;'},
-            `${names('A')} vs ${names('B')} \u00b7 $${game.stakes[nine]||0} to the end of the ${nine}`)
-        ]),
-        h('div',{class:'hole-press-btns',style:'flex-shrink:0;'},teams.map(t =>
-          h('button',{class:`hole-press-btn nassau-press${on.includes(t)?' active':''}`,'data-team':t,
-            'aria-label':`${on.includes(t) ? 'Take back the press by' : 'Press for'} ${names(t)} in match ${matchNo}`,
-            onclick:()=>{ Game.toggleManualPress(game, hole, t); State.scheduleSave(); State.scheduleRender(); }},
-            teams.length > 1 ? `${on.includes(t) ? '\u2713 ' : ''}${names(t)}` : (on.includes(t) ? 'Pressed \u2713' : 'Press'))))
-      ]);
-    }).filter(Boolean);
-    const nassauPressSection = nassauPressRows.length ? h('div',{class:'hole-press-section'},nassauPressRows) : null;
 
     // Scoring card
     const scoringCard = h('div',{class:'hole-scoring'},[
@@ -8762,7 +8756,6 @@ const UI = {
       kpSection,
       wolfSection,
       pressSection,
-      nassauPressSection,
       clearBtn
     ].filter(Boolean));
 
@@ -9490,7 +9483,8 @@ const UI = {
         const isNassau = game.gameType === 'nassau';
         const result = isNassau ? Game.computeResult(game) : Game.computeVegasResult(game);
         const sz = (game.teamA||[]).length || 1;
-        const fmtSeg = (s) => s.winners.join('/');
+        // A manual press is marked *, as in the results' hole-by-hole view.
+        const fmtSeg = (s) => s.winners.map((w, i) => w + (s.lines[i] && s.lines[i].manual ? '*' : '')).join('/');
         const allHolesScored = [...(game.teamA||[]), ...(game.teamB||[])].every(pid => {
           const scores = game.gross[pid];
           return scores && scores.every(s => s != null);
