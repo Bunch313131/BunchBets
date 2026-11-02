@@ -886,9 +886,12 @@ body.splashing > header, body.splashing > main, body.splashing > .bottom-nav { d
 // === CONSTANTS ===
 const STORAGE_KEY = 'nassauV28_complete';
 const MIN_SCORE = 1, MAX_SCORE = 15, HOLES = 18;
-const APP_VERSION = '8.3';
+const APP_VERSION = '8.4';
 const VERSION_KEY = 'bunchbets-version';
 const RELEASE_NOTES = {
+  '8.4': [
+    'Nassau: the team that\u2019s down can press by hand \u2014 tap Press on the hole screen. It counts from that hole to the end of the nine, at the nine\u2019s stake, and tapping it again takes it back',
+  ],
   '8.2': [
     'Group accounts are on for everyone \u2014 sign in from the menu or the first setup screen to get your rounds, groups and standings on any phone. Playing without an account works exactly as before.',
   ],
@@ -3045,6 +3048,10 @@ const Game = {
     let pa = Array.isArray(g.presses) ? g.presses.slice(0,18) : Utils.make18('');
     while (pa.length < 18) pa.push('');
     g.presses = pa.map(v => ['','press','blind'].includes(v) ? v : '');
+    // Nassau manual presses: {start: hole position, by: 'A'|'B'}, at most one
+    // per team per hole. See Game.pressableBy for who may add one.
+    g.manualPresses = (Array.isArray(g.manualPresses) ? g.manualPresses : []).filter((mp) =>
+      mp && Number.isInteger(mp.start) && mp.start >= 0 && mp.start <= 17 && (mp.by === 'A' || mp.by === 'B'));
     
     g.gross = g.gross || {};
     g.junkCounts = g.junkCounts || {};
@@ -3395,6 +3402,18 @@ const Game = {
       }
     }
 
+    // Manual presses. A team that is down presses the nine it is on, from the
+    // hole being played to the end of that nine, at that nine's stake. They sit
+    // beside the auto-presses and never start auto-presses of their own.
+    // Mirrored exactly in buildSegmentThroughHole.
+    if (end - start === 8) {
+      (g.manualPresses || []).forEach(mp => {
+        if (mp.start >= start && mp.start <= end) {
+          lines.push({start:mp.start, end, stake, pressedBy:mp.by, manual:true, pressesTriggered:1});
+        }
+      });
+    }
+
     const winners = [];
     let payA = 0, teamPayA = 0;
     const szA = (g.teamA||[]).length || 1;
@@ -3585,6 +3604,31 @@ const Game = {
     return {aVal, bVal, netA: aVal - bVal, frontNetPts, backNetPts, frontNetVal, backNetVal};
   },
 
+  /**
+   * Who may add a manual press on `hole`: the team down on the nine's main bet
+   * over the holes BEFORE it — 'A', 'B', or null when level (so never on the
+   * first hole of a nine). The press then includes `hole` itself.
+   */
+  pressableBy(g, hole) {
+    if (!g || g.gameType !== 'nassau' || hole < 0 || hole > 17) return null;
+    let cum = 0;
+    for (let i = hole < 9 ? 0 : 9; i < hole; i++) {
+      const d = this.holeDiff(g, i);
+      if (d != null) cum += d;
+    }
+    return cum < 0 ? 'A' : cum > 0 ? 'B' : null;
+  },
+
+  /** Add or take back a team's manual press on `hole`. Returns true if one is now on. */
+  toggleManualPress(g, hole, by) {
+    g.manualPresses = g.manualPresses || [];
+    const i = g.manualPresses.findIndex((mp) => mp.start === hole && mp.by === by);
+    if (i >= 0) { g.manualPresses.splice(i, 1); return false; }
+    if (this.pressableBy(g, hole) !== by) return false;
+    g.manualPresses.push({ start: hole, by });
+    return true;
+  },
+
   computeResult(g) {
     const front = this.buildSegment(g, 0, 8, g.stakes.front, g.autoPress.front);
     const back = this.buildSegment(g, 9, 17, g.stakes.back, g.autoPress.back);
@@ -3659,6 +3703,15 @@ const Game = {
           line.pressesTriggered = 1;
         }
       }
+    }
+
+    // Manual presses, as in buildSegment: only those started by maxHole.
+    if (end - start === 8) {
+      (g.manualPresses || []).forEach(mp => {
+        if (mp.start >= start && mp.start <= capEnd) {
+          lines.push({start:mp.start, end:capEnd, stake, pressedBy:mp.by, manual:true, pressesTriggered:1});
+        }
+      });
     }
 
     const winners = [];
@@ -6907,7 +6960,7 @@ const Wizard = {
               '<li>Split = push (0)</li>' +
               '<li>Lose both = lose the hole (-1)</li>' +
               '</ul>' +
-              '<p><strong>Presses:</strong> When a team is down 2 or more, a new bet automatically starts (auto-press). All active bets run in parallel.</p>' +
+              '<p><strong>Presses:</strong> When a team is down 2 or more, a new bet automatically starts (auto-press). A team that is down on a nine can also press by hand from the hole screen: the press counts from that hole to the end of the nine, at that nine\u2019s stake. All active bets run in parallel.</p>' +
               '<p><strong>Scoring:</strong> Each bet pays out based on the final margin. Stakes are per player.</p>';
           } else if (type === 'vegas') {
             title = 'Vegas';
@@ -8658,6 +8711,30 @@ const UI = {
       ]);
     })) : null;
 
+    // Nassau manual press. Offered only to the team down on this nine (before
+    // this hole); the press includes this hole and runs to the end of the nine
+    // at the nine's stake. A press already on this hole shows lit and taps off.
+    const nassauGames = State.data.games.filter(gm => gm.gameType === 'nassau');
+    const nassauPressRows = nassauGames.map(game => {
+      const actualIdx = State.data.games.indexOf(game);
+      const theme = `theme-g${(actualIdx%6)+1}`;
+      const down = Game.pressableBy(game, hole);
+      const on = (game.manualPresses || []).filter(mp => mp.start === hole).map(mp => mp.by);
+      const teams = [...new Set([...on, ...(down ? [down] : [])])];
+      if (!teams.length) return null;
+      const names = (t) => (t === 'A' ? game.teamA : game.teamB).map(pid => UI.shortName(pid)).join(' & ');
+      const nine = hole < 9 ? 'front' : 'back';
+      return h('div',{class:`hole-press-row ${theme}`},[
+        h('span',{class:'hole-press-label'},UI.gameLabel(game)),
+        h('div',{class:'hole-press-btns'},teams.map(t =>
+          h('button',{class:`hole-press-btn nassau-press${on.includes(t)?' active':''}`,'data-team':t,
+            title:`$${game.stakes[nine]||0} to the end of the ${nine} nine, starting this hole`,
+            onclick:()=>{ Game.toggleManualPress(game, hole, t); State.scheduleSave(); State.scheduleRender(); }},
+            on.includes(t) ? `${names(t)} pressed \u2713` : `Press: ${names(t)}`)))
+      ]);
+    }).filter(Boolean);
+    const nassauPressSection = nassauPressRows.length ? h('div',{class:'hole-press-section'},nassauPressRows) : null;
+
     // Scoring card
     const scoringCard = h('div',{class:'hole-scoring'},[
       navBar,
@@ -8666,6 +8743,7 @@ const UI = {
       kpSection,
       wolfSection,
       pressSection,
+      nassauPressSection,
       clearBtn
     ].filter(Boolean));
 
@@ -10316,7 +10394,7 @@ const UI = {
         return h('div',{class:theme},[h('div',{class:'card'},[h('div',{},'Error calculating Nassau result: ' + e.message)])]);
       }
 
-      const buildNassauHoleRows = (startHole, endHole, autoPress) => {
+      const buildNassauHoleRows = (startHole, endHole, stake, autoPress) => {
         const rows = [];
         const A = g.teamA || [];
         const B = g.teamB || [];
@@ -10327,8 +10405,11 @@ const UI = {
           diffs.push(Game.holeDiff(g, h));
         }
 
-        // Track bet lines - each has a start hole and we track cumulative
-        const betLines = [{ start: startHole, pressesTriggered: 0 }];
+        // The bet lines come from Game.buildSegment, the same calculation the
+        // settlement uses. This view used to run its own press logic, which
+        // could open several presses off one bet where the settlement opens
+        // one, and knew nothing of manual presses.
+        const betLines = Game.buildSegment(g, startHole, endHole, stake, autoPress).lines.slice().sort((a, b) => a.start - b.start);
 
         for (let hole = startHole; hole <= endHole; hole++) {
           const holeIdx = hole - startHole;
@@ -10376,20 +10457,8 @@ const UI = {
               if (d != null) cum += d;
             }
 
-            lineStatuses.push(cum > 0 ? `+${cum}` : cum === 0 ? 'E' : String(cum));
-
-            // Check if new press should be triggered (auto-press logic)
-            if (autoPress && hole < endHole) {
-              const pressLevel = Math.floor(Math.abs(cum) / 2);
-              if (pressLevel > line.pressesTriggered) {
-                // Add new press starting next hole if not already there
-                const nextHole = hole + 1;
-                if (!betLines.some(l => l.start === nextHole)) {
-                  betLines.push({ start: nextHole, pressesTriggered: 0 });
-                }
-                line.pressesTriggered = pressLevel;
-              }
-            }
+            // A manual press is marked with *, and noted under the nine.
+            lineStatuses.push((cum > 0 ? `+${cum}` : cum === 0 ? 'E' : String(cum)) + (line.manual ? '*' : ''));
           });
 
           const betStatusTxt = lineStatuses.join('/');
@@ -10419,11 +10488,16 @@ const UI = {
           if (diffs[h] != null) finalCum += diffs[h];
         }
 
+        const manual = betLines.filter(l => l.manual);
+        if (manual.length) {
+          rows.push(h('div',{class:'note',style:'margin-top:6px;'},
+            '* Manual press: ' + manual.map(l => `${l.pressedBy === 'A' ? 'A' : 'B'} from #${Game.holeLabel(l.start)}`).join(', ')));
+        }
         return { rows, cumulative: finalCum };
       };
 
-      const front = buildNassauHoleRows(0, 8, g.autoPress.front);
-      const back = buildNassauHoleRows(9, 17, g.autoPress.back);
+      const front = buildNassauHoleRows(0, 8, g.stakes.front, g.autoPress.front);
+      const back = buildNassauHoleRows(9, 17, g.stakes.back, g.autoPress.back);
 
       const fmtTP = (tot, sz) => {
         const s = Math.max(1, sz||1);
@@ -12475,6 +12549,7 @@ document.getElementById('clearBtn').onclick = () => {
     g.quadsConfirmed = {};
     // Reset presses back to original stakes
     if (g.presses) g.presses = {};
+    g.manualPresses = [];
     if (g.vegasMultipliers) g.vegasMultipliers = Utils.make18(1);
   });
   State.data._clearedHoles = {};

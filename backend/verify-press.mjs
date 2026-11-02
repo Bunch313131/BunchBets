@@ -65,3 +65,42 @@ for (let i = 0; i < 20000; i++) {
 }
 console.log(`shipped buildSegment matches the fuzz-validated rule : ${n - bad}/${n}`);
 console.log(`buildSegmentThroughHole agrees with buildSegment     : ${n - badThru}/${n}`);
+
+// ---------------------------------------------------------- manual presses
+// A manual press is an extra line from its hole to the end of ITS nine, at
+// the stake given, never on the overall, and never spawning auto-presses. The
+// running (through-hole) version must agree with the live one: completely at
+// hole 17, and at any earlier hole, holding exactly the presses started by then.
+const sig = (seg) => seg.lines.map((l) => `${l.start}-${l.end}${l.manual ? 'm' + l.pressedBy : ''}`).join(',') + '|' + seg.payA;
+let mBad = 0, mThru = 0, mPartial = 0, mN = 0;
+for (let i = 0; i < 20000; i++) {
+  const diffs = mk(18);
+  const manualPresses = [];
+  const k = Math.floor(rnd() * 4);
+  for (let j = 0; j < k; j++) manualPresses.push({ start: Math.floor(rnd() * 18), by: rnd() < 0.5 ? 'A' : 'B' });
+  const g = { __diffs: diffs, teamA: ['a1', 'a2'], teamB: ['b1', 'b2'], manualPresses };
+  const plain = { __diffs: diffs, teamA: g.teamA, teamB: g.teamB };
+  mN++;
+  for (const [s0, e0] of [[0, 8], [9, 17], [0, 17]]) {
+    const seg = Game.buildSegment(g, s0, e0, 5, true);
+    const autoOnly = Game.buildSegment(plain, s0, e0, 5, true);
+    const mine = manualPresses.filter((mp) => e0 - s0 === 8 && mp.start >= s0 && mp.start <= e0);
+    const manualLines = seg.lines.filter((l) => l.manual);
+    const ok =
+      // the auto-presses are untouched by the manual ones
+      JSON.stringify(seg.lines.filter((l) => !l.manual).map((l) => l.start)) === JSON.stringify(autoOnly.lines.map((l) => l.start)) &&
+      // one line per manual press on this nine, to the nine's end, at its stake
+      manualLines.length === mine.length &&
+      manualLines.every((l, idx) => l.start === mine[idx].start && l.end === e0 && l.stake === 5 && l.pressedBy === mine[idx].by);
+    if (!ok) mBad++;
+    if (sig(Game.buildSegmentThroughHole(g, s0, e0, 5, true, 17)) !== sig(seg)) mThru++;
+    const maxHole = Math.floor(rnd() * 18);
+    const partial = Game.buildSegmentThroughHole(g, s0, e0, 5, true, maxHole);
+    const wantN = mine.filter((mp) => mp.start <= Math.min(e0, maxHole)).length;
+    if (maxHole >= s0 && partial.lines.filter((l) => l.manual).length !== wantN) mPartial++;
+  }
+}
+console.log(`manual presses: right lines, auto-presses untouched  : ${mN - mBad}/${mN}`);
+console.log(`manual presses: through-hole agrees at hole 18       : ${mN - mThru}/${mN}`);
+console.log(`manual presses: only those started by the hole shown : ${mN - mPartial}/${mN}`);
+if (bad || badThru || mBad || mThru || mPartial) process.exit(1);
