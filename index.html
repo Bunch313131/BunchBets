@@ -296,6 +296,7 @@ select.press-select { min-height:36px; padding:6px 8px; font-size:14px; }
 .press-label { font-weight:600; font-size:12px; }
 .hole-press-section { padding:6px 12px 2px; }
 .hole-press-row { display:flex; align-items:center; justify-content:space-between; padding:6px 10px; border-radius:8px; margin-bottom:4px; }
+.nassau-press-row { gap:10px; }
 .hole-press-row.theme-g1 { background:rgba(22,163,74,0.15); }
 .hole-press-row.theme-g2 { background:rgba(220,38,38,0.15); }
 .hole-press-row.theme-g3 { background:rgba(217,119,6,0.15); }
@@ -3610,13 +3611,19 @@ const Game = {
    * first hole of a nine). The press then includes `hole` itself.
    */
   pressableBy(g, hole) {
-    if (!g || g.gameType !== 'nassau' || hole < 0 || hole > 17) return null;
+    const cum = this.nineStanding(g, hole);
+    return cum < 0 ? 'A' : cum > 0 ? 'B' : null;
+  },
+
+  /** The nine's main bet over the holes before `hole`, from Team A's side (+ = A up). */
+  nineStanding(g, hole) {
+    if (!g || g.gameType !== 'nassau' || hole < 0 || hole > 17) return 0;
     let cum = 0;
     for (let i = hole < 9 ? 0 : 9; i < hole; i++) {
       const d = this.holeDiff(g, i);
       if (d != null) cum += d;
     }
-    return cum < 0 ? 'A' : cum > 0 ? 'B' : null;
+    return cum;
   },
 
   /** Add or take back a team's manual press on `hole`. Returns true if one is now on. */
@@ -8722,15 +8729,27 @@ const UI = {
       const on = (game.manualPresses || []).filter(mp => mp.start === hole).map(mp => mp.by);
       const teams = [...new Set([...on, ...(down ? [down] : [])])];
       if (!teams.length) return null;
+      // Say WHICH match in full. With several matches the short game labels
+      // can be identical ("T/TI vs B/K" twice), and the same team is often down
+      // in all of them, so neither tells the rows apart.
       const names = (t) => (t === 'A' ? game.teamA : game.teamB).map(pid => UI.shortName(pid)).join(' & ');
       const nine = hole < 9 ? 'front' : 'back';
-      return h('div',{class:`hole-press-row ${theme}`},[
-        h('span',{class:'hole-press-label'},UI.gameLabel(game)),
-        h('div',{class:'hole-press-btns'},teams.map(t =>
+      const cum = Game.nineStanding(game, hole);
+      const matchNo = actualIdx + 1;
+      const head = down
+        ? `Match ${matchNo}: ${names(down)} ${Math.abs(cum)} down on the ${nine}`
+        : `Match ${matchNo}: ${on.map(names).join(', ')} pressed`;
+      return h('div',{class:`hole-press-row nassau-press-row ${theme}`,'data-game':actualIdx},[
+        h('div',{class:'hole-press-label',style:'min-width:0;'},[
+          h('div',{},head),
+          h('div',{style:'font-weight:400;font-size:11px;opacity:.75;margin-top:2px;'},
+            `${names('A')} vs ${names('B')} \u00b7 $${game.stakes[nine]||0} to the end of the ${nine}`)
+        ]),
+        h('div',{class:'hole-press-btns',style:'flex-shrink:0;'},teams.map(t =>
           h('button',{class:`hole-press-btn nassau-press${on.includes(t)?' active':''}`,'data-team':t,
-            title:`$${game.stakes[nine]||0} to the end of the ${nine} nine, starting this hole`,
+            'aria-label':`${on.includes(t) ? 'Take back the press by' : 'Press for'} ${names(t)} in match ${matchNo}`,
             onclick:()=>{ Game.toggleManualPress(game, hole, t); State.scheduleSave(); State.scheduleRender(); }},
-            on.includes(t) ? `${names(t)} pressed \u2713` : `Press: ${names(t)}`)))
+            teams.length > 1 ? `${on.includes(t) ? '\u2713 ' : ''}${names(t)}` : (on.includes(t) ? 'Pressed \u2713' : 'Press'))))
       ]);
     }).filter(Boolean);
     const nassauPressSection = nassauPressRows.length ? h('div',{class:'hole-press-section'},nassauPressRows) : null;

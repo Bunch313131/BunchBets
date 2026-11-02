@@ -60,6 +60,7 @@ await page.evaluate(() => {
   window.__score = score;
 });
 
+const rowHeads = () => page.evaluate(() => [...document.querySelectorAll('.nassau-press-row')].map((r) => r.innerText.replace(/\s+/g, ' ')));
 const holeButtons = async (pos) => {
   await page.evaluate((p) => {
     const S = window._bb.State;
@@ -80,7 +81,9 @@ console.log('\nwho may press\n');
 check('nobody on the first hole of a nine', await holeButtons(0), []);
 const teamA = await page.evaluate(() => ['p1', 'p2'].map((p) => window._bb.UI.shortName(p)).join(' & '));
 check('on hole 4, only team A (down 6), offered to press',
-  await holeButtons(3), [{ team: 'A', text: 'Press: ' + teamA, on: false }]);
+  await holeButtons(3), [{ team: 'A', text: 'Press', on: false }]);
+check('  the row says which match, who is down and by how much',
+  (await rowHeads())[0].startsWith(`Match 1: ${teamA} 6 down on the front`), true);
 check('team B cannot press while ahead', await page.evaluate(() =>
   window._bb.Game.toggleManualPress(window._bb.State.data.games[0], 3, 'B')), false);
 
@@ -89,7 +92,7 @@ await page.evaluate(() => document.querySelector('.nassau-press[data-team="A"]')
 await page.waitForTimeout(250);
 check('tapping Press records it from THIS hole', await game(), [{ start: 3, by: 'A' }]);
 const lit = await holeButtons(3);
-check('  and the button shows it, lit', [lit.length, lit[0].on, /pressed/.test(lit[0].text)], [1, true, true]);
+check('  and the button shows it, lit', [lit.length, lit[0].on, lit[0].text], [1, true, 'Pressed \u2713']);
 check('nothing on the back nine', (await holeButtons(9)).length, 0);
 
 // Holes 4-9: A wins both balls every hole (+2 each, +12).
@@ -140,6 +143,31 @@ check('auto-press starts are unchanged by the manual press', await page.evaluate
   g.manualPresses = saved;
   return JSON.stringify(withIt) === JSON.stringify(without);
 }), true);
+
+console.log('\nseveral matches\n');
+// Five players, three matches: Tyler & Timothy against each other pair. The
+// short game labels collide here ("T/TI vs B/K" twice), so each press row must
+// name its match and both sides in full.
+await page.evaluate(() => {
+  const { State, Game } = window._bb;
+  State.data.players = [['Tyler Bryan',0],['Brian Casey',6],['Brian Bunch',8],['Kenneth Bernard',12],['Timothy Mar',21]]
+    .map(([name, handicap], i) => ({ id: 'p' + (i + 1), name, handicap }));
+  const mk = (a, b) => { const g = Game.create(); Object.assign(g, { gameType: 'nassau', teamA: a, teamB: b, scoringMode: 'hi_low',
+    stakes: { front: 5, back: 5, overall: 5 }, autoPress: { front: false, back: false, overall: false }, withJunk: false, handicapMode: 'full' });
+    State.data.players.forEach((pl) => { g.gross[pl.id] = Array(18).fill(null); g.junkCounts[pl.id] = Array(18).fill(0); }); return Game.sanitize(g); };
+  State.data.games = [mk(['p1','p5'],['p2','p3']), mk(['p1','p5'],['p2','p4']), mk(['p1','p5'],['p3','p4'])];
+  State.data._scoredHoles = {};
+  for (let h = 0; h < 2; h++) { State.data.games.forEach((g) => { ['p1','p5'].forEach((p) => g.gross[p][h] = 6); ['p2','p3','p4'].forEach((p) => g.gross[p][h] = 4); }); State.data._scoredHoles[h] = true; }
+});
+await holeButtons(2);
+const heads = await rowHeads();
+check('one press row per match', heads.length, 3);
+check('  each naming a different match', new Set(heads.map((t) => t.split(':')[0])).size, 3);
+check('  with both sides in full, all different', new Set(heads.map((t) => t.split(' vs ')[1])).size, 3);
+await page.evaluate(() => document.querySelector('.nassau-press-row[data-game="1"] .nassau-press').click());
+await page.waitForTimeout(250);
+check('pressing in match 2 presses match 2 only', await page.evaluate(() =>
+  window._bb.State.data.games.map((g) => g.manualPresses.length)), [0, 1, 0]);
 
 console.log('\nclearing scores\n');
 // The menu's Clear Scores button, which confirms first (accepted here).
