@@ -148,6 +148,33 @@ check('auto-press starts are unchanged by the manual press', await page.evaluate
   return JSON.stringify(withIt) === JSON.stringify(without);
 }), true);
 
+console.log('\npressing again on a later hole\n');
+// A team can press more than once, one press per hole: A presses on hole 4,
+// is still down on hole 6, and presses again. Fresh scores, auto-presses off.
+await page.evaluate(() => {
+  const { State } = window._bb, g = State.data.games[0];
+  g.autoPress.front = false; g.manualPresses = []; State.data._scoredHoles = {};
+  State.data.players.forEach((p) => { g.gross[p.id] = Array(18).fill(null); });
+  for (let pos = 0; pos < 3; pos++) window.__score(pos, 5, 3);     // A 6 down after 3
+});
+await holeButtons(3);
+await page.evaluate(() => document.querySelector('.nassau-press[data-team="A"]').click());
+await page.waitForTimeout(200);
+await page.evaluate(() => { for (let pos = 3; pos < 5; pos++) window.__score(pos, 5, 3); });  // still losing
+const again = await holeButtons(5);
+check('on hole 6, still down, A is offered Press again', again.map((b) => [b.team, b.text]), [['A', 'Press']]);
+await page.evaluate(() => document.querySelector('.nassau-press[data-team="A"]').click());
+await page.waitForTimeout(200);
+check('  and now has two presses, from holes 4 and 6', await game(), [{ start: 3, by: 'A' }, { start: 5, by: 'A' }]);
+await page.evaluate(() => { for (let pos = 5; pos < 9; pos++) window.__score(pos, 3, 5); });  // A wins 6-9
+// Main bet: -10 then +8 = -2 (B). Press from 4: -4 then +8 = +4 (A). Press from 6: +8 (A).
+check('  each settled as its own bet', await front(), { payA: 5, manual: [[3, 8, 5, 'A'], [5, 8, 5, 'A']] });
+check('one press per team per hole: no second press on hole 6', await page.evaluate(() => {
+  const { Game, State } = window._bb, g = State.data.games[0];
+  // Toggling the same hole again takes it back rather than adding another.
+  Game.toggleManualPress(g, 5, 'A'); const n = g.manualPresses.length; Game.toggleManualPress(g, 5, 'A'); return n;
+}), 1);
+
 console.log('\nseveral matches\n');
 // Five players, three matches: Tyler & Timothy against each other pair. The
 // short game labels collide here ("T/TI vs B/K" twice), so each press row must
