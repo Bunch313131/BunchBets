@@ -1,0 +1,65 @@
+# Add one golfer to a group from their GHIN number, without anyone's computer.
+#
+# Runs backend/add-golfer.mjs with the repository's secrets. The script refuses
+# unless GHIN returns the expected name for that number, and the golfer's
+# index comes straight from GHIN. Dry run unless "Write it" is ticked.
+#
+# Secrets (shared with refresh-indexes.yml):
+#   GHIN_CREDS, FIREBASE_KEY_PROD, FIREBASE_KEY_TEST
+name: Add golfer
+
+on:
+  workflow_dispatch:
+    inputs:
+      ghin:
+        description: 'GHIN number'
+        required: true
+      name:
+        description: 'Name exactly as GHIN has it (e.g. Michael Newell)'
+        required: true
+      group:
+        description: 'Group name or id'
+        required: true
+        default: 'ELMO'
+      project:
+        description: 'Which database'
+        type: choice
+        options: [PROD, TEST]
+        default: PROD
+      commit:
+        description: 'Write it (untick for a dry run)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  add:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Add ${{ inputs.name }} to ${{ inputs.group }} (${{ inputs.project }})
+        working-directory: backend
+        env:
+          GHIN_CREDS: ${{ secrets.GHIN_CREDS }}
+          FIREBASE_KEY: ${{ inputs.project == 'TEST' && secrets.FIREBASE_KEY_TEST || secrets.FIREBASE_KEY_PROD }}
+          IN_GHIN: ${{ inputs.ghin }}
+          IN_NAME: ${{ inputs.name }}
+          IN_GROUP: ${{ inputs.group }}
+          COMMIT_FLAG: ${{ inputs.commit && '--commit' || '' }}
+        run: |
+          if [ -z "$FIREBASE_KEY" ] || [ -z "$GHIN_CREDS" ]; then
+            echo "::error::GHIN_CREDS or the Firebase key secret is not set"; exit 1
+          fi
+          umask 077
+          printf '%s\n' "$GHIN_CREDS"   > "$RUNNER_TEMP/ghin-creds.txt"
+          printf '%s\n' "$FIREBASE_KEY" > "$RUNNER_TEMP/key.json"
+          node add-golfer.mjs "$RUNNER_TEMP/key.json" "$RUNNER_TEMP/ghin-creds.txt" "$IN_GHIN" "$IN_NAME" "$IN_GROUP" $COMMIT_FLAG
+      - name: Remove credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/ghin-creds.txt" "$RUNNER_TEMP/key.json"
