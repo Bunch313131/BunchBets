@@ -13,15 +13,19 @@
  * Created unclaimed and not discoverable, which is the only shape the rules
  * permit for someone who has not published themselves.
  *
+ * The group is given by id, or by its name ("ELMO") when no group has that id.
+ * Membership is the golfer's own poolGroupIds — what the app reads. The
+ * group's legacy poolGolferIds list is still appended to, for older tools.
+ *
  * Usage:
- *   node add-golfer.mjs <key.json> <ghin-creds.rtf> <ghinNumber> "<Expected Name>" <groupId> [--commit]
+ *   node add-golfer.mjs <key.json> <ghin-creds.rtf> <ghinNumber> "<Expected Name>" <group id or name> [--commit]
  */
 import { readFileSync } from 'node:fs';
 import crypto from 'node:crypto';
 
-const [keyPath, credsPath, NUMBER, EXPECTED, GROUP] = process.argv.slice(2);
+const [keyPath, credsPath, NUMBER, EXPECTED, GROUP_ARG] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const COMMIT = process.argv.includes('--commit');
-if (!GROUP) {
+if (!GROUP_ARG) {
   console.error('usage: add-golfer.mjs <key.json> <ghin-creds.rtf> <ghin> "<Name>" <groupId> [--commit]');
   process.exit(1);
 }
@@ -81,6 +85,23 @@ const ROOT = `projects/${key.project_id}/databases/(default)/documents`;
 const base = `https://firestore.googleapis.com/v1/${ROOT}`;
 const H = { Authorization: 'Bearer ' + access_token, 'Content-Type': 'application/json' };
 
+// The group: by id, else by name (case-insensitive), and it must be exactly one.
+let GROUP = GROUP_ARG;
+const byId = await fetch(`${base}/groups/${encodeURIComponent(GROUP_ARG)}`, { headers: H });
+if (!byId.ok) {
+  const all = ((await (await fetch(`${base}/groups?pageSize=300`, { headers: H })).json()).documents || []);
+  const hits = all.filter((d) => String(d.fields?.name?.stringValue || '').toLowerCase() === GROUP_ARG.toLowerCase());
+  if (hits.length !== 1) {
+    console.error(`no single group with id or name "${GROUP_ARG}" — groups: ` +
+      all.map((d) => `${d.fields?.name?.stringValue} (${d.name.split('/').pop()})`).join(', '));
+    process.exit(1);
+  }
+  GROUP = hits[0].name.split('/').pop();
+}
+const groupName = byId.ok ? (await byId.json()).fields?.name?.stringValue
+  : GROUP_ARG;
+console.log(`group: ${groupName} (id ${GROUP})`);
+
 const id = `ghin:${NUMBER}`;
 const existing = await fetch(`${base}/golfers/${id}`, { headers: H });
 if (existing.ok) {
@@ -102,7 +123,7 @@ const fields = {
 
 console.log(`\nwould write golfers/${id}:`);
 for (const [k, v] of Object.entries(fields)) console.log(`  ${k.padEnd(15)} ${JSON.stringify(Object.values(v)[0])}`);
-console.log(`and append ${id} to groups/${GROUP}.poolGolferIds`);
+console.log(`and make sure ${id} is in ${groupName}: golfers/${id}.poolGroupIds gains ${GROUP}`);
 
 if (!COMMIT) { console.log('\ndry run — rerun with --commit'); process.exit(0); }
 
@@ -113,17 +134,22 @@ if (!existing.ok) {
   console.log(`\ncreated golfers/${id}`);
 }
 
-// appendMissingElements, so a rerun cannot produce a duplicate entry.
+// appendMissingElements, so a rerun cannot produce a duplicate entry. The
+// golfer's own poolGroupIds is what the app's group pool query reads; an
+// existing golfer used to get only the group's legacy list, and so never
+// appeared in the group.
 const t = await fetch(`https://firestore.googleapis.com/v1/${ROOT}:commit`, {
   method: 'POST', headers: H,
-  body: JSON.stringify({ writes: [{ transform: {
-    document: `${ROOT}/groups/${GROUP}`,
-    fieldTransforms: [{ fieldPath: 'poolGolferIds',
-                        appendMissingElements: { values: [{ stringValue: id }] } }],
-  } }] }),
+  body: JSON.stringify({ writes: [
+    { transform: { document: `${ROOT}/golfers/${id}`,
+      fieldTransforms: [{ fieldPath: 'poolGroupIds', appendMissingElements: { values: [{ stringValue: GROUP }] } }] } },
+    { transform: { document: `${ROOT}/groups/${GROUP}`,
+      fieldTransforms: [{ fieldPath: 'poolGolferIds', appendMissingElements: { values: [{ stringValue: id }] } }] } },
+  ] }),
 });
-if (!t.ok) { console.error(`pool append failed ${t.status} ${(await t.text()).slice(0, 300)}`); process.exit(1); }
+if (!t.ok) { console.error(`group membership failed ${t.status} ${(await t.text()).slice(0, 300)}`); process.exit(1); }
 
-const grp = (await (await fetch(`${base}/groups/${GROUP}`, { headers: H })).json()).fields;
-const pool = (grp.poolGolferIds.arrayValue.values || []).map((v) => v.stringValue);
-console.log(`groups/${GROUP}.poolGolferIds now has ${pool.length}, includes ${id}: ${pool.includes(id)}`);
+const gf = (await (await fetch(`${base}/golfers/${encodeURIComponent(id)}`, { headers: H })).json()).fields || {};
+const groups = (gf.poolGroupIds?.arrayValue?.values || []).map((v) => v.stringValue);
+console.log(`golfers/${id}: ${gf.name?.stringValue}, index ${gf.currentIndex?.stringValue}, in ${groupName}: ${groups.includes(GROUP)}`);
+if (!groups.includes(GROUP)) process.exit(1);
